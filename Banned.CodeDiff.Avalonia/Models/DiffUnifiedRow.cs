@@ -9,37 +9,37 @@ public abstract class DiffUnifiedRow : DiffRow;
 public sealed class DiffUnifiedContentRow : DiffUnifiedRow
 {
     internal DiffUnifiedContentRow(string? oldNumber, string? newNumber, string text, DiffCellKind kind,
-                                    IReadOnlyList<DiffHighlight> highlights, DiffBrushSet brushes)
+                                   IReadOnlyList<DiffHighlight> highlights, DiffBrushSet brushes)
     {
         Highlights = highlights;
-        OldNumber = oldNumber;
-        NewNumber = newNumber;
-        Text = text;
-        Kind = kind;
+        OldNumber  = oldNumber;
+        NewNumber  = newNumber;
+        Text       = text;
+        Kind       = kind;
         Sign = kind switch
         {
-            DiffCellKind.Add => "+",
+            DiffCellKind.Add    => "+",
             DiffCellKind.Delete => "-",
-            _ => " ",
+            _                   => " ",
         };
 
         NumberBackground = kind switch
         {
-            DiffCellKind.Add => brushes.AddNumber,
+            DiffCellKind.Add    => brushes.AddNumber,
             DiffCellKind.Delete => brushes.DeleteNumber,
-            _ => brushes.ContextNumber,
+            _                   => brushes.ContextNumber,
         };
         ContentBackground = kind switch
         {
-            DiffCellKind.Add => brushes.AddContent,
+            DiffCellKind.Add    => brushes.AddContent,
             DiffCellKind.Delete => brushes.DeleteContent,
-            _ => brushes.ContextContent,
+            _                   => brushes.ContextContent,
         };
         HighlightBrush = kind switch
         {
-            DiffCellKind.Add => brushes.AddContentHighlight,
+            DiffCellKind.Add    => brushes.AddContentHighlight,
             DiffCellKind.Delete => brushes.DeleteContentHighlight,
-            _ => null,
+            _                   => null,
         };
         NumberForeground = brushes.NumberForeground;
     }
@@ -80,10 +80,10 @@ public sealed class DiffUnifiedHunkRow : DiffUnifiedRow
 {
     internal DiffUnifiedHunkRow(string hunkText, DiffBrushSet brushes)
     {
-        HunkText = hunkText;
-        NumberBackground = brushes.HunkNumber;
+        HunkText          = hunkText;
+        NumberBackground  = brushes.HunkNumber;
         ContentBackground = brushes.HunkContent;
-        HunkForeground = brushes.HunkForeground;
+        HunkForeground    = brushes.HunkForeground;
     }
 
     /// <summary>Gets the hunk header text (the "@@ -a,b +c,d @@" line).</summary>

@@ -30,27 +30,18 @@ public sealed class DiffFile
     }
 
     private SourceFile? _oldFileResult;
-
     private SourceFile? _newFileResult;
 
-    private List<RawDiff>? _diffListResults;
-
-    private List<DiffLine>? _diffLines;
-
+    private List<RawDiff>?             _diffListResults;
+    private List<DiffLine>?            _diffLines;
     private Dictionary<int, DiffLine>? _oldFileDiffLines;
-
     private Dictionary<int, DiffLine>? _newFileDiffLines;
+    private Dictionary<int, string>?   _oldFileLines;
+    private Dictionary<int, string>?   _newFileLines;
+    private Dictionary<int, bool>?     _oldFilePlaceholderLines;
+    private Dictionary<int, bool>?     _newFilePlaceholderLines;
 
-    private Dictionary<int, string>? _oldFileLines;
-
-    private Dictionary<int, string>? _newFileLines;
-
-    private Dictionary<int, bool>? _oldFilePlaceholderLines;
-
-    private Dictionary<int, bool>? _newFilePlaceholderLines;
-
-    private readonly List<SplitLineItem> _splitLeftLines = [];
-
+    private readonly List<SplitLineItem> _splitLeftLines  = [];
     private readonly List<SplitLineItem> _splitRightLines = [];
 
     private Dictionary<int, DiffLine>? _splitHunksLines;
@@ -60,46 +51,30 @@ public sealed class DiffFile
     private Dictionary<int, DiffLine>? _unifiedHunksLines;
 
     private bool _hasInitRaw;
-
     private bool _hasBuildSplit;
-
     private bool _hasBuildUnified;
 
     private bool _composeByDiff;
 
     // JS: set by _mergeFullBundle (bundle serialization is M2 scope)
-    private bool _composeByRange { get; set; }
-
-    private bool _hasExpandSplitAll;
-
-    private bool _hasExpandUnifiedAll;
-
-    public string OldFileName { get; private set; }
-
-    public string OldFileContent { get; private set; }
-
-    public string OldFileLang { get; private set; }
-
-    public string NewFileName { get; private set; }
-
-    public string NewFileContent { get; private set; }
-
-    public string NewFileLang { get; private set; }
+    private bool   _composeByRange { get; set; }
+    private bool   _hasExpandSplitAll;
+    private bool   _hasExpandUnifiedAll;
+    public  string OldFileName    { get; private set; }
+    public  string OldFileContent { get; private set; }
+    public  string OldFileLang    { get; private set; }
+    public  string NewFileName    { get; private set; }
+    public  string NewFileContent { get; private set; }
+    public  string NewFileLang    { get; private set; }
 
     public IReadOnlyList<string> DiffList { get; private set; }
 
-    public int DiffLineLength { get; private set; }
-
-    public int SplitLineLength { get; private set; }
-
-    public int UnifiedLineLength { get; private set; }
-
-    public int FileLineLength { get; private set; }
-
-    public int AdditionLength { get; private set; }
-
-    public int DeletionLength { get; private set; }
-
+    public int  DiffLineLength       { get; private set; }
+    public int  SplitLineLength      { get; private set; }
+    public int  UnifiedLineLength    { get; private set; }
+    public int  FileLineLength       { get; private set; }
+    public int  AdditionLength       { get; private set; }
+    public int  DeletionLength       { get; private set; }
     public bool HasSomeLineCollapsed { get; private set; }
 
     /// <summary>JS: subscribe/notifyAll — the render layer listens for model changes.</summary>
@@ -604,8 +579,8 @@ public sealed class DiffFile
             if (oldDiffLine == null && newDiffLine == null)
             {
                 if (_oldFilePlaceholderLines != null                                     &&
-                    _oldFilePlaceholderLines.TryGetValue(oldFileLineNumber, out var oph) && oph
-                 && _newFilePlaceholderLines != null                                     &&
+                    _oldFilePlaceholderLines.TryGetValue(oldFileLineNumber, out var oph) && oph &&
+                    _newFilePlaceholderLines != null                                     &&
                     _newFilePlaceholderLines.TryGetValue(newFileLineNumber, out var nph) && nph)
                 {
                     oldFileLineNumber++;
@@ -1137,11 +1112,9 @@ public sealed class DiffFile
             case HunkExpandDirection.All :
             {
                 UnhideUnifiedRange(info.StartHiddenIndex, info.EndHiddenIndex);
-                current.UnifiedInfo = info.WithHunkInfo(
-                                                        current.HunkInfo ?? new HunkInfo(),
+                current.UnifiedInfo = info.WithHunkInfo(current.HunkInfo ?? new HunkInfo(),
                                                         startHiddenIndex : info.EndHiddenIndex,
-                                                        plainText : current.Text
-                                                       );
+                                                        plainText : current.Text);
                 break;
             }
             case HunkExpandDirection.Down :

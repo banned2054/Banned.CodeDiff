@@ -24,13 +24,13 @@ public abstract class DiffSplitRow : DiffRow;
 /// <summary>One side of a split content row: line number, text, and resolved brushes.</summary>
 public sealed class DiffSplitCellModel
 {
-    internal DiffSplitCellModel(string? number, string text, DiffCellKind kind,
-                                IReadOnlyList<DiffHighlight> highlights, DiffBrushSet brushes)
+    internal DiffSplitCellModel(
+        string? number, string text, DiffCellKind kind, IReadOnlyList<DiffHighlight> highlights, DiffBrushSet brushes)
     {
         Highlights = highlights;
-        Number = number;
-        Text   = text;
-        Kind   = kind;
+        Number     = number;
+        Text       = text;
+        Kind       = kind;
         Sign = kind switch
         {
             DiffCellKind.Add    => "+",
@@ -47,11 +47,11 @@ public sealed class DiffSplitCellModel
         };
         HighlightBrush = highlights.Count > 0
             ? kind switch
-              {
-                  DiffCellKind.Add    => brushes.AddContentHighlight,
-                  DiffCellKind.Delete => brushes.DeleteContentHighlight,
-                  _                   => (IBrush?)null,
-              }
+            {
+                DiffCellKind.Add    => brushes.AddContentHighlight,
+                DiffCellKind.Delete => brushes.DeleteContentHighlight,
+                _                   => (IBrush?)null,
+            }
             : null;
         NumberForeground = brushes.NumberForeground;
     }

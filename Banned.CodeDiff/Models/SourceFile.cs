@@ -10,20 +10,16 @@ namespace Banned.CodeDiff.Models;
 /// </summary>
 public sealed class SourceFile(string row, string lang, string? fileName = null)
 {
-    public string Raw { get; } = Transform.ProcessTransformForFile(row);
-
-    public string Lang { get; } = lang;
-
+    public string  Raw      { get; } = Transform.ProcessTransformForFile(row);
+    public string  Lang     { get; } = lang;
     public string? FileName { get; } = fileName;
 
     /// <summary>JS: rawFile — 1-based line number → line content (trailing "\n" kept except on the last line).</summary>
     public Dictionary<int, string> RawFile { get; private set; } = new();
 
-    public bool HasDoRaw { get; private set; }
-
-    public int? RawLength { get; private set; }
-
-    public int MaxLineNumber { get; private set; }
+    public bool HasDoRaw      { get; private set; }
+    public int? RawLength     { get; private set; }
+    public int  MaxLineNumber { get; private set; }
 
     public void DoRaw()
     {

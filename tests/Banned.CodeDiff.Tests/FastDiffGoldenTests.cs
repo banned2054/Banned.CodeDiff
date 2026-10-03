@@ -42,8 +42,7 @@ public class FastDiffGoldenTests
         var actual = RunCase(c);
 
         var diffs = GoldenSupport.Compare(c["out"], GoldenSupport.DumpFastDiffResult(actual));
-        Assert.That(diffs.Count == 0,
-                    Is.True,
+        Assert.That(diffs.Count == 0, Is.True,
                     $"case #{index}: {string.Join("\n", diffs)}\ninput a={Truncate(a)} b={Truncate(b)}");
     }
 

@@ -6,149 +6,149 @@
     <Styles.Resources>
         <ResourceDictionary>
             <ControlTheme x:Key="{x:Type v:DiffView}" x:DataType="v:DiffView" TargetType="v:DiffView">
-        <Setter Property="Template">
-            <Setter.Value>
-                <ControlTemplate>
-                    <ScrollViewer Background="{TemplateBinding Background}"
-                                  HorizontalScrollBarVisibility="Disabled">
-                        <ItemsControl FontFamily="{TemplateBinding FontFamily}"
-                                      FontSize="{TemplateBinding FontSize}"
-                                      Foreground="{TemplateBinding Foreground}"
-                                      ItemsSource="{Binding Rows, RelativeSource={RelativeSource TemplatedParent}}">
-                            <ItemsControl.DataTemplates>
-                                <DataTemplate x:DataType="m:DiffSplitContentRow">
-                                    <Grid MinHeight="22"
-                                          ClipToBounds="True"
-                                          ColumnDefinitions="Auto,*,1,Auto,*">
-                                        <Border Width="{Binding $parent[v:DiffView].NumberColumnWidth}"
-                                                Background="{Binding Left.NumberBackground}">
-                                            <TextBlock Margin="10,2"
-                                                       Foreground="{Binding Left.NumberForeground}"
-                                                       Text="{Binding Left.Number}"
-                                                       TextAlignment="Right"
-                                                       VerticalAlignment="Center" />
-                                        </Border>
-                                        <Border Grid.Column="1"
-                                                Background="{Binding Left.ContentBackground}"
-                                                ClipToBounds="True">
-                                            <StackPanel Margin="4,2,0,2"
-                                                        Orientation="Horizontal"
-                                                        VerticalAlignment="Center">
-                                                <TextBlock Margin="0,0,6,0"
-                                                           Text="{Binding Left.Sign}" />
-                                                <v:DiffSegmentText Text="{Binding Left.Text}"
-                                                                   HighlightBrush="{Binding Left.HighlightBrush}"
-                                                                   Highlights="{Binding Left.Highlights}" />
-                                            </StackPanel>
-                                        </Border>
-                                        <Rectangle Grid.Column="2"
-                                                   Fill="{Binding SplitterBrush}" />
-                                        <Border Grid.Column="3"
-                                                Width="{Binding $parent[v:DiffView].NumberColumnWidth}"
-                                                Background="{Binding Right.NumberBackground}">
-                                            <TextBlock Margin="10,2"
-                                                       Foreground="{Binding Right.NumberForeground}"
-                                                       Text="{Binding Right.Number}"
-                                                       TextAlignment="Right"
-                                                       VerticalAlignment="Center" />
-                                        </Border>
-                                        <Border Grid.Column="4"
-                                                Background="{Binding Right.ContentBackground}"
-                                                ClipToBounds="True">
-                                            <StackPanel Margin="4,2,0,2"
-                                                        Orientation="Horizontal"
-                                                        VerticalAlignment="Center">
-                                                <TextBlock Margin="0,0,6,0"
-                                                           Text="{Binding Right.Sign}" />
-                                                <v:DiffSegmentText Text="{Binding Right.Text}"
-                                                                   HighlightBrush="{Binding Right.HighlightBrush}"
-                                                                   Highlights="{Binding Right.Highlights}" />
-                                            </StackPanel>
-                                        </Border>
-                                    </Grid>
-                                </DataTemplate>
-                                <DataTemplate x:DataType="m:DiffSplitHunkRow">
-                                    <Grid MinHeight="28"
-                                          ClipToBounds="True"
-                                          ColumnDefinitions="Auto,*,1,Auto,*">
-                                        <Border Width="{Binding $parent[v:DiffView].NumberColumnWidth}"
-                                                Background="{Binding NumberBackground}" />
-                                        <Border Grid.Column="1"
-                                                Background="{Binding ContentBackground}">
-                                            <TextBlock Margin="6,2,10,2"
-                                                       Foreground="{Binding HunkForeground}"
-                                                       Text="{Binding HunkText}"
-                                                       VerticalAlignment="Center" />
-                                        </Border>
-                                        <Rectangle Grid.Column="2"
-                                                   Fill="{Binding SplitterBrush}" />
-                                        <Border Grid.Column="3"
-                                                Width="{Binding $parent[v:DiffView].NumberColumnWidth}"
-                                                Background="{Binding SideBackground}" />
-                                        <Border Grid.Column="4"
-                                                Background="{Binding SideBackground}" />
-                                    </Grid>
-                                </DataTemplate>
-                                <DataTemplate x:DataType="m:DiffUnifiedContentRow">
-                    <Grid MinHeight="22"
-                          ClipToBounds="True"
-                          ColumnDefinitions="Auto,Auto,*">
-                        <Border Width="{Binding $parent[v:DiffView].NumberColumnWidth}"
-                                Background="{Binding NumberBackground}">
-                            <TextBlock Margin="10,2"
-                                       Foreground="{Binding NumberForeground}"
-                                       Text="{Binding OldNumber}"
-                                       TextAlignment="Right"
-                                       VerticalAlignment="Center" />
-                        </Border>
-                        <Border Grid.Column="1"
-                                Width="{Binding $parent[v:DiffView].NumberColumnWidth}"
-                                Background="{Binding NumberBackground}">
-                            <TextBlock Margin="10,2"
-                                       Foreground="{Binding NumberForeground}"
-                                       Text="{Binding NewNumber}"
-                                       TextAlignment="Right"
-                                       VerticalAlignment="Center" />
-                        </Border>
-                        <Border Grid.Column="2"
-                                Background="{Binding ContentBackground}"
-                                ClipToBounds="True">
-                            <StackPanel Margin="4,2,0,2"
-                                        Orientation="Horizontal"
-                                        VerticalAlignment="Center">
-                                <TextBlock Margin="0,0,6,0"
-                                           Text="{Binding Sign}" />
-                                <v:DiffSegmentText Text="{Binding Text}"
-                                                   HighlightBrush="{Binding HighlightBrush}"
-                                                   Highlights="{Binding Highlights}" />
-                            </StackPanel>
-                        </Border>
-                    </Grid>
-                </DataTemplate>
-                <DataTemplate x:DataType="m:DiffUnifiedHunkRow">
-                    <Grid MinHeight="28"
-                          ClipToBounds="True"
-                          ColumnDefinitions="Auto,Auto,*">
-                        <Border Width="{Binding $parent[v:DiffView].NumberColumnWidth}"
-                                Background="{Binding NumberBackground}" />
-                        <Border Grid.Column="1"
-                                Width="{Binding $parent[v:DiffView].NumberColumnWidth}"
-                                Background="{Binding NumberBackground}" />
-                        <Border Grid.Column="2"
-                                Background="{Binding ContentBackground}">
-                            <TextBlock Margin="6,2,10,2"
-                                       Foreground="{Binding HunkForeground}"
-                                       Text="{Binding HunkText}"
-                                       VerticalAlignment="Center" />
-                        </Border>
-                    </Grid>
-                </DataTemplate>
-            </ItemsControl.DataTemplates>
-                        </ItemsControl>
-                    </ScrollViewer>
-                </ControlTemplate>
-            </Setter.Value>
-        </Setter>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate>
+                            <ScrollViewer Background="{TemplateBinding Background}"
+                                          HorizontalScrollBarVisibility="Disabled">
+                                <ItemsControl FontFamily="{TemplateBinding FontFamily}"
+                                              FontSize="{TemplateBinding FontSize}"
+                                              Foreground="{TemplateBinding Foreground}"
+                                              ItemsSource="{Binding Rows, RelativeSource={RelativeSource TemplatedParent}}">
+                                    <ItemsControl.DataTemplates>
+                                        <DataTemplate x:DataType="m:DiffSplitContentRow">
+                                            <Grid MinHeight="22"
+                                                  ClipToBounds="True"
+                                                  ColumnDefinitions="Auto,*,1,Auto,*">
+                                                <Border Width="{Binding $parent[v:DiffView].NumberColumnWidth}"
+                                                        Background="{Binding Left.NumberBackground}">
+                                                    <TextBlock Margin="10,2"
+                                                               Foreground="{Binding Left.NumberForeground}"
+                                                               Text="{Binding Left.Number}"
+                                                               TextAlignment="Right"
+                                                               VerticalAlignment="Center" />
+                                                </Border>
+                                                <Border Grid.Column="1"
+                                                        Background="{Binding Left.ContentBackground}"
+                                                        ClipToBounds="True">
+                                                    <StackPanel Margin="4,2,0,2"
+                                                                Orientation="Horizontal"
+                                                                VerticalAlignment="Center">
+                                                        <TextBlock Margin="0,0,6,0"
+                                                                   Text="{Binding Left.Sign}" />
+                                                        <v:DiffSegmentText Text="{Binding Left.Text}"
+                                                                           HighlightBrush="{Binding Left.HighlightBrush}"
+                                                                           Highlights="{Binding Left.Highlights}" />
+                                                    </StackPanel>
+                                                </Border>
+                                                <Rectangle Grid.Column="2"
+                                                           Fill="{Binding SplitterBrush}" />
+                                                <Border Grid.Column="3"
+                                                        Width="{Binding $parent[v:DiffView].NumberColumnWidth}"
+                                                        Background="{Binding Right.NumberBackground}">
+                                                    <TextBlock Margin="10,2"
+                                                               Foreground="{Binding Right.NumberForeground}"
+                                                               Text="{Binding Right.Number}"
+                                                               TextAlignment="Right"
+                                                               VerticalAlignment="Center" />
+                                                </Border>
+                                                <Border Grid.Column="4"
+                                                        Background="{Binding Right.ContentBackground}"
+                                                        ClipToBounds="True">
+                                                    <StackPanel Margin="4,2,0,2"
+                                                                Orientation="Horizontal"
+                                                                VerticalAlignment="Center">
+                                                        <TextBlock Margin="0,0,6,0"
+                                                                   Text="{Binding Right.Sign}" />
+                                                        <v:DiffSegmentText Text="{Binding Right.Text}"
+                                                                           HighlightBrush="{Binding Right.HighlightBrush}"
+                                                                           Highlights="{Binding Right.Highlights}" />
+                                                    </StackPanel>
+                                                </Border>
+                                            </Grid>
+                                        </DataTemplate>
+                                        <DataTemplate x:DataType="m:DiffSplitHunkRow">
+                                            <Grid MinHeight="28"
+                                                  ClipToBounds="True"
+                                                  ColumnDefinitions="Auto,*,1,Auto,*">
+                                                <Border Width="{Binding $parent[v:DiffView].NumberColumnWidth}"
+                                                        Background="{Binding NumberBackground}" />
+                                                <Border Grid.Column="1"
+                                                        Background="{Binding ContentBackground}">
+                                                    <TextBlock Margin="6,2,10,2"
+                                                               Foreground="{Binding HunkForeground}"
+                                                               Text="{Binding HunkText}"
+                                                               VerticalAlignment="Center" />
+                                                </Border>
+                                                <Rectangle Grid.Column="2"
+                                                           Fill="{Binding SplitterBrush}" />
+                                                <Border Grid.Column="3"
+                                                        Width="{Binding $parent[v:DiffView].NumberColumnWidth}"
+                                                        Background="{Binding SideBackground}" />
+                                                <Border Grid.Column="4"
+                                                        Background="{Binding SideBackground}" />
+                                            </Grid>
+                                        </DataTemplate>
+                                        <DataTemplate x:DataType="m:DiffUnifiedContentRow">
+                                            <Grid MinHeight="22"
+                                                  ClipToBounds="True"
+                                                  ColumnDefinitions="Auto,Auto,*">
+                                                <Border Width="{Binding $parent[v:DiffView].NumberColumnWidth}"
+                                                        Background="{Binding NumberBackground}">
+                                                    <TextBlock Margin="10,2"
+                                                               Foreground="{Binding NumberForeground}"
+                                                               Text="{Binding OldNumber}"
+                                                               TextAlignment="Right"
+                                                               VerticalAlignment="Center" />
+                                                </Border>
+                                                <Border Grid.Column="1"
+                                                        Width="{Binding $parent[v:DiffView].NumberColumnWidth}"
+                                                        Background="{Binding NumberBackground}">
+                                                    <TextBlock Margin="10,2"
+                                                               Foreground="{Binding NumberForeground}"
+                                                               Text="{Binding NewNumber}"
+                                                               TextAlignment="Right"
+                                                               VerticalAlignment="Center" />
+                                                </Border>
+                                                <Border Grid.Column="2"
+                                                        Background="{Binding ContentBackground}"
+                                                        ClipToBounds="True">
+                                                    <StackPanel Margin="4,2,0,2"
+                                                                Orientation="Horizontal"
+                                                                VerticalAlignment="Center">
+                                                        <TextBlock Margin="0,0,6,0"
+                                                                   Text="{Binding Sign}" />
+                                                        <v:DiffSegmentText Text="{Binding Text}"
+                                                                           HighlightBrush="{Binding HighlightBrush}"
+                                                                           Highlights="{Binding Highlights}" />
+                                                    </StackPanel>
+                                                </Border>
+                                            </Grid>
+                                        </DataTemplate>
+                                        <DataTemplate x:DataType="m:DiffUnifiedHunkRow">
+                                            <Grid MinHeight="28"
+                                                  ClipToBounds="True"
+                                                  ColumnDefinitions="Auto,Auto,*">
+                                                <Border Width="{Binding $parent[v:DiffView].NumberColumnWidth}"
+                                                        Background="{Binding NumberBackground}" />
+                                                <Border Grid.Column="1"
+                                                        Width="{Binding $parent[v:DiffView].NumberColumnWidth}"
+                                                        Background="{Binding NumberBackground}" />
+                                                <Border Grid.Column="2"
+                                                        Background="{Binding ContentBackground}">
+                                                    <TextBlock Margin="6,2,10,2"
+                                                               Foreground="{Binding HunkForeground}"
+                                                               Text="{Binding HunkText}"
+                                                               VerticalAlignment="Center" />
+                                                </Border>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.DataTemplates>
+                                </ItemsControl>
+                            </ScrollViewer>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
             </ControlTheme>
         </ResourceDictionary>
     </Styles.Resources>

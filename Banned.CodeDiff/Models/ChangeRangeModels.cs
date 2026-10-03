@@ -8,10 +8,8 @@ public readonly record struct TextRange(int Location, int Length);
 /// <summary>Port of change-range.ts IRange (relativeChanges result).</summary>
 public sealed class LineRange
 {
-    public TextRange Range { get; set; }
-
-    public bool? HasLineChange { get; set; }
-
+    public TextRange      Range         { get; set; }
+    public bool?          HasLineChange { get; set; }
     public NewLineSymbol? NewLineSymbol { get; set; }
 }
 
@@ -21,9 +19,7 @@ public sealed record DiffItem(int Type, string Str, int StartIndex, int EndIndex
 /// <summary>Port of change-range.ts DiffRange (diffChanges result).</summary>
 public sealed class DiffRange
 {
-    public IReadOnlyList<DiffItem> Range { get; set; } = [];
-
-    public bool? HasLineChange { get; set; }
-
-    public NewLineSymbol? NewLineSymbol { get; set; }
+    public IReadOnlyList<DiffItem> Range         { get; set; } = [];
+    public bool?                   HasLineChange { get; set; }
+    public NewLineSymbol?          NewLineSymbol { get; set; }
 }

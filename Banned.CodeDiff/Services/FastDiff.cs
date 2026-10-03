@@ -644,9 +644,9 @@ public static class FastDiff
                 // Eliminate an equality that is smaller or equal to the edits on both
                 // sides of it.
                 if (
-                    lastEquality        != null
-                 && lastEquality.Length <= Math.Max(lengthInsertions1, lengthDeletions1)
-                 && lastEquality.Length <= Math.Max(lengthInsertions2, lengthDeletions2)
+                    lastEquality        != null                                          &&
+                    lastEquality.Length <= Math.Max(lengthInsertions1, lengthDeletions1) &&
+                    lastEquality.Length <= Math.Max(lengthInsertions2, lengthDeletions2)
                 )
                 {
                     // Duplicate record.

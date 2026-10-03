@@ -91,10 +91,10 @@ public sealed class DiffHunkHeader(int oldStartLine, int oldLineCount, int newSt
     {
         // NOTE: kept identical to the JS original, which compares oldStartLine twice
         // and never compares newLineCount.
-        return OldStartLine == other.OldStartLine
-            && OldLineCount == other.OldLineCount
-            && NewStartLine == other.NewStartLine
-            && OldStartLine == other.OldStartLine;
+        return OldStartLine == other.OldStartLine &&
+               OldLineCount == other.OldLineCount &&
+               NewStartLine == other.NewStartLine &&
+               OldStartLine == other.OldStartLine;
     }
 }
 
@@ -127,12 +127,12 @@ public sealed class DiffHunk(
             return true;
         }
 
-        return Header.Equals(other.Header)
-            && UnifiedDiffStart == other.UnifiedDiffStart
-            && UnifiedDiffEnd   == other.UnifiedDiffEnd
-            && ExpansionType    == other.ExpansionType
-            && Lines.Count      == other.Lines.Count
-            && Lines.Zip(other.Lines, (xLine, o) => xLine.Equals(o)).All(x => x);
+        return Header.Equals(other.Header)                &&
+               UnifiedDiffStart == other.UnifiedDiffStart &&
+               UnifiedDiffEnd   == other.UnifiedDiffEnd   &&
+               ExpansionType    == other.ExpansionType    &&
+               Lines.Count      == other.Lines.Count      &&
+               Lines.Zip(other.Lines, (xLine, o) => xLine.Equals(o)).All(x => x);
     }
 }
 
@@ -247,13 +247,6 @@ public class DiffLine(
 public static class DiffLineExtensions
 {
     /// <summary>Port of parse/diff-line.ts checkDiffLineIncludeChange.</summary>
-    public static bool CheckDiffLineIncludeChange(this DiffLine? diffLine)
-    {
-        if (diffLine is null)
-        {
-            return false;
-        }
-
-        return diffLine.Type == DiffLineType.Add || diffLine.Type == DiffLineType.Delete;
-    }
+    public static bool CheckDiffLineIncludeChange(this DiffLine? diffLine) =>
+        diffLine?.Type is DiffLineType.Add or DiffLineType.Delete;
 }

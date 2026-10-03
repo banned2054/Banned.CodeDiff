@@ -13,34 +13,24 @@ public class UnitTests
     {
         // the exact fast-diff@1.3.0 output (its README example is outdated)
         var result = FastDiff.Diff("Hello world.", "Goodbye world.");
-        Assert.That(result.Select(t => (t.Op, t.Text)).ToArray(),
-                    Is.EqualTo(
-                               new[]
-                               {
-                                   (FastDiff.Delete, "Hell"),
-                                   (FastDiff.Insert, "G"),
-                                   (FastDiff.Equal, "o"),
-                                   (FastDiff.Insert, "odbye"),
-                                   (FastDiff.Equal, " world."),
-                               }
-                              )
-                   );
+        Assert.That(result.Select(t => (t.Op, t.Text)).ToArray(), Is.EqualTo([
+            (FastDiff.Delete, "Hell"),
+            (FastDiff.Insert, "G"),
+            (FastDiff.Equal, "o"),
+            (FastDiff.Insert, "odbye"),
+            (FastDiff.Equal, " world.")
+        ]));
     }
 
     [Test]
     public void FastDiff_SemanticCleanupMergesEdits()
     {
         var result = FastDiff.Diff("The cat came.", "The came.", (int?)null, cleanup : true);
-        Assert.That(result.Select(t => (t.Op, t.Text)).ToArray(),
-                    Is.EqualTo(
-                               new[]
-                               {
-                                   (FastDiff.Equal, "The "),
-                                   (FastDiff.Delete, "cat "),
-                                   (FastDiff.Equal, "came."),
-                               }
-                              )
-                   );
+        Assert.That(result.Select(t => (t.Op, t.Text)).ToArray(), Is.EqualTo([
+            (FastDiff.Equal, "The "),
+            (FastDiff.Delete, "cat "),
+            (FastDiff.Equal, "came.")
+        ]));
     }
 
     [Test]
@@ -73,9 +63,7 @@ public class UnitTests
     [Test]
     public void DiffParser_ParsesBasicHunk()
     {
-        var rd = DiffParser.Shared.Parse(
-                                         "--- a/f.txt\n+++ b/f.txt\n@@ -1,2 +1,2 @@\n-old\n+new\n keep\n"
-                                        );
+        var rd = DiffParser.Shared.Parse("--- a/f.txt\n+++ b/f.txt\n@@ -1,2 +1,2 @@\n-old\n+new\n keep\n");
         Assert.That(rd.IsBinary, Is.False);
         Assert.That(rd.Hunks, Has.Count.EqualTo(1));
         Assert.That(rd.Hunks[0].Lines.Count, Is.EqualTo(4)); // hunk header + -old + +new + " keep"
@@ -85,9 +73,7 @@ public class UnitTests
     [Test]
     public void DiffParser_DetectsBinary()
     {
-        var rd = DiffParser.Shared.Parse(
-                                         "diff --git a/x b/x\nBinary files a/x and b/x differ\n"
-                                        );
+        var rd = DiffParser.Shared.Parse("diff --git a/x b/x\nBinary files a/x and b/x differ\n");
         Assert.That(rd.IsBinary, Is.True);
         Assert.That(rd.Hunks, Is.Empty);
     }
@@ -95,8 +81,7 @@ public class UnitTests
     [Test]
     public void DiffParser_ThrowsOnInvalidHunkHeader()
     {
-        Assert.Catch<Exception>(() => DiffParser.Shared.Parse("--- a/f\n+++ b/f\n@@ not a header @@\n a\n")
-                               );
+        Assert.Catch<Exception>(() => DiffParser.Shared.Parse("--- a/f\n+++ b/f\n@@ not a header @@\n a\n"));
     }
 
     [Test]

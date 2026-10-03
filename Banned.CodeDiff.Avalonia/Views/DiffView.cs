@@ -163,13 +163,12 @@ public sealed class DiffView : TemplatedControl
         {
             switch (row)
             {
-                case DiffSplitContentRow split:
+                case DiffSplitContentRow split :
                     digits = Math.Max(digits,
                                       Math.Max(split.Left.Number?.Length ?? 0, split.Right.Number?.Length ?? 0));
                     break;
-                case DiffUnifiedContentRow unified:
-                    digits = Math.Max(digits,
-                                      Math.Max(unified.OldNumber?.Length ?? 0, unified.NewNumber?.Length ?? 0));
+                case DiffUnifiedContentRow unified :
+                    digits = Math.Max(digits, Math.Max(unified.OldNumber?.Length ?? 0, unified.NewNumber?.Length ?? 0));
                     break;
             }
         }

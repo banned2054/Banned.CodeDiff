@@ -10,41 +10,32 @@ namespace Banned.CodeDiff.Models;
 public sealed class SyntaxNodeProperties
 {
     public List<string>? ClassName { get; set; }
-
-    public string? Style { get; set; }
+    public string?       Style     { get; set; }
 }
 
 public sealed class SyntaxNode
 {
-    public string Type { get; set; } = "";
-
-    public string Value { get; set; } = "";
-
-    public int LineNumber { get; set; }
-
-    public int StartIndex { get; set; }
-
-    public int EndIndex { get; set; }
+    public string Type       { get; set; } = "";
+    public string Value      { get; set; } = "";
+    public int    LineNumber { get; set; }
+    public int    StartIndex { get; set; }
+    public int    EndIndex   { get; set; }
 
     public SyntaxNodeProperties? Properties { get; set; }
-
-    public List<SyntaxNode>? Children { get; set; }
+    public List<SyntaxNode>?     Children   { get; set; }
 }
 
 public sealed class SyntaxNodeSpan
 {
-    public SyntaxNode Node { get; set; } = new();
-
+    public SyntaxNode  Node    { get; set; } = new();
     public SyntaxNode? Wrapper { get; set; }
 }
 
 public sealed class SyntaxLine
 {
-    public string Value { get; set; } = "";
-
-    public int LineNumber { get; set; }
-
-    public int ValueLength { get; set; }
+    public string Value       { get; set; } = "";
+    public int    LineNumber  { get; set; }
+    public int    ValueLength { get; set; }
 
     public List<SyntaxNodeSpan>? NodeList { get; set; }
 }

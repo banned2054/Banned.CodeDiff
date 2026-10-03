@@ -3,7 +3,7 @@ using Banned.CodeDiff.Services;
 using System.Text.Json.Nodes;
 using NUnit.Framework;
 
-[assembly: Parallelizable(ParallelScope.None)]
+[assembly : Parallelizable(ParallelScope.None)]
 
 namespace Banned.CodeDiff.Tests;
 
@@ -179,16 +179,14 @@ public static class GoldenSupport
         var arr = new JsonArray();
         foreach (var i in r.Range)
         {
-            arr.Add(
-                    new JsonObject
-                    {
-                        ["type"]       = i.Type,
-                        ["str"]        = i.Str,
-                        ["startIndex"] = i.StartIndex,
-                        ["endIndex"]   = i.EndIndex,
-                        ["length"]     = i.Length,
-                    }
-                   );
+            arr.Add(new JsonObject
+            {
+                ["type"]       = i.Type,
+                ["str"]        = i.Str,
+                ["startIndex"] = i.StartIndex,
+                ["endIndex"]   = i.EndIndex,
+                ["length"]     = i.Length,
+            });
         }
 
         return new JsonObject

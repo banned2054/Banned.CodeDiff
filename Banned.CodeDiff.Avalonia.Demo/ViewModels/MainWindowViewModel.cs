@@ -10,11 +10,11 @@ namespace Banned.CodeDiff.Avalonia.Demo.ViewModels;
 
 public sealed class MainWindowViewModel : INotifyPropertyChanged
 {
-    private string        _diffText = SampleDiff.ProgramCs;
-    private DiffFile?     _diffFile;
-    private bool          _isDark;
-    private DiffViewMode  _viewMode = DiffViewMode.Split;
-    private bool          _isFastDiff = true;
+    private string       _diffText = SampleDiff.ProgramCs;
+    private DiffFile?    _diffFile;
+    private bool         _isDark;
+    private DiffViewMode _viewMode   = DiffViewMode.Split;
+    private bool         _isFastDiff = true;
 
     public MainWindowViewModel()
     {
@@ -37,11 +37,9 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         get => _isFastDiff;
         set
         {
-            if (Set(ref _isFastDiff, value))
-            {
-                TemplateOptions.SetEnableFastDiffTemplate(value);
-                Render();
-            }
+            if (!Set(ref _isFastDiff, value)) return;
+            TemplateOptions.SetEnableFastDiffTemplate(value);
+            Render();
         }
     }
 
@@ -127,8 +125,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             return;
         }
 
-        var file = new DiffFile(oldFileName: "", oldFileContent: "", newFileName: "", newFileContent: "",
-                                diffList: [DiffText]);
+        var file = new DiffFile(oldFileName : "", oldFileContent : "", newFileName : "", newFileContent : "",
+                                diffList : [DiffText]);
         file.Init();
         file.BuildSplitDiffLines();
         file.BuildUnifiedDiffLines();

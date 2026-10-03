@@ -17,7 +17,7 @@ internal static class DiffUnifiedRowBuilder
     public static IReadOnlyList<DiffRow> Build(DiffFile file, ThemeVariant variant)
     {
         var brushes = DiffBrushes.Get(variant);
-        var rows = new List<DiffRow>(file.UnifiedLineLength);
+        var rows    = new List<DiffRow>(file.UnifiedLineLength);
 
         for (var index = 0; index < file.UnifiedLineLength; index++)
         {
@@ -37,9 +37,9 @@ internal static class DiffUnifiedRowBuilder
             var lineText = (line.Value ?? diff.Text)?.TrimEnd('\r', '\n') ?? string.Empty;
             var kind = diff.Type switch
             {
-                DiffLineType.Add => DiffCellKind.Add,
+                DiffLineType.Add    => DiffCellKind.Add,
                 DiffLineType.Delete => DiffCellKind.Delete,
-                _ => DiffCellKind.Context,
+                _                   => DiffCellKind.Context,
             };
 
             rows.Add(new DiffUnifiedContentRow(line.OldLineNumber?.ToString(), line.NewLineNumber?.ToString(),

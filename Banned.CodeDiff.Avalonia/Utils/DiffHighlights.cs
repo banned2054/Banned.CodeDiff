@@ -24,12 +24,12 @@ internal static class DiffHighlights
             var operation = kind == DiffCellKind.Add ? FastDiff.Insert : FastDiff.Delete;
 
             return fastDiff.Range
-                          .Where(item => item.Type == operation && item.Length > 0)
-                          .Select(item => new DiffHighlight(item.StartIndex, item.Length))
-                          .ToArray();
+                           .Where(item => item.Type == operation && item.Length > 0)
+                           .Select(item => new DiffHighlight(item.StartIndex, item.Length))
+                           .ToArray();
         }
 
-        if (diff.Changes is { HasLineChange: true } relative && relative.Range.Length > 0)
+        if (diff.Changes is { HasLineChange: true, Range.Length: > 0 } relative)
         {
             return [new DiffHighlight(relative.Range.Location, relative.Range.Length)];
         }

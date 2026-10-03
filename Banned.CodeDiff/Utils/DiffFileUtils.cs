@@ -12,7 +12,7 @@ public static class DiffFileUtils
 
         var splitLines = new List<DiffSplitLineItem>();
 
-        foreach (var index in DiffTool.NumIterator(splitLineLength, (int i) => i))
+        foreach (var index in DiffTool.NumIterator(splitLineLength, i => i))
         {
             splitLines.Add(new DiffSplitLineItem(DiffFileLineType.Hunk, index, index + 1));
 
@@ -30,7 +30,7 @@ public static class DiffFileUtils
     {
         var splitLineLength = diffFile.SplitLineLength;
 
-        return (from index in DiffTool.NumIterator(splitLineLength, (int i) => i)
+        return (from index in DiffTool.NumIterator(splitLineLength, i => i)
                 let splitLeftLine = diffFile.GetSplitLeftLine(index)
                 let splitRightLine = diffFile.GetSplitRightLine(index)
                 where splitLeftLine?.IsHidden != true && splitRightLine?.IsHidden != true

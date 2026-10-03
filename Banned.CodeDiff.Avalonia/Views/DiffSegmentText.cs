@@ -94,15 +94,15 @@ public sealed class DiffSegmentText : Control
     }
 
     /// <summary>Computes the highlight rectangles for the given ranges within a text layout.</summary>
-    internal static IEnumerable<Rect> ComputeHighlightRects(TextLayout layout, int textLength,
-                                                            IReadOnlyList<DiffHighlight> highlights)
+    internal static IEnumerable<Rect> ComputeHighlightRects(
+        TextLayout layout, int textLength, IReadOnlyList<DiffHighlight> highlights)
     {
         var height = GetLayoutHeight(layout);
 
         foreach (var highlight in highlights)
         {
             var start = Math.Clamp(highlight.Start, 0, textLength);
-            var end = Math.Clamp(highlight.Start + highlight.Length, start, textLength);
+            var end   = Math.Clamp(highlight.Start + highlight.Length, start, textLength);
 
             if (end == start)
             {
@@ -125,12 +125,7 @@ public sealed class DiffSegmentText : Control
     protected override Size MeasureOverride(Size availableSize)
     {
         var layout = GetLayout();
-        var width = 0.0;
-
-        foreach (var line in layout.TextLines)
-        {
-            width = Math.Max(width, line.WidthIncludingTrailingWhitespace);
-        }
+        var width  = layout.TextLines.Select(line => line.WidthIncludingTrailingWhitespace).Prepend(0.0).Max();
 
         return new Size(width, GetLayoutHeight(layout));
     }
@@ -160,14 +155,7 @@ public sealed class DiffSegmentText : Control
 
     private static double GetLayoutHeight(TextLayout layout)
     {
-        var height = 0.0;
-
-        foreach (var line in layout.TextLines)
-        {
-            height += line.Height;
-        }
-
-        return height;
+        return layout.TextLines.Sum(line => line.Height);
     }
 
     private TextLayout GetLayout()
@@ -177,8 +165,7 @@ public sealed class DiffSegmentText : Control
             return _layout;
         }
 
-        _layout = new TextLayout(Text ?? string.Empty, new Typeface(FontFamily), FontSize,
-                                 Foreground ?? Brushes.Black);
+        _layout = new TextLayout(Text ?? string.Empty, new Typeface(FontFamily), FontSize, Foreground ?? Brushes.Black);
 
         return _layout;
     }
@@ -190,8 +177,10 @@ public sealed class DiffSegmentText : Control
 
         // The cached layout depends on text, font, and foreground properties; highlight ranges
         // and brushes only affect rendering.
-        if (change.Property == TextProperty || change.Property == FontFamilyProperty ||
-            change.Property == FontSizeProperty || change.Property == ForegroundProperty)
+        if (change.Property == TextProperty       ||
+            change.Property == FontFamilyProperty ||
+            change.Property == FontSizeProperty   ||
+            change.Property == ForegroundProperty)
         {
             _layout = null;
         }
