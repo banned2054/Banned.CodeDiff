@@ -21,8 +21,11 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         // Word-level ranges are computed at DiffFile.Init() time; the global switch must be set
         // before the first render. Toggling re-creates the file.
         TemplateOptions.SetEnableFastDiffTemplate(_isFastDiff);
-        RenderCommand     = new RelayCommand(Render);
-        LoadSampleCommand = new RelayCommand(LoadSample);
+        RenderCommand          = new RelayCommand(Render);
+        LoadSampleCommand      = new RelayCommand(LoadSample);
+        LoadExpandableCommand  = new RelayCommand(LoadExpandable);
+        ExpandAllCommand       = new RelayCommand(ExpandAll);
+        CollapseAllCommand     = new RelayCommand(CollapseAll);
         Render();
     }
 
@@ -31,6 +34,12 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     public ICommand RenderCommand { get; }
 
     public ICommand LoadSampleCommand { get; }
+
+    public ICommand LoadExpandableCommand { get; }
+
+    public ICommand ExpandAllCommand { get; }
+
+    public ICommand CollapseAllCommand { get; }
 
     public bool IsFastDiff
     {
@@ -54,12 +63,27 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         get => _diffFile;
         set
         {
+            if (_diffFile != null)
+            {
+                _diffFile.Updated -= OnFileUpdated;
+            }
+
             if (Set(ref _diffFile, value))
             {
+                if (_diffFile != null)
+                {
+                    // Expansion mutates the model in place; refresh stats and button states.
+                    _diffFile.Updated += OnFileUpdated;
+                }
+
                 OnPropertyChanged(nameof(Stats));
+                OnPropertyChanged(nameof(CanExpandHunks));
             }
         }
     }
+
+    /// <summary>Gets whether the current model still has collapsed hunks that can be expanded.</summary>
+    public bool CanExpandHunks => DiffFile?.HasSomeLineCollapsed == true && DiffFile.GetExpandEnabled();
 
     public DiffViewMode ViewMode
     {
@@ -101,9 +125,14 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         {
             var file = DiffFile;
 
-            return file == null
-                ? "无模型"
-                : $"+{file.AdditionLength} -{file.DeletionLength} / split {file.SplitLineLength} 行 / unified {file.UnifiedLineLength} 行";
+            if (file == null)
+            {
+                return "无模型";
+            }
+
+            var collapsed = file.HasSomeLineCollapsed ? " / 有折叠行" : "";
+
+            return $"+{file.AdditionLength} -{file.DeletionLength} / split {file.SplitLineLength} 行 / unified {file.UnifiedLineLength} 行{collapsed}";
         }
     }
 
@@ -111,6 +140,34 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     {
         DiffText = SampleDiff.ProgramCs;
         Render();
+    }
+
+    private void LoadExpandable()
+    {
+        var (oldContent, newContent, diffText) = ExpandableSample.Create();
+
+        DiffText = diffText;
+
+        // Real file contents (not paste-only) keep the expand state machine enabled.
+        var file = new DiffFile(oldFileName : "Sample.cs", oldFileContent : oldContent,
+                                newFileName : "Sample.cs", newFileContent : newContent,
+                                diffList    : [diffText]);
+        file.Init();
+        file.BuildSplitDiffLines();
+        file.BuildUnifiedDiffLines();
+        DiffFile = file;
+    }
+
+    private void ExpandAll() =>
+        DiffFile?.OnAllExpand(_viewMode == DiffViewMode.Unified ? ExpandViewMode.Unified : ExpandViewMode.Split);
+
+    private void CollapseAll() =>
+        DiffFile?.OnAllCollapse(_viewMode == DiffViewMode.Unified ? ExpandViewMode.Unified : ExpandViewMode.Split);
+
+    private void OnFileUpdated()
+    {
+        OnPropertyChanged(nameof(Stats));
+        OnPropertyChanged(nameof(CanExpandHunks));
     }
 
     private void Render()

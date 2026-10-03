@@ -40,9 +40,30 @@
 - Unified view mode: `DiffView.ViewMode` switches between split (default) and unified rendering —
   single column with dual (old/new) line-number columns, deleted lines above the added ones,
   matching the GitHub unified layout. The demo gains a mode toggle and dual-model statistics.
+- Hunk expand/collapse UI (M4): hunk placeholder rows now carry expand buttons wired to the
+  model's expand API through `DiffView.ExpandHunkUpCommand` / `ExpandHunkDownCommand` /
+  `ExpandHunkAllCommand`. Button placement mirrors the upstream git-diff-view components:
+  a single Expand Up on the first hunk, a single Expand Down on the trailing collapse strip,
+  a single Expand All when fewer than 40 hidden lines remain, and a stacked down+up pair
+  otherwise. The synthetic trailing hunk (previously not rendered) now shows as the bottom
+  expand strip. Expansion requires a model built with real old/new file contents; paste-only
+  diffs render hunk rows without buttons.
+- Row virtualization (M4): the row list renders through a `VirtualizingStackPanel`; a 10k-line
+  model (785 visible rows) realizes only ~25 containers in an 800×600 viewport.
+- Behavior alignment (M4): a hunk placeholder row is only rendered while it still hides lines
+  (`startHiddenIndex < endHiddenIndex`), matching GitHub and the upstream view components —
+  in particular the leading `@@` header of a hunk starting at line 1 is no longer shown, and
+  fully expanded placeholders disappear. Raw gap lines revealed by expansion (no `DiffLine`,
+  but a line number and file text) now render as plain context rows instead of empty cells.
+- Demo: new "load expandable sample" action (a synthetic multi-hunk file with real contents
+  exercising every button shape) and expand-all / collapse-all toolbar buttons.
 - Hosts include the control theme explicitly — Avalonia does not auto-discover control-library
   themes: `<StyleInclude Source="avares://Banned.CodeDiff.Avalonia/Themes/Generic.axaml" />`.
-- New headless UI test suite (`tests/Banned.CodeDiff.Avalonia.Tests`, xunit.v3 +
-  Avalonia.Headless.XUnit): asserts the theme loads through the consumer-style include, the
+- New headless UI test suite (`tests/Banned.CodeDiff.Avalonia.Tests`, now NUnit +
+  `Avalonia.Headless.NUnit`): asserts the theme loads through the consumer-style include, the
   template instantiates, row models build correctly in both split and unified modes, mode
-  switching rebuilds rows, and palette colors match the upstream values.
+  switching rebuilds rows, and palette colors match the upstream values. Grown to 22 cases with
+  M4 (expand directions, button placement, command wiring, virtualization, 10k-line performance
+  baseline); the test app now also loads the Fluent theme like a real consumer — previously
+  only the library theme was loaded, so `ItemsControl`/`Button` never received themes and row
+  containers were never instantiated.

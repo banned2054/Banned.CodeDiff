@@ -1,3 +1,4 @@
+using System.Windows.Input;
 using Avalonia;
 using Avalonia.Controls.Primitives;
 using Avalonia.Media;
@@ -53,6 +54,10 @@ public sealed class DiffView : TemplatedControl
         SetCurrentValue(FontFamilyProperty, new FontFamily("Menlo, Consolas, monospace"));
         SetCurrentValue(FontSizeProperty, 14.0);
 
+        ExpandHunkUpCommand   = new HunkExpandCommand(this, HunkExpandDirection.Up);
+        ExpandHunkDownCommand = new HunkExpandCommand(this, HunkExpandDirection.Down);
+        ExpandHunkAllCommand  = new HunkExpandCommand(this, HunkExpandDirection.All);
+
         // Brushes are baked into the rows; switch palette by rebuilding on theme changes.
         ActualThemeVariantChanged += (_, _) => RebuildRows();
     }
@@ -76,6 +81,18 @@ public sealed class DiffView : TemplatedControl
 
     /// <summary>Gets the resolved line-number column width for the current rows and font size.</summary>
     public double NumberColumnWidth => _numberColumnWidth;
+
+    /// <summary>Gets the command that expands a hunk row up by the compose length (40 lines);
+    /// the command parameter is the <see cref="DiffSplitHunkRow"/> or <see cref="DiffUnifiedHunkRow"/>.</summary>
+    public ICommand ExpandHunkUpCommand { get; }
+
+    /// <summary>Gets the command that expands a hunk row down by the compose length (40 lines);
+    /// the command parameter is the <see cref="DiffSplitHunkRow"/> or <see cref="DiffUnifiedHunkRow"/>.</summary>
+    public ICommand ExpandHunkDownCommand { get; }
+
+    /// <summary>Gets the command that fully expands a hunk row; the command parameter is the
+    /// <see cref="DiffSplitHunkRow"/> or <see cref="DiffUnifiedHunkRow"/>.</summary>
+    public ICommand ExpandHunkAllCommand { get; }
 
     /// <inheritdoc />
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
@@ -177,5 +194,33 @@ public sealed class DiffView : TemplatedControl
                              Math.Ceiling(digits * FontSize * MonospaceCharWidthRatio) + NumberColumnPadding);
 
         SetAndRaise(NumberColumnWidthProperty, ref _numberColumnWidth, width);
+    }
+
+    /// <summary>Relays a hunk-row expand click to the model's expand API for the active view mode.</summary>
+    private sealed class HunkExpandCommand(DiffView owner, HunkExpandDirection direction) : ICommand
+    {
+        // Availability is encoded in the row's button visibility, so there is no per-row state to
+        // invalidate; the empty handlers keep command sources subscribed without overhead.
+        public event EventHandler? CanExecuteChanged
+        {
+            add { }
+            remove { }
+        }
+
+        public bool CanExecute(object? parameter) =>
+            owner.DiffFile?.GetExpandEnabled() == true && parameter is DiffSplitHunkRow or DiffUnifiedHunkRow;
+
+        public void Execute(object? parameter)
+        {
+            switch (parameter)
+            {
+                case DiffSplitHunkRow split :
+                    owner.DiffFile?.OnSplitHunkExpand(direction, split.HunkIndex);
+                    break;
+                case DiffUnifiedHunkRow unified :
+                    owner.DiffFile?.OnUnifiedHunkExpand(direction, unified.HunkIndex);
+                    break;
+            }
+        }
     }
 }

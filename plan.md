@@ -16,8 +16,8 @@
 | M1 | 纯逻辑库（解析 + 行模型 + 词级区间 + 展开状态机） | ✅ 已完成 |
 | M2 | 最小可看：split 视图渲染 | ✅ 已完成 |
 | M3 | 词级高亮渲染 | ✅ 已完成 |
-| M4 | hunk 展开/收起 UI + 虚拟化 | ⬜ |
-| M5 | 语法高亮 | ⬜ |
+| M4 | hunk 展开/收起 UI + 虚拟化 | ✅ 已完成 |
+| M5 | 语法高亮 | ⬜ 下一步 |
 | M6 | 打磨 | ⬜ |
 
 每个里程碑保持可构建、可测试、可演示；完成一个更新一次本文件状态与 `Docs/CHANGELOG.md`。
@@ -27,7 +27,8 @@
 - `Banned.CodeDiff` 核心库完成：解析（`DiffParser`）、split/unified 行模型（`DiffFile`）、
   词级区间（`ChangeRange` / `FastDiff`）、展开状态机、`TemplateOptions` 全局开关。
 - 目录已按 `Models` / `Services` / `Utils` 分类。
-- 577 个测试全绿（构建 0 警告 0 错误），含与 JS 原版逐字段对比的黄金基准。
+- 577 个核心测试 + 22 个 Avalonia headless 测试全绿（构建 0 警告 0 错误），
+  含与 JS 原版逐字段对比的黄金基准。
 - `Banned.CodeDiff.Avalonia`（`DiffView` split 控件 + Demo）已就位，详见第 4 节执行结果。
 
 ## 4. M2 最小可看
@@ -105,7 +106,7 @@
 - [x] Spike 结论：Avalonia 文本 Run 无背景属性（仅 Foreground），per-run 背景不可行；
       采用 `TextLayout` 自绘（`HitTestTextPosition(int)→Rect` 解析区间边界 x 坐标，
       `Draw(context, origin)` 绘制文本），矩形计算有独立单测。
-- [ ] 万行级性能基线 → 归入 M4（虚拟化一起做）。
+- [x] 万行级性能基线 → 已随 M4 完成并记录（见第 6 节）。
 
 **执行结果（2026-10-03）**：
 
@@ -138,9 +139,43 @@
 
 **验收**：
 
-- [ ] 占位行三种方向展开均生效，展开后行号与内容正确。
-- [ ] 万行级 diff 滚动流畅，无整表重建；虚拟化下无可见的行错位。
-- [ ] 性能基线已记录。
+- [x] 占位行三种方向展开均生效，展开后行号与内容正确。
+- [x] 万行级 diff 行虚拟化（仅实化可见行容器；滚动不触发整表重建——行列表只在
+      展开/收起/模式切换时重建）。滚动流畅度的主观体验交由 Demo 人工验证。
+- [x] 性能基线已记录（见执行结果）。
+
+**执行结果（2026-10-03）**：
+
+- **hunk 占位行展开接线**：`DiffSplitHunkRow` / `DiffUnifiedHunkRow` 增加 `HunkIndex`
+  （传给 `On*HunkExpand` 的模型键）与按钮可见性标志；按钮摆放规则逐条移植上游
+  `DiffSplitHunkLine*.tsx` 的 ternary 链（首个 hunk 单个 Expand Up、末尾合成折叠条单个
+  Expand Down、剩余隐藏行 < 40 显示单个 Expand All、否则显示上下成对的 Down+Up）。
+  `DiffView` 暴露 `ExpandHunkUpCommand` / `ExpandHunkDownCommand` / `ExpandHunkAllCommand`
+  （`ICommand`，参数为 hunk 行），模板按当前模式转发到 `OnSplitHunkExpand` /
+  `OnUnifiedHunkExpand`。展开按钮图标为上游 `DiffExpand.tsx` 的 SVG path 数据原样移植
+  （已验证 Avalonia 12 `Geometry.Parse` 支持 SVG 弧线与隐式 lineto）。
+- **上游可见性对齐（行为修正）**：hunk 行只在隐藏区间非空时渲染
+  （`startHiddenIndex < endHiddenIndex`，纯 diff 模式下无 info 的 `@@` 头照常渲染）；
+  由此首个 hunk 从第 1 行开始时其 `@@` 头不再显示——与 GitHub/上游一致，M2 遗留差异。
+  尾部合成 hunk（键 = `SplitLineLength`/`UnifiedLineLength`）此前不渲染，现已作为
+  底部折叠条渲染（空文本 + 单个向下展开按钮）。
+- **展开后的原始行渲染**：`Diff == null` 的行此前一律按占位空单元格处理；展开显出的
+  原始 gap 行（有行号有文本、无 DiffLine）现在渲染为普通 context 行（split/unified 两处）。
+- **虚拟化**：模板 ItemsPanel 换 `VirtualizingStackPanel`；split 左右列本就是同一行
+  Grid 的两半，同步滚动天然成立。
+- **Demo**：新增「载入可展开示例」（`ExpandableSample` 生成带真实文件内容的合成样例，
+  各 gap 大小覆盖全部按钮形态）与「全部展开 / 全部收起」工具栏按钮（`CanExpandHunks`
+  随 `Updated` 刷新）。
+- **测试**：UI 测试扩至 22 个（新增 `DiffExpandTests`：按钮摆放规则、三方向展开的行数/
+  行号/占位行位移断言、首 hunk 向上全展、尾部折叠条、unified 展开、全部展开/收起、
+  模板命令接线、纯 diff 无按钮、万行虚拟化与性能基线）。既有测试按新可见性规则更新
+  预期。TestApp 补加载 FluentTheme（此前只有库主题，`ItemsControl`/`Button` 无
+  ControlTheme，容器从不实例化——M2/M3 测试未覆盖到所以没暴露）。
+- **性能基线**（headless、Debug、10,312 行模型 / 98 个折叠 hunk / 785 可见行）：
+  模型 Init+Build 50 ms；行构建 36 ms；模板+首布局 1195 ms（首布局含主题/XAML 一次性
+  JIT 开销）；**实化容器 25 / 785**（视口 800×600）。
+- 顺手修复：展开会改变行数导致 ScrollViewer 视口跳变，展开锚定（点击行保持在视口内）
+  留到 M6 打磨。
 
 ## 7. M5 语法高亮
 

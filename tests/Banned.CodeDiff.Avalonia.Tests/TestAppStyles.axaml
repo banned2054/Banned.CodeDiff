@@ -1,5 +1,9 @@
 <Styles xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="Banned.CodeDiff.Avalonia.Tests.TestAppStyles">
+    <!-- Mirror a real consumer app: a base theme (Fluent) supplies ControlThemes for the
+         built-in controls the DiffView template uses (ItemsControl, Button), then the control
+         library theme is included explicitly like the README shows. -->
+    <StyleInclude Source="avares://Avalonia.Themes.Fluent/FluentTheme.axaml" />
     <StyleInclude Source="avares://Banned.CodeDiff.Avalonia/Themes/Generic.axaml" />
 </Styles>

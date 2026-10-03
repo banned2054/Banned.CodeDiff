@@ -1,4 +1,5 @@
 using Avalonia.Media;
+using Banned.CodeDiff.Models;
 
 namespace Banned.CodeDiff.Avalonia.Models;
 
@@ -75,16 +76,45 @@ public sealed class DiffUnifiedContentRow : DiffUnifiedRow
     public IBrush NumberForeground { get; }
 }
 
-/// <summary>A unified collapsed hunk placeholder row showing the "@@" header.</summary>
+/// <summary>A unified collapsed hunk placeholder row showing the "@@" header with expand affordances.</summary>
 public sealed class DiffUnifiedHunkRow : DiffUnifiedRow
 {
-    internal DiffUnifiedHunkRow(string hunkText, DiffBrushSet brushes)
+    internal DiffUnifiedHunkRow(int hunkIndex, DiffLine hunk, bool expandEnabled, int composeLength,
+                                string hunkText, DiffBrushSet brushes)
     {
+        HunkIndex = hunkIndex;
+
+        var info = hunk.UnifiedInfo;
+        var hiddenCount = info != null ? info.EndHiddenIndex - info.StartHiddenIndex : 0;
+        var (up, down, all) = DiffHunkExpand.Buttons(expandEnabled && info != null, hunk.IsFirst == true,
+                                                     hunk.IsLast == true, hiddenCount, composeLength);
+
+        IsExpandEnabled = expandEnabled && info != null;
+        CanExpandUp     = up;
+        CanExpandDown   = down;
+        CanExpandAll    = all;
         HunkText          = hunkText;
         NumberBackground  = brushes.HunkNumber;
         ContentBackground = brushes.HunkContent;
         HunkForeground    = brushes.HunkForeground;
+        ExpandForeground  = brushes.NumberForeground;
     }
+
+    /// <summary>Gets the unified model index of the hunk — the key passed to
+    /// <see cref="Services.DiffFile.OnUnifiedHunkExpand"/>.</summary>
+    public int HunkIndex { get; }
+
+    /// <summary>Gets whether the model allows expansion at all (not composed from diff-only text).</summary>
+    public bool IsExpandEnabled { get; }
+
+    /// <summary>Gets whether the Expand Up button is shown.</summary>
+    public bool CanExpandUp { get; }
+
+    /// <summary>Gets whether the Expand Down button is shown.</summary>
+    public bool CanExpandDown { get; }
+
+    /// <summary>Gets whether the Expand All button is shown.</summary>
+    public bool CanExpandAll { get; }
 
     /// <summary>Gets the hunk header text (the "@@ -a,b +c,d @@" line).</summary>
     public string HunkText { get; }
@@ -97,4 +127,7 @@ public sealed class DiffUnifiedHunkRow : DiffUnifiedRow
 
     /// <summary>Gets the hunk header text brush.</summary>
     public IBrush HunkForeground { get; }
+
+    /// <summary>Gets the expand-button icon brush (upstream plainLineNumberColor).</summary>
+    public IBrush ExpandForeground { get; }
 }

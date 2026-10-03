@@ -22,9 +22,9 @@ Development follows the milestones in [plan.md](./plan.md):
 |---|---|---|
 | M1 | Core logic library `Banned.CodeDiff` | Done — 577 tests green, golden-tested against the JS original |
 | M2 | `Banned.CodeDiff.Avalonia` minimal split view | Done — `DiffView` control + demo |
-| M3 | Word-level highlight rendering | Next |
-| M4 | Hunk expand/collapse + virtualization | Planned |
-| M5 | Syntax highlighting (TextMateSharp) | Planned |
+| M3 | Word-level highlight rendering | Done |
+| M4 | Hunk expand/collapse + virtualization | Done |
+| M5 | Syntax highlighting (TextMateSharp) | Next |
 | M6 | Themes, wrap mode, copy | Planned |
 
 ## Features
@@ -40,9 +40,10 @@ Development follows the milestones in [plan.md](./plan.md):
 - Global template switches — `TemplateOptions` toggles fast-diff word-level diff and template building
 - Zero UI dependencies in the core library
 - `DiffView` Avalonia control — read-only GitHub-style diff view with line-level add/delete
-  backgrounds, word-level highlight blocks inside changed lines, collapsed hunk placeholders, and
-  light/dark palettes; renders split (two columns) or unified (single column, dual line numbers,
-  deleted lines above the added ones)
+  backgrounds, word-level highlight blocks inside changed lines, collapsed hunk placeholders with
+  clickable expand affordances (expand up / down / all, matching GitHub's placement rules), row
+  virtualization for large diffs, and light/dark palettes; renders split (two columns) or unified
+  (single column, dual line numbers, deleted lines above the added ones)
 
 ## Installation
 
@@ -80,6 +81,14 @@ it stays in sync through the model's `Updated` event. `ViewMode` switches betwee
 line-number columns, renders collapsed hunk placeholder rows, switches its light/dark palette
 with `ActualThemeVariant`, and paints word-level highlight blocks inside changed lines when
 `DiffLine.DiffChanges` (fast-diff) or `DiffLine.Changes` (relative) ranges are available.
+
+Hunk placeholder rows carry expand buttons (single Expand Up on the first hunk, Expand Down on
+the trailing strip, a stacked down+up pair or a single Expand All otherwise — mirroring the
+upstream git-diff-view placement rules) wired to the model's expand API through the control's
+`ExpandHunkUpCommand` / `ExpandHunkDownCommand` / `ExpandHunkAllCommand`. Expansion requires a
+model built with real old/new file contents: paste-only diffs (empty file contents) compose from
+the diff text itself and cannot expand. Rows render through a `VirtualizingStackPanel`, so large
+diffs realize only the visible slice of containers.
 
 Run the included demo to paste a diff and see it rendered:
 
@@ -175,6 +184,11 @@ file.OnSplitHunkExpand(HunkExpandDirection.All, 0);
 // unified counterpart: file.OnUnifiedHunkExpand(HunkExpandDirection.Up, index);
 ```
 
+The `DiffView` control wires this automatically: each hunk placeholder row exposes the
+appropriate expand buttons, and `file.OnAllExpand` / `OnAllCollapse` can be bound to toolbar
+actions (the demo does this). A leading `@@` header whose hidden range is empty (a hunk starting
+at line 1) is not rendered, matching GitHub and the upstream view components.
+
 ## Usage Notes
 
 - `DiffParser.Shared` and `TemplateOptions` are globally stateful (matching the JS original); do not
@@ -192,9 +206,11 @@ dotnet test tests/Banned.CodeDiff.Avalonia.Tests/Banned.CodeDiff.Avalonia.Tests.
 ```
 
 577 core cases (NUnit, golden tests comparing field-by-field against the JS original
-`@git-diff-view/core` + `fast-diff@1.3.0`) — plus 11 headless Avalonia UI tests (NUnit +
+`@git-diff-view/core` + `fast-diff@1.3.0`) — plus 22 headless Avalonia UI tests (NUnit +
 Avalonia.Headless.NUnit) covering the control theme, template instantiation, row building in
-both view modes, mode switching, and word-level highlight ranges and rectangle computation.
+both view modes, mode switching, word-level highlight ranges and rectangle computation, hunk
+expansion in all directions with button-placement rules, command wiring, and row virtualization
+on a 10k-line model.
 
 ## 📜 Changelog
 

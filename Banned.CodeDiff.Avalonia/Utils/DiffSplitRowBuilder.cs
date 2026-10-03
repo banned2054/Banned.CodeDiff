@@ -8,9 +8,10 @@ namespace Banned.CodeDiff.Avalonia.Utils;
 /// <summary>
 /// Builds the flat row list rendered by <see cref="Views.DiffView"/> from a built
 /// <see cref="DiffFile"/> split model. Mirrors the upstream render loop: for each split row index,
-/// the collapsed hunk placeholder (when present) is emitted above the content row, and hidden rows
-/// are skipped. The synthetic trailing hunk keyed at <c>SplitLineLength</c> is out of the content
-/// range and intentionally not rendered (expand rows are M4 scope).
+/// the collapsed hunk placeholder (when present and still hiding lines) is emitted above the
+/// content row, and hidden rows are skipped. The synthetic trailing hunk is keyed at
+/// <c>SplitLineLength</c> — one past the last content row — so the loop runs one extra index to
+/// render the bottom expand strip.
 /// </summary>
 internal static class DiffSplitRowBuilder
 {
@@ -19,12 +20,14 @@ internal static class DiffSplitRowBuilder
         var brushes = DiffBrushes.Get(variant);
         var rows    = new List<DiffRow>(file.SplitLineLength);
 
-        for (var index = 0; index < file.SplitLineLength; index++)
+        for (var index = 0; index <= file.SplitLineLength; index++)
         {
-            if (file.GetSplitHunkLine(index) is { } hunk)
+            if (file.GetSplitHunkLine(index) is { } hunk &&
+                DiffHunkExpand.IsRendered(hunk.SplitInfo, file.GetIsPureDiffRender()))
             {
                 var text = hunk.SplitInfo?.PlainText is { Length: > 0 } plainText ? plainText : hunk.Text;
-                rows.Add(new DiffSplitHunkRow(text.TrimEnd(), brushes));
+                rows.Add(new DiffSplitHunkRow(index, hunk, file.GetExpandEnabled(),
+                                              DiffFile.GetCurrentComposeLength(), text.TrimEnd(), brushes));
             }
 
             var left  = file.GetSplitLeftLine(index);
@@ -49,10 +52,19 @@ internal static class DiffSplitRowBuilder
     private static DiffSplitCellModel CreateCell(SplitLineItem? item, DiffBrushSet brushes)
     {
         // Placeholder half-rows (the opposite side holds an add/delete) are bare SplitLineItem
-        // instances with a null Diff; content rows always carry their DiffLine.
-        if (item?.Diff is not { } diff)
+        // instances with no line number; content rows always carry their DiffLine.
+        if (item == null || (item.Diff == null && item.LineNumber == null))
         {
             return new DiffSplitCellModel(null, string.Empty, DiffCellKind.Empty, [], brushes);
+        }
+
+        // Raw gap lines revealed by expansion have no DiffLine — they render as plain context
+        // cells from the file content.
+        if (item.Diff is not { } diff)
+        {
+            return new DiffSplitCellModel(item.LineNumber?.ToString(),
+                                          (item.Value ?? string.Empty).TrimEnd('\r', '\n'),
+                                          DiffCellKind.Context, [], brushes);
         }
 
         var number = item.LineNumber?.ToString();

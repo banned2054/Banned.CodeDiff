@@ -22,9 +22,9 @@ hunk 展开以及语法高亮。
 |---|---|---|
 | M1 | 核心逻辑库 `Banned.CodeDiff` | 已完成 — 577 测试全绿，含与 JS 原版对比的黄金基准 |
 | M2 | `Banned.CodeDiff.Avalonia` 最小 split 视图 | 已完成 — `DiffView` 控件 + Demo |
-| M3 | 词级高亮渲染 | 下一步 |
-| M4 | hunk 展开/收起 + 虚拟化 | 计划中 |
-| M5 | 语法高亮（TextMateSharp） | 计划中 |
+| M3 | 词级高亮渲染 | 已完成 |
+| M4 | hunk 展开/收起 + 虚拟化 | 已完成 |
+| M5 | 语法高亮（TextMateSharp） | 下一步 |
 | M6 | 深浅主题、wrap、复制 | 计划中 |
 
 ## 功能
@@ -40,8 +40,9 @@ hunk 展开以及语法高亮。
 - **全局模板开关** — `TemplateOptions` 控制 fast-diff 词级 diff 与模板构建的启用。
 - 核心库**零 UI 依赖**。
 - **`DiffView` Avalonia 控件** — 只读 GitHub 风格 diff 视图，行级增删背景色、
-  变更行内的词级高亮块、收起 hunk 占位行、明暗两套配色；支持 split（双栏）与
-  unified（单栏、双行号、删除行在新增行上方）两种视图模式。
+  变更行内的词级高亮块、带可点击展开入口的收起 hunk 占位行（up / down / all，
+  按钮摆放规则与上游/GitHub 一致）、面向大 diff 的行虚拟化、明暗两套配色；
+  支持 split（双栏）与 unified（单栏、双行号、删除行在新增行上方）两种视图模式。
 
 ## 安装
 
@@ -76,6 +77,13 @@ dotnet add package Banned.CodeDiff.Avalonia
 并通过模型的 `Updated` 事件保持同步。`ViewMode` 在默认的 `Split` 与 `Unified`
 （单栏统一视图）之间切换。控件默认等宽字体、行号列宽自适应、渲染收起 hunk 占位行，
 并随 `ActualThemeVariant` 切换明暗配色。
+
+hunk 占位行自带展开按钮（首个 hunk 单个向上展开、文件尾部折叠条单个向下展开、
+其余按剩余隐藏行数显示「上下成对」或单个全部展开——与上游 git-diff-view 的摆放规则
+一致），经由控件的 `ExpandHunkUpCommand` / `ExpandHunkDownCommand` /
+`ExpandHunkAllCommand` 接到模型的展开 API。展开需要以真实新旧文件内容构建模型：
+纯 diff 文本（文件内容为空）从 diff 自身合成两侧，无法展开。行渲染走
+`VirtualizingStackPanel`，大 diff 只实化可见范围内的行容器。
 
 运行 Demo 体验「粘贴 diff → 出界面」：
 
@@ -169,6 +177,10 @@ file.OnSplitHunkExpand(HunkExpandDirection.All, 0);
 // 单栏对应：file.OnUnifiedHunkExpand(HunkExpandDirection.Up, index);
 ```
 
+`DiffView` 控件已自动接线：每个 hunk 占位行会显示对应方向的展开按钮，
+`file.OnAllExpand` / `OnAllCollapse` 可绑定到工具栏动作（Demo 即如此）。
+隐藏区间为空的首个 `@@` 头（hunk 从第 1 行开始）不渲染，与 GitHub 及上游一致。
+
 ## 使用注意
 
 - `DiffParser.Shared` 与 `TemplateOptions` 是全局有状态的（与 JS 原版一致），
@@ -186,8 +198,9 @@ dotnet test tests/Banned.CodeDiff.Avalonia.Tests/Banned.CodeDiff.Avalonia.Tests.
 ```
 
 577 个核心用例（NUnit，含与 JS 原版 `@git-diff-view/core` + `fast-diff@1.3.0` 逐字段对比的黄金基准）
-+ 11 个 headless Avalonia UI 测试（NUnit + Avalonia.Headless.NUnit，覆盖主题加载、模板实例化、
-两种视图行构建、模式切换、词级高亮区间与矩形计算）。
++ 22 个 headless Avalonia UI 测试（NUnit + Avalonia.Headless.NUnit，覆盖主题加载、模板实例化、
+两种视图行构建、模式切换、词级高亮区间与矩形计算、三方向 hunk 展开与按钮摆放规则、
+命令接线，以及万行级模型的行虚拟化）。
 
 ## 📜 更新日志
 
