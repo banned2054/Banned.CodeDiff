@@ -17,4 +17,19 @@
 
 ### Banned.CodeDiff.Avalonia
 
-- In development (M2): minimal split view rendering — not yet published.
+- Initial implementation (M2): the `DiffView` control renders a read-only, GitHub-style split view
+  from a `DiffFile` — line-level add/delete/context backgrounds, collapsed hunk placeholder rows,
+  a monospace default font (`Menlo, Consolas, monospace`, 14px), auto-sized line-number columns,
+  and light/dark palettes mirroring the upstream color variables. Assigning the model invokes
+  `Init`/`BuildSplitDiffLines` on demand and the view refreshes through the model's `Updated` event.
+- Demo app (`Banned.CodeDiff.Avalonia.Demo`): paste a unified diff text and render it, with a
+  built-in sample, light/dark theme toggle, and add/delete statistics.
+- Unified view mode: `DiffView.ViewMode` switches between split (default) and unified rendering —
+  single column with dual (old/new) line-number columns, deleted lines above the added ones,
+  matching the GitHub unified layout. The demo gains a mode toggle and dual-model statistics.
+- Hosts include the control theme explicitly — Avalonia does not auto-discover control-library
+  themes: `<StyleInclude Source="avares://Banned.CodeDiff.Avalonia/Themes/Generic.axaml" />`.
+- New headless UI test suite (`tests/Banned.CodeDiff.Avalonia.Tests`, xunit.v3 +
+  Avalonia.Headless.XUnit): asserts the theme loads through the consumer-style include, the
+  template instantiates, row models build correctly in both split and unified modes, mode
+  switching rebuilds rows, and palette colors match the upstream values.

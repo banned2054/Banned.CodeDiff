@@ -71,6 +71,32 @@
   调整公开 API 必须由用户明确授权。
 - 每个 `public` 顶级类型放独立文件；只服务于单个实现的私有类型保留在所属类中。
 
+## Avalonia 控件库约定
+
+- **Avalonia 不会自动加载控件库的 `Themes/Generic.axaml`**（与 WPF 不同，没有 `ThemeInfo`
+  魔法发现）。库的全部 ControlTheme 集中在 `Themes/Generic.axaml` 一个入口，由宿主在
+  `Application.Styles` 显式 `StyleInclude`（README 双语使用示例必须包含这一行）。
+- **该文件根元素必须是 `Styles`**，ControlTheme 放在 `Styles.Resources` 的
+  `ResourceDictionary` 内并带 `x:Key="{x:Type ...}"`（Fluent 主题同款结构）。根写成
+  `ResourceDictionary` 会让宿主构建期报 AVLN2000（expected IStyle）；`Styles` 直接子元素
+  不能带 x:Key。
+- 新增控件的主题一律加入该字典，不另开第二入口；`TextBox.Watermark` 在 Avalonia 12 已改名
+  `PlaceholderText`。
+- `DiffFile` 等核心类型位于 `Banned.CodeDiff.Services` 命名空间（不是 Models）。
+- UI 回归测试在 `tests/Banned.CodeDiff.Avalonia.Tests`（xunit.v3 + Avalonia.Headless.XUnit；
+  该包依赖 **xunit.v3** 而非 xunit 2.x，注册方式为
+  `[assembly: AvaloniaTestApplication(typeof(Builder))]` + 静态 `BuildAvaloniaApp()`，
+  测试方法用 `[AvaloniaFact]`）。TestApp 以消费方同款 StyleInclude 加载主题，
+  控件模板/渲染改动的验证以这些测试为准，不依赖截图。
+
+## 验证纪律（血泪教训）
+
+- 构建输出**不允许 tail/grep 截断到看不见错误**；判断成败必须看退出码或显式 grep error，
+  防止"构建失败但跑着旧二进制"的假绿。
+- UI 截图验证必须用**中立提问**的图像分析（不得把预期写进问题），且"通过"结论要有可交叉
+  验证的程序化证据（如界面统计文本与独立控制台输出一致）；视觉模型可能部分真实部分编造，
+  每项结论独立核实。
+
 ## 构建与验证
 
 - 本地验证使用 `dotnet build Banned.CodeDiff.slnx`，需要时追加 `-c Release`。

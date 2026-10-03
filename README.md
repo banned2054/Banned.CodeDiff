@@ -21,8 +21,8 @@ Development follows the milestones in [plan.md](./plan.md):
 | Milestone | Scope | State |
 |---|---|---|
 | M1 | Core logic library `Banned.CodeDiff` | Done — 577 tests green, golden-tested against the JS original |
-| M2 | `Banned.CodeDiff.Avalonia` minimal split view | Next |
-| M3 | Word-level highlight rendering | Planned |
+| M2 | `Banned.CodeDiff.Avalonia` minimal split view | Done — `DiffView` control + demo |
+| M3 | Word-level highlight rendering | Next |
 | M4 | Hunk expand/collapse + virtualization | Planned |
 | M5 | Syntax highlighting (TextMateSharp) | Planned |
 | M6 | Themes, wrap mode, copy | Planned |
@@ -39,6 +39,9 @@ Development follows the milestones in [plan.md](./plan.md):
   and an `Updated` notification the host uses to refresh the view
 - Global template switches — `TemplateOptions` toggles fast-diff word-level diff and template building
 - Zero UI dependencies in the core library
+- `DiffView` Avalonia control — read-only GitHub-style diff view with line-level add/delete
+  backgrounds, collapsed hunk placeholders, and light/dark palettes; renders split (two columns)
+  or unified (single column, dual line numbers, deleted lines above the added ones)
 
 ## Installation
 
@@ -46,9 +49,41 @@ Development follows the milestones in [plan.md](./plan.md):
 dotnet add package Banned.CodeDiff.Avalonia
 ```
 
-> The control package is not published yet (M2 in development). Until then, consume the core logic
-> library via a project reference to `Banned.CodeDiff/Banned.CodeDiff.csproj`. Whether
-> `Banned.CodeDiff` also ships as a standalone NuGet package has not been decided yet.
+> The control package is not published yet. Until then, consume the libraries via project references
+> (`Banned.CodeDiff.Avalonia` brings the core library with it). Whether `Banned.CodeDiff` also ships
+> as a standalone NuGet package has not been decided yet.
+
+## Avalonia Control
+
+`DiffView` renders a `DiffFile` as a read-only split view. Include the control theme once in your
+application (Avalonia does not auto-discover control-library themes), then place the control:
+
+```xml
+<Application xmlns="https://github.com/avaloniaui">
+    <Application.Styles>
+        <FluentTheme />
+        <StyleInclude Source="avares://Banned.CodeDiff.Avalonia/Themes/Generic.axaml" />
+    </Application.Styles>
+</Application>
+```
+
+```xml
+<Window xmlns:views="clr-namespace:Banned.CodeDiff.Avalonia.Views;assembly=Banned.CodeDiff.Avalonia">
+    <views:DiffView DiffFile="{Binding DiffFile}" />
+</Window>
+```
+
+Assign a `DiffFile` (built or not — the control invokes `Init` / `Build*DiffLines` on demand) and
+it stays in sync through the model's `Updated` event. `ViewMode` switches between the default
+`Split` and `Unified` rendering. The control uses a monospace font by default, auto-sizes the
+line-number columns, renders collapsed hunk placeholder rows, and switches its light/dark palette
+with `ActualThemeVariant`.
+
+Run the included demo to paste a diff and see it rendered:
+
+```powershell
+dotnet run --project Banned.CodeDiff.Avalonia.Demo/Banned.CodeDiff.Avalonia.Demo.csproj
+```
 
 ## Basic Usage
 
@@ -151,10 +186,12 @@ file.OnSplitHunkExpand(HunkExpandDirection.All, 0);
 
 ```powershell
 dotnet test tests/Banned.CodeDiff.Tests/Banned.CodeDiff.Tests.csproj
+dotnet test tests/Banned.CodeDiff.Avalonia.Tests/Banned.CodeDiff.Avalonia.Tests.csproj
 ```
 
-577 cases, including golden tests that compare field-by-field against the JS original
-(`@git-diff-view/core` + `fast-diff@1.3.0`).
+577 core cases — including golden tests comparing field-by-field against the JS original
+(`@git-diff-view/core` + `fast-diff@1.3.0`) — plus 6 headless Avalonia UI tests covering the
+control theme, template instantiation, row building in both view modes, and mode switching.
 
 ## 📜 Changelog
 

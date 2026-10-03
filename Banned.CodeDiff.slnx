@@ -1,4 +1,7 @@
 <Solution>
   <Project Path="Banned.CodeDiff/Banned.CodeDiff.csproj" />
+  <Project Path="Banned.CodeDiff.Avalonia/Banned.CodeDiff.Avalonia.csproj" />
+  <Project Path="Banned.CodeDiff.Avalonia.Demo/Banned.CodeDiff.Avalonia.Demo.csproj" />
   <Project Path="tests/Banned.CodeDiff.Tests/Banned.CodeDiff.Tests.csproj" />
+  <Project Path="tests/Banned.CodeDiff.Avalonia.Tests/Banned.CodeDiff.Avalonia.Tests.csproj" />
 </Solution>

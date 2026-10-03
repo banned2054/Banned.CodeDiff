@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <IsAotCompatible>true</IsAotCompatible>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <PackageId>Banned.CodeDiff.Avalonia</PackageId>
+    <Version>0.1.0</Version>
+    <Title>Banned.CodeDiff.Avalonia</Title>
+    <Authors>banned</Authors>
+    <Description>Avalonia diff viewer controls rendering GitHub-style split and unified views.</Description>
+    <PackageTags>avalonia;diff;viewer;git;split;unified</PackageTags>
+    <RepositoryUrl>https://github.com/banned2054/Banned.CodeDiff</RepositoryUrl>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="12.1.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Banned.CodeDiff\Banned.CodeDiff.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\README.md" Pack="true" PackagePath="\" />
+    <None Include="..\NOTICE" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>

@@ -21,8 +21,8 @@ hunk 展开以及语法高亮。
 | 里程碑 | 范围 | 状态 |
 |---|---|---|
 | M1 | 核心逻辑库 `Banned.CodeDiff` | 已完成 — 577 测试全绿，含与 JS 原版对比的黄金基准 |
-| M2 | `Banned.CodeDiff.Avalonia` 最小 split 视图 | 下一步 |
-| M3 | 词级高亮渲染 | 计划中 |
+| M2 | `Banned.CodeDiff.Avalonia` 最小 split 视图 | 已完成 — `DiffView` 控件 + Demo |
+| M3 | 词级高亮渲染 | 下一步 |
 | M4 | hunk 展开/收起 + 虚拟化 | 计划中 |
 | M5 | 语法高亮（TextMateSharp） | 计划中 |
 | M6 | 深浅主题、wrap、复制 | 计划中 |
@@ -39,6 +39,9 @@ hunk 展开以及语法高亮。
   每次变更触发 `Updated` 事件，宿主刷新界面即可。
 - **全局模板开关** — `TemplateOptions` 控制 fast-diff 词级 diff 与模板构建的启用。
 - 核心库**零 UI 依赖**。
+- **`DiffView` Avalonia 控件** — 只读 GitHub 风格 diff 视图，行级增删背景色、
+  收起 hunk 占位行、明暗两套配色；支持 split（双栏）与 unified（单栏、双行号、
+  删除行在新增行上方）两种视图模式。
 
 ## 安装
 
@@ -46,9 +49,39 @@ hunk 展开以及语法高亮。
 dotnet add package Banned.CodeDiff.Avalonia
 ```
 
-> 控件包尚未发布（M2 开发中）。在此之前请通过项目引用
-> `Banned.CodeDiff/Banned.CodeDiff.csproj` 使用核心逻辑库。`Banned.CodeDiff` 是否单独发布
-> NuGet 包尚未决定。
+> 控件包尚未发布。在此之前请通过项目引用使用（`Banned.CodeDiff.Avalonia`
+> 会一并带上核心库）。`Banned.CodeDiff` 是否单独发布 NuGet 包尚未决定。
+
+## Avalonia 控件
+
+`DiffView` 把 `DiffFile` 渲染为只读 split 视图。先在应用里引入一次控件主题
+（Avalonia 不会自动发现控件库的主题），再放置控件：
+
+```xml
+<Application xmlns="https://github.com/avaloniaui">
+    <Application.Styles>
+        <FluentTheme />
+        <StyleInclude Source="avares://Banned.CodeDiff.Avalonia/Themes/Generic.axaml" />
+    </Application.Styles>
+</Application>
+```
+
+```xml
+<Window xmlns:views="clr-namespace:Banned.CodeDiff.Avalonia.Views;assembly=Banned.CodeDiff.Avalonia">
+    <views:DiffView DiffFile="{Binding DiffFile}" />
+</Window>
+```
+
+赋值 `DiffFile` 即渲染（未构建也没关系，控件会按需调用 `Init` / `Build*DiffLines`），
+并通过模型的 `Updated` 事件保持同步。`ViewMode` 在默认的 `Split` 与 `Unified`
+（单栏统一视图）之间切换。控件默认等宽字体、行号列宽自适应、渲染收起 hunk 占位行，
+并随 `ActualThemeVariant` 切换明暗配色。
+
+运行 Demo 体验「粘贴 diff → 出界面」：
+
+```powershell
+dotnet run --project Banned.CodeDiff.Avalonia.Demo/Banned.CodeDiff.Avalonia.Demo.csproj
+```
 
 ## 基本用法
 
@@ -149,10 +182,11 @@ file.OnSplitHunkExpand(HunkExpandDirection.All, 0);
 
 ```powershell
 dotnet test tests/Banned.CodeDiff.Tests/Banned.CodeDiff.Tests.csproj
+dotnet test tests/Banned.CodeDiff.Avalonia.Tests/Banned.CodeDiff.Avalonia.Tests.csproj
 ```
 
-577 个用例，含与 JS 原版（`@git-diff-view/core` + `fast-diff@1.3.0`）逐字段对比的
-黄金基准测试。
+577 个核心用例（含与 JS 原版 `@git-diff-view/core` + `fast-diff@1.3.0` 逐字段对比的黄金基准）
++ 6 个 headless Avalonia UI 测试（覆盖控件主题加载、模板实例化、两种视图的行构建与模式切换）。
 
 ## 📜 更新日志
 

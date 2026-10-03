@@ -14,8 +14,8 @@
 | 里程碑 | 主题 | 状态 |
 |---|---|---|
 | M1 | 纯逻辑库（解析 + 行模型 + 词级区间 + 展开状态机） | ✅ 已完成 |
-| M2 | 最小可看：split 视图渲染 | ⬜ 下一步 |
-| M3 | 词级高亮渲染 | ⬜ |
+| M2 | 最小可看：split 视图渲染 | ✅ 已完成 |
+| M3 | 词级高亮渲染 | ⬜ 下一步 |
 | M4 | hunk 展开/收起 UI + 虚拟化 | ⬜ |
 | M5 | 语法高亮 | ⬜ |
 | M6 | 打磨 | ⬜ |
@@ -28,7 +28,7 @@
   词级区间（`ChangeRange` / `FastDiff`）、展开状态机、`TemplateOptions` 全局开关。
 - 目录已按 `Models` / `Services` / `Utils` 分类。
 - 577 个测试全绿（构建 0 警告 0 错误），含与 JS 原版逐字段对比的黄金基准。
-- `Banned.CodeDiff.Avalonia` 项目尚未创建。
+- `Banned.CodeDiff.Avalonia`（`DiffView` split 控件 + Demo）已就位，详见第 4 节执行结果。
 
 ## 4. M2 最小可看
 
@@ -46,9 +46,43 @@
 
 **验收**：
 
-- [ ] Demo 中粘贴 diff 文本即可看到 split 双栏视图。
-- [ ] 增/删行有正确背景色，行号与内容对齐，等宽字体，无编辑行为。
-- [ ] `dotnet build Banned.CodeDiff.slnx` Debug/Release 0 警告 0 错误，577 测试不回归。
+- [x] Demo 中粘贴 diff 文本即可看到 split 双栏视图。
+- [x] 增/删行有正确背景色，行号与内容对齐，等宽字体，无编辑行为。
+- [x] `dotnet build Banned.CodeDiff.slnx` Debug/Release 0 警告 0 错误，577 测试不回归。
+
+**执行结果（2026-10-03）**：
+
+- 新增 `Banned.CodeDiff.Avalonia` 控件库（`Views/DiffView`、`Models/DiffSplitRow` 行模型、
+  `Models/DiffBrushes` 明暗两套画刷（对齐上游 `_base.css` 变量值）、
+  `Utils/DiffSplitRowBuilder` 行构建、`Themes/Generic.axaml` ControlTheme）
+  与 `Banned.CodeDiff.Avalonia.Demo`（粘贴 diff → 渲染、载入示例、深浅主题切换、统计栏）。
+- `DiffView`：`DiffFile` 属性赋值即渲染（内部幂等调用 `Init`/`BuildSplitDiffLines`），
+  订阅模型 `Updated` 自动刷新；行号列宽按最大行号位数自适应；`ActualThemeVariant`
+  变化时换画刷重建行；默认等宽字体 `Menlo, Consolas, monospace`、字号 14。
+- hunk 占位行（`@@` 头）按 `GetSplitHunkLine` 渲染，与 JS 槽位循环一致；
+  键等于 `SplitLineLength` 的合成尾 hunk 不渲染（展开行属 M4）。
+- 冒烟验证（含两次返工）：首轮"通过"为误判——引导式截图分析复述了预期；实际 DiffView
+  空白、状态栏为空。根因一：**Avalonia 不自动加载控件库 `Themes/Generic.axaml`**，
+  ControlTheme 必须由宿主显式 `StyleInclude`；根因二（用户实测反馈）：**StyleInclude 的
+  目标必须是 `Styles` 根**——`ResourceDictionary` 根会触发构建期 AVLN2000
+  （"expected Avalonia.Styling.IStyle"），而当时 `tail -2` 截断构建输出掩盖了该错误，
+  "复验"实际跑的是旧二进制。最终结构：`Styles` 根 + `Styles.Resources` 内
+  `ResourceDictionary` 包裹带 `x:Key="{x:Type ...}"` 的 ControlTheme（Fluent 主题同款）。
+- 程序化回归门：新增 `tests/Banned.CodeDiff.Avalonia.Tests`（xunit.v3 +
+  Avalonia.Headless.XUnit 12.1.0），TestApp 以消费方同款 StyleInclude 加载主题，
+  断言模板实例化（ScrollViewer/ItemsControl + 13 项）、行模型结构与上游配色值
+  （#dafbe1/#ffebe9）。该包依赖 xunit.v3 而非 xunit 2.x，注册用
+  `[assembly: AvaloniaTestApplication(typeof(Builder))]` + 静态 `BuildAvaloniaApp()`。
+- 最终复验（三证据链）：控制台探针（4/2/11）、构建零错误（输出全量检查）、中立提问
+  截图分析（13 行双栏、@@ 行位于第 1/8 行、统计 `+4 -2 / split 11 行` 与探针一致）。
+- unified 单栏视图已补齐（2026-10-03，应用户需求提前完成）：`DiffView.ViewMode`
+  （Split/Unified）切换，unified 为单栏 + 双行号列、删除行在新增行上方（GitHub 布局）；
+  新增 `Models/DiffUnifiedRow.cs` 与 `Utils/DiffUnifiedRowBuilder.cs`，行构建懒按当前模式。
+  验证：unified 探针（13 内容行 + hunk 于 index 0/8）+ headless 断言（15 行、2 hunk、
+  Delete=2/Add=4、模式切换重建）+ 中立截图分析（15 行、浅蓝行位于第 1/10 行、
+  粉行行号 `4|空` 绿行 `空|4`，与探针逐位吻合）。Demo 加「Unified 视图」开关，
+  统计栏同时显示 split/unified 行数（VM 构建双模型，控件侧幂等）。
+  视觉模型曾把粉行数成 3（实际 2），已用程序化断言钉死——再次印证验证纪律的必要性。
 
 ## 5. M3 词级高亮
 
