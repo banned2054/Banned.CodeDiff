@@ -132,6 +132,13 @@
   Vue escape-html（MIT）、fast-diff（Apache-2.0）。**新增任何上游衍生代码必须同步更新 NOTICE**；
   后续接入 TextMateSharp 等第三方库时同样如此。
 
+## Git 提交风格
+
+- 提交标题使用 conventional 前缀 + 中文描述，冒号后不加空格：`feat:中文描述`、`fix:中文描述`、
+  `test:中文描述`、`docs:中文描述`、`chore:中文描述` 等。
+- 标题不以句号结尾；需要补充细节时写在正文（可用列表），标题保持一行简述。
+- 不做 push，发布相关操作见下节。
+
 ## NuGet 打包与发布
 
 - 除非用户在当前任务中明确要求，否则禁止在本地执行 `dotnet pack`、`nuget pack`、
