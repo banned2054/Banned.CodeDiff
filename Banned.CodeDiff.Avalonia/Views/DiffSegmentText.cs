@@ -8,11 +8,14 @@ using Banned.CodeDiff.Avalonia.Models;
 namespace Banned.CodeDiff.Avalonia.Views;
 
 /// <summary>
-/// Renders one diff line and paints word-level highlight rectangles behind the changed ranges.
-/// Avalonia text runs expose no per-run background, so the highlight is custom-drawn: the whole
-/// line is laid out once with <see cref="TextLayout"/> and
-/// <see cref="TextLayout.HitTestTextPosition"/> resolves each range boundary to an x coordinate.
-/// Single line, no wrap (wrap mode is M6 scope).
+/// Renders one diff line: syntax-colored text segments plus word-level highlight
+/// rectangles behind the changed ranges. Avalonia text runs expose no per-run
+/// background, so the highlight is custom-drawn: the whole line is laid out once
+/// with <see cref="TextLayout"/> and <see cref="TextLayout.HitTestTextPosition"/>
+/// resolves each range boundary to an x coordinate. Syntax coloring draws each
+/// <see cref="DiffSyntaxRun"/> as its own small layout, positioned at the x
+/// coordinate the whole-line layout reports for the run start (monospaced diff
+/// text keeps segments aligned). Single line, no wrap (wrap mode is M6 scope).
 /// </summary>
 public sealed class DiffSegmentText : Control
 {
@@ -26,6 +29,10 @@ public sealed class DiffSegmentText : Control
     /// <summary>Identifies the <see cref="Highlights"/> dependency property.</summary>
     public static readonly StyledProperty<IReadOnlyList<DiffHighlight>> HighlightsProperty =
         AvaloniaProperty.Register<DiffSegmentText, IReadOnlyList<DiffHighlight>>(nameof(Highlights));
+
+    /// <summary>Identifies the <see cref="SyntaxRuns"/> dependency property.</summary>
+    public static readonly StyledProperty<IReadOnlyList<DiffSyntaxRun>?> SyntaxRunsProperty =
+        AvaloniaProperty.Register<DiffSegmentText, IReadOnlyList<DiffSyntaxRun>?>(nameof(SyntaxRuns));
 
     /// <summary>Identifies the <see cref="HighlightBrush"/> dependency property.</summary>
     public static readonly StyledProperty<IBrush?> HighlightBrushProperty =
@@ -45,10 +52,12 @@ public sealed class DiffSegmentText : Control
 
     private TextLayout? _layout;
 
+    private IReadOnlyList<(TextLayout Layout, double X)>? _syntaxLayouts;
+
     static DiffSegmentText()
     {
         AffectsMeasure<DiffSegmentText>(TextProperty, FontFamilyProperty, FontSizeProperty);
-        AffectsRender<DiffSegmentText>(HighlightsProperty, HighlightBrushProperty, ForegroundProperty);
+        AffectsRender<DiffSegmentText>(HighlightsProperty, SyntaxRunsProperty, HighlightBrushProperty, ForegroundProperty);
     }
 
     /// <summary>Gets or sets the line text to render.</summary>
@@ -63,6 +72,14 @@ public sealed class DiffSegmentText : Control
     {
         get => GetValue(HighlightsProperty);
         set => SetValue(HighlightsProperty, value);
+    }
+
+    /// <summary>Gets or sets the syntax-colored segments within <see cref="Text"/>;
+    /// <c>null</c> renders the whole line with <see cref="Foreground"/>.</summary>
+    public IReadOnlyList<DiffSyntaxRun>? SyntaxRuns
+    {
+        get => GetValue(SyntaxRunsProperty);
+        set => SetValue(SyntaxRunsProperty, value);
     }
 
     /// <summary>Gets or sets the brush used to paint the highlight rectangles.</summary>
@@ -150,7 +167,19 @@ public sealed class DiffSegmentText : Control
             }
         }
 
-        layout.Draw(context, new Point(0, 0));
+        var syntaxLayouts = GetSyntaxLayouts(layout);
+
+        if (syntaxLayouts == null)
+        {
+            layout.Draw(context, new Point(0, 0));
+
+            return;
+        }
+
+        foreach (var (runLayout, x) in syntaxLayouts)
+        {
+            runLayout.Draw(context, new Point(x, 0));
+        }
     }
 
     private static double GetLayoutHeight(TextLayout layout)
@@ -170,19 +199,89 @@ public sealed class DiffSegmentText : Control
         return _layout;
     }
 
+    /// <summary>
+    /// Builds one small layout per syntax run, offset to the x coordinate the whole-line
+    /// layout reports for the run start. Gaps between runs (plain segments) fall back to the
+    /// whole-line layout's default foreground, so they are drawn as part of the nearest
+    /// default-colored run — plain text is prepended to the first run's start and appended
+    /// after the last run's end via the fallback layout pass.
+    /// </summary>
+    private IReadOnlyList<(TextLayout Layout, double X)>? GetSyntaxLayouts(TextLayout layout)
+    {
+        if (_syntaxLayouts != null)
+        {
+            return _syntaxLayouts;
+        }
+
+        var runs = SyntaxRuns;
+
+        if (runs is not { Count: > 0 })
+        {
+            return null;
+        }
+
+        var text = Text ?? string.Empty;
+
+        var typeface = new Typeface(FontFamily);
+
+        var layouts = new List<(TextLayout, double)>(runs.Count + 2);
+
+        // Plain text before the first colored run.
+        if (runs[0].Start > 0)
+        {
+            layouts.Add((new TextLayout(text[..runs[0].Start], typeface, FontSize, Foreground ?? Brushes.Black), 0));
+        }
+
+        var previousEnd = 0;
+
+        foreach (var run in runs)
+        {
+            var start = Math.Clamp(run.Start, 0, text.Length);
+            var end   = Math.Clamp(run.Start + run.Length, start, text.Length);
+
+            // A gap between runs renders with the default foreground.
+            if (start > previousEnd)
+            {
+                layouts.Add((new TextLayout(text[previousEnd..start], typeface, FontSize, Foreground ?? Brushes.Black),
+                             layout.HitTestTextPosition(previousEnd).X));
+            }
+
+            if (end > start)
+            {
+                layouts.Add((new TextLayout(text[start..end], typeface, FontSize, run.Foreground),
+                             layout.HitTestTextPosition(start).X));
+            }
+
+            previousEnd = Math.Max(previousEnd, end);
+        }
+
+        // Plain text after the last colored run.
+        if (previousEnd < text.Length)
+        {
+            layouts.Add((new TextLayout(text[previousEnd..], typeface, FontSize, Foreground ?? Brushes.Black),
+                         layout.HitTestTextPosition(previousEnd).X));
+        }
+
+        _syntaxLayouts = layouts;
+
+        return _syntaxLayouts;
+    }
+
     /// <inheritdoc />
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
         base.OnPropertyChanged(change);
 
-        // The cached layout depends on text, font, and foreground properties; highlight ranges
-        // and brushes only affect rendering.
-        if (change.Property == TextProperty       ||
-            change.Property == FontFamilyProperty ||
-            change.Property == FontSizeProperty   ||
-            change.Property == ForegroundProperty)
+        // The cached layouts depend on text, font, foreground, and the run structure;
+        // highlight ranges and brushes only affect rendering.
+        if (change.Property == TextProperty        ||
+            change.Property == FontFamilyProperty  ||
+            change.Property == FontSizeProperty    ||
+            change.Property == ForegroundProperty  ||
+            change.Property == SyntaxRunsProperty)
         {
-            _layout = null;
+            _layout        = null;
+            _syntaxLayouts = null;
         }
     }
 }

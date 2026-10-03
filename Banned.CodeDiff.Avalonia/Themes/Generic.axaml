@@ -49,7 +49,8 @@
                                                                    Text="{Binding Left.Sign}" />
                                                         <v:DiffSegmentText Text="{Binding Left.Text}"
                                                                            HighlightBrush="{Binding Left.HighlightBrush}"
-                                                                           Highlights="{Binding Left.Highlights}" />
+                                                                           Highlights="{Binding Left.Highlights}"
+                                                                           SyntaxRuns="{Binding Left.SyntaxRuns}" />
                                                     </StackPanel>
                                                 </Border>
                                                 <Rectangle Grid.Column="2"
@@ -73,7 +74,8 @@
                                                                    Text="{Binding Right.Sign}" />
                                                         <v:DiffSegmentText Text="{Binding Right.Text}"
                                                                            HighlightBrush="{Binding Right.HighlightBrush}"
-                                                                           Highlights="{Binding Right.Highlights}" />
+                                                                           Highlights="{Binding Right.Highlights}"
+                                                                           SyntaxRuns="{Binding Right.SyntaxRuns}" />
                                                     </StackPanel>
                                                 </Border>
                                             </Grid>
@@ -167,7 +169,8 @@
                                                                    Text="{Binding Sign}" />
                                                         <v:DiffSegmentText Text="{Binding Text}"
                                                                            HighlightBrush="{Binding HighlightBrush}"
-                                                                           Highlights="{Binding Highlights}" />
+                                                                           Highlights="{Binding Highlights}"
+                                                                           SyntaxRuns="{Binding SyntaxRuns}" />
                                                     </StackPanel>
                                                 </Border>
                                             </Grid>

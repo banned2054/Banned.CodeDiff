@@ -37,3 +37,33 @@ The golden-test harness (tests/js-harness) bundles the TypeScript sources of
 git-diff-view and fast-diff@1.3.0 with esbuild to generate reference data at
 development time. These sources are test-only inputs and are not distributed
 with the compiled libraries or NuGet packages.
+
+Syntax highlighting (M5) is built on:
+
+TextMateSharp (grammar tokenization engine, with its Onigwrap oniguruma binding)
+Copyright (c) 2022 danipascual
+Licensed under the MIT License
+https://github.com/danipascual/TextMateSharp
+
+The scope-to-color theme matching (Services/TextMate/ScopeThemeMatcher.cs) is a
+C# port of the vscode-textmate theme matcher as bundled with shiki:
+
+vscode-textmate / @shikijs/vscode-textmate
+Copyright (c) Microsoft Corporation
+Licensed under the MIT License
+
+The embedded TextMate grammars (Resources/TextMate/grammars) and the GitHub
+light/dark themes (Resources/TextMate/themes) are extracted from the shiki
+bundled languages and themes:
+
+shiki (@shikijs/langs, @shikijs/themes)
+Copyright (c) 2021 Anthony Fu
+Licensed under the MIT License
+
+The individual grammar files originate from their upstream VS Code language
+extensions and keep their respective licenses (MIT / TextMate license); the
+github-light/github-dark themes originate from the GitHub Visual Studio Code
+theme (MIT). Extraction happens at development time via
+tests/js-harness/extract-textmate.mjs, which also normalizes capture
+shorthand and converts/drops the begin/while rules TextMateSharp cannot
+compile.

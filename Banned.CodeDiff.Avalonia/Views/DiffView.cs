@@ -4,6 +4,7 @@ using Avalonia.Controls.Primitives;
 using Avalonia.Media;
 using Banned.CodeDiff.Avalonia.Models;
 using Banned.CodeDiff.Avalonia.Utils;
+using Banned.CodeDiff.Models;
 using Banned.CodeDiff.Services;
 
 namespace Banned.CodeDiff.Avalonia.Views;
@@ -34,6 +35,14 @@ public sealed class DiffView : TemplatedControl
     /// <summary>Identifies the <see cref="ViewMode"/> dependency property.</summary>
     public static readonly StyledProperty<DiffViewMode> ViewModeProperty =
         AvaloniaProperty.Register<DiffView, DiffViewMode>(nameof(ViewMode));
+
+    /// <summary>Identifies the <see cref="SyntaxHighlight"/> dependency property.</summary>
+    public static readonly StyledProperty<bool> SyntaxHighlightProperty =
+        AvaloniaProperty.Register<DiffView, bool>(nameof(SyntaxHighlight), true);
+
+    /// <summary>Identifies the <see cref="Highlighter"/> dependency property.</summary>
+    public static readonly StyledProperty<IDiffHighlighter?> HighlighterProperty =
+        AvaloniaProperty.Register<DiffView, IDiffHighlighter?>(nameof(Highlighter));
 
     /// <summary>Identifies the <see cref="Rows"/> direct property.</summary>
     public static readonly DirectProperty<DiffView, IReadOnlyList<DiffRow>> RowsProperty =
@@ -76,6 +85,23 @@ public sealed class DiffView : TemplatedControl
         set => SetValue(ViewModeProperty, value);
     }
 
+    /// <summary>Gets or sets whether the model runs syntax highlighting
+    /// (<c>DiffFile.InitSyntax</c>) before rendering; the built-in TextMate engine
+    /// colors lines when the language is registered.</summary>
+    public bool SyntaxHighlight
+    {
+        get => GetValue(SyntaxHighlightProperty);
+        set => SetValue(SyntaxHighlightProperty, value);
+    }
+
+    /// <summary>Gets or sets the syntax engine passed to <c>InitSyntax</c>; <c>null</c> uses
+    /// the core library's built-in TextMate engine (upstream: registerHighlighter).</summary>
+    public IDiffHighlighter? Highlighter
+    {
+        get => GetValue(HighlighterProperty);
+        set => SetValue(HighlighterProperty, value);
+    }
+
     /// <summary>Gets the flat row list currently rendered (content rows and hunk placeholders).</summary>
     public IReadOnlyList<DiffRow> Rows => _rows;
 
@@ -113,7 +139,8 @@ public sealed class DiffView : TemplatedControl
 
             RebuildRows();
         }
-        else if (change.Property == ViewModeProperty)
+        else if (change.Property == ViewModeProperty || change.Property == SyntaxHighlightProperty ||
+                 change.Property == HighlighterProperty)
         {
             RebuildRows();
         }
@@ -142,7 +169,14 @@ public sealed class DiffView : TemplatedControl
 
             if (file != null)
             {
-                file.Init();
+                // Upstream keeps raw init and syntax init separable (the vue component only runs
+                // initSyntax while syntax highlighting is enabled); DiffFile.Init runs both.
+                file.InitRaw();
+
+                if (SyntaxHighlight)
+                {
+                    file.InitSyntax(Highlighter);
+                }
 
                 rows = ViewMode switch
                 {

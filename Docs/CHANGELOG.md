@@ -2,6 +2,41 @@
 
 ## Unreleased
 
+### M5 — Syntax Highlighting
+
+- **`Banned.CodeDiff`**: syntax highlighting state ported from `file.ts` / `diff-file.ts` —
+  `SourceFile.DoSyntax` (max-line threshold, language check, idempotence), `DiffFile.InitSyntax`
+  (with optional injected engine), and `GetOldSyntaxLine` / `GetNewSyntaxLine`. `Init()` now runs
+  both `InitRaw` and `InitSyntax`, matching the upstream `init()`.
+- Built-in `TextMateHighlighter` engine: TextMateSharp 2.x tokenization carrying the rule stack
+  across lines (block comments / template literals keep their state across collapsed hunks),
+  producing shiki-shaped wrapper styles with both theme colors
+  (`--diff-view-dark:#…;--diff-view-light:#…`). Theme matching is a straight port of the
+  vscode-textmate matcher (`ScopeThemeMatcher`); TextMateSharp's own `Theme.Match` mis-resolves
+  descendant selectors on scope stacks, and is not used.
+- Grammars and themes embed the shiki-bundled sources (@shikijs/langs / @shikijs/themes,
+  20 languages plus their dependency grammars, github-light/dark). Files over 2000 raw lines or
+  in unregistered languages render plain, mirroring the upstream guard.
+- Golden tests replay the REAL shiki engine (same `codeToHast` options as `@git-diff-view/shiki`)
+  plus the upstream `processAST` against the C# engine, field-by-field, for C# / TypeScript /
+  JSON / Vue samples. Three lines carry known TextMateSharp↔vscode-oniguruma engine divergences
+  (C# interpolation capture boundaries; the CSS class-selector misjudgment inside `<style>`),
+  explicitly pinned and relaxed in `SyntaxGoldenTests` — the port cannot correct those inside
+  the embedded grammars.
+- Upstream behavior difference (intentional): when the injected highlighter does not know the
+  language, the JS falls back to lowlight (highlight.js); the C# port has no lowlight port, so
+  such files simply stay unhighlighted.
+- **`Banned.CodeDiff.Avalonia`**: `DiffView.SyntaxHighlight` (default on) drives `InitSyntax`;
+  `DiffView.Highlighter` injects a custom engine. Content rows carry syntax runs resolved from
+  the wrapper styles per theme variant (dark/light picked at row-build time, theme switches
+  rebuild rows without re-tokenizing), rendered as per-run foregrounds on top of the existing
+  word-level highlight rectangles. Lines with more than 150 spans degrade to plain text
+  (upstream render guard).
+- Demo: syntax toggle, a paste-mode filename extraction from the diff headers (so pasted
+  `.cs` diffs colorize), and a C#/TypeScript/JSON sample cycler.
+- NOTICE updated for TextMateSharp, the vscode-textmate theme-matching port, and the embedded
+  shiki grammars/themes.
+
 ### Tests
 
 - Migrated both test suites from xunit to NUnit 5.0.0 (constraint-model asserts,

@@ -26,12 +26,14 @@ public abstract class DiffSplitRow : DiffRow;
 public sealed class DiffSplitCellModel
 {
     internal DiffSplitCellModel(
-        string? number, string text, DiffCellKind kind, IReadOnlyList<DiffHighlight> highlights, DiffBrushSet brushes)
+        string? number, string text, DiffCellKind kind, IReadOnlyList<DiffHighlight> highlights,
+        IReadOnlyList<DiffSyntaxRun>? syntaxRuns, DiffBrushSet brushes)
     {
-        Highlights = highlights;
-        Number     = number;
-        Text       = text;
-        Kind       = kind;
+        Highlights  = highlights;
+        SyntaxRuns  = syntaxRuns;
+        Number      = number;
+        Text        = text;
+        Kind        = kind;
         Sign = kind switch
         {
             DiffCellKind.Add    => "+",
@@ -71,6 +73,10 @@ public sealed class DiffSplitCellModel
 
     /// <summary>Gets the word-level highlight ranges within <see cref="Text"/>.</summary>
     public IReadOnlyList<DiffHighlight> Highlights { get; }
+
+    /// <summary>Gets the syntax-colored runs within <see cref="Text"/>, or <c>null</c> when the
+    /// line renders plain (no syntax data, or over the 150-span degradation guard).</summary>
+    public IReadOnlyList<DiffSyntaxRun>? SyntaxRuns { get; }
 
     /// <summary>Gets the word-level highlight brush, or <c>null</c> when there is nothing to highlight.</summary>
     public IBrush? HighlightBrush { get; }

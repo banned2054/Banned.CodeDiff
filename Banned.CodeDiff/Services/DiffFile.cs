@@ -3,12 +3,11 @@ using Banned.CodeDiff.Models;
 namespace Banned.CodeDiff.Services;
 
 /// <summary>
-/// Port of packages/core/src/diff-file.ts — the M1 (pure logic) subset:
-/// raw file composition, diff parsing + word-level ranges, and the
-/// split/unified line models with expand/collapse.
+/// Port of packages/core/src/diff-file.ts — the M1 (pure logic) subset plus the
+/// syntax state (M5): raw file composition, diff parsing + word-level ranges,
+/// the split/unified line models with expand/collapse, and initSyntax.
 ///
-/// Not ported (M2 / web-specific):
-/// - syntax highlighting state and templates (initSyntax, getBundle)
+/// Not ported (web-specific):
 /// - bundle serialization (getBundle / mergeBundle / _getFullBundle)
 /// - cloned-instance sync and DOM ids (subscribe stays as a simple event)
 /// </summary>
@@ -40,6 +39,15 @@ public sealed class DiffFile
     private Dictionary<int, string>?   _newFileLines;
     private Dictionary<int, bool>?     _oldFilePlaceholderLines;
     private Dictionary<int, bool>?     _newFilePlaceholderLines;
+
+    private Dictionary<int, SyntaxLine>? _oldFileSyntaxLines;
+    private Dictionary<int, SyntaxLine>? _newFileSyntaxLines;
+
+    private string? _highlighterName;
+    private string? _highlighterType;
+    private string? _theme;
+
+    private bool _hasInitSyntax;
 
     private readonly List<SplitLineItem> _splitLeftLines  = [];
     private readonly List<SplitLineItem> _splitRightLines = [];
@@ -496,7 +504,7 @@ public sealed class DiffFile
         return _newFileLines != null && _newFileLines.TryGetValue(lineNumber, out var l) ? l : null;
     }
 
-    /// <summary>Port of initRaw (syntax init is M2).</summary>
+    /// <summary>Port of initRaw (plus the initRaw-time #syncSyntax call).</summary>
     public void InitRaw()
     {
         if (_hasInitRaw)
@@ -509,12 +517,106 @@ public sealed class DiffFile
         DoDiff();
         ComposeDiff();
         ComposeFile();
+        SyncSyntax();
         _hasInitRaw = true;
+    }
+
+    // ---- syntax (initSyntax) ----
+
+    /// <summary>Port of initTheme: theme ?? existing ?? "light".</summary>
+    public void InitTheme(string? theme)
+    {
+        _theme = theme ?? _theme ?? "light";
+    }
+
+    /// <summary>JS: _getTheme.</summary>
+    public string? GetTheme() => _theme;
+
+    /// <summary>JS: _getHighlighterName / _getHighlighterType.</summary>
+    public string? GetHighlighterName() => _highlighterName;
+
+    /// <summary>JS: _getHighlighterType.</summary>
+    public string? GetHighlighterType() => _highlighterType;
+
+    /// <summary>Port of initSyntax({ registerHighlighter }).</summary>
+    public void InitSyntax(IDiffHighlighter? registerHighlighter = null)
+    {
+        if (_hasInitSyntax && (registerHighlighter == null ||
+                               (registerHighlighter.Name == _highlighterName &&
+                                registerHighlighter.Type == _highlighterType)))
+        {
+            _newFileSyntaxLines = _newFileResult?.SyntaxFile;
+
+            _oldFileSyntaxLines = _oldFileResult?.SyntaxFile;
+
+            return;
+        }
+
+        DoSyntax(registerHighlighter);
+
+        ComposeDiff();
+
+        _hasInitSyntax = true;
+    }
+
+    private void DoSyntax(IDiffHighlighter? registerHighlighter)
+    {
+        // JS: the composeByMerge-without-full-merge bail-out is not ported
+        // (bundle serialization is not ported).
+
+        ComposeSyntax(registerHighlighter);
+
+        SyncSyntax();
+    }
+
+    private void ComposeSyntax(IDiffHighlighter? registerHighlighter)
+    {
+        _oldFileResult?.DoSyntax(registerHighlighter, _theme);
+
+        _oldFileSyntaxLines = _oldFileResult?.SyntaxFile;
+
+        _newFileResult?.DoSyntax(registerHighlighter, _theme);
+
+        _newFileSyntaxLines = _newFileResult?.SyntaxFile;
+    }
+
+    private void SyncSyntax()
+    {
+        _highlighterName = !string.IsNullOrEmpty(_oldFileResult?.HighlighterName) ? _oldFileResult!.HighlighterName
+                           : !string.IsNullOrEmpty(_newFileResult?.HighlighterName) ? _newFileResult!.HighlighterName
+                           : _highlighterName;
+
+        _highlighterType = !string.IsNullOrEmpty(_oldFileResult?.HighlighterType) ? _oldFileResult!.HighlighterType
+                           : !string.IsNullOrEmpty(_newFileResult?.HighlighterType) ? _newFileResult!.HighlighterType
+                           : _highlighterType;
+
+        if (!string.IsNullOrEmpty(_oldFileResult?.HighlighterName))
+        {
+            _oldFileSyntaxLines = _oldFileResult!.SyntaxFile;
+        }
+
+        if (!string.IsNullOrEmpty(_newFileResult?.HighlighterName))
+        {
+            _newFileSyntaxLines = _newFileResult!.SyntaxFile;
+        }
+    }
+
+    /// <summary>Port of getOldSyntaxLine — syntax spans of the old file line, or <c>null</c>.</summary>
+    public SyntaxLine? GetOldSyntaxLine(int lineNumber)
+    {
+        return _oldFileSyntaxLines != null && _oldFileSyntaxLines.TryGetValue(lineNumber, out var line) ? line : null;
+    }
+
+    /// <summary>Port of getNewSyntaxLine — syntax spans of the new file line, or <c>null</c>.</summary>
+    public SyntaxLine? GetNewSyntaxLine(int lineNumber)
+    {
+        return _newFileSyntaxLines != null && _newFileSyntaxLines.TryGetValue(lineNumber, out var line) ? line : null;
     }
 
     public void Init()
     {
         InitRaw();
+        InitSyntax();
     }
 
     // ---- split / unified line models ----

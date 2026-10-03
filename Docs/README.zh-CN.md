@@ -24,7 +24,7 @@ hunk 展开以及语法高亮。
 | M2 | `Banned.CodeDiff.Avalonia` 最小 split 视图 | 已完成 — `DiffView` 控件 + Demo |
 | M3 | 词级高亮渲染 | 已完成 |
 | M4 | hunk 展开/收起 + 虚拟化 | 已完成 |
-| M5 | 语法高亮（TextMateSharp） | 下一步 |
+| M5 | 语法高亮（TextMateSharp） | 已完成 — 与 shiki 引擎黄金基准对照 |
 | M6 | 深浅主题、wrap、复制 | 计划中 |
 
 ## 功能
@@ -38,6 +38,10 @@ hunk 展开以及语法高亮。
 - **hunk 展开/收起** — up / down / all 方向的展开状态机，步长可配（默认 40 行）；
   每次变更触发 `Updated` 事件，宿主刷新界面即可。
 - **全局模板开关** — `TemplateOptions` 控制 fast-diff 词级 diff 与模板构建的启用。
+- **语法高亮** — 内置 TextMate 引擎（TextMateSharp + shiki 同源的 TextMate 语法与
+  GitHub 明暗主题）对完整新旧文件做词法着色，按行提供着色区间
+  （`DiffFile.InitSyntax` / `GetOldSyntaxLine` / `GetNewSyntaxLine`）；
+  通过 `IDiffHighlighter` 可替换引擎。
 - 核心库**零 UI 依赖**。
 - **`DiffView` Avalonia 控件** — 只读 GitHub 风格 diff 视图，行级增删背景色、
   变更行内的词级高亮块、带可点击展开入口的收起 hunk 占位行（up / down / all，
@@ -75,7 +79,9 @@ dotnet add package Banned.CodeDiff.Avalonia
 
 赋值 `DiffFile` 即渲染（未构建也没关系，控件会按需调用 `Init` / `Build*DiffLines`），
 并通过模型的 `Updated` 事件保持同步。`ViewMode` 在默认的 `Split` 与 `Unified`
-（单栏统一视图）之间切换。控件默认等宽字体、行号列宽自适应、渲染收起 hunk 占位行，
+（单栏统一视图）之间切换；`SyntaxHighlight`（默认开）会执行 `InitSyntax`，
+行内文字按语法着色并随明暗主题取色，`Highlighter` 可注入自定义 `IDiffHighlighter` 引擎。
+控件默认等宽字体、行号列宽自适应、渲染收起 hunk 占位行，
 并随 `ActualThemeVariant` 切换明暗配色。
 
 hunk 占位行自带展开按钮（首个 hunk 单个向上展开、文件尾部折叠条单个向下展开、
@@ -181,6 +187,29 @@ file.OnSplitHunkExpand(HunkExpandDirection.All, 0);
 `file.OnAllExpand` / `OnAllCollapse` 可绑定到工具栏动作（Demo 即如此）。
 隐藏区间为空的首个 `@@` 头（hunk 从第 1 行开始）不渲染，与 GitHub 及上游一致。
 
+## 语法高亮
+
+核心库内置语法引擎：TextMateSharp 词法分析，配 upstream shiki 引擎同款打包的
+TextMate 语法与 GitHub 明暗主题。`InitSyntax` 对**完整**新旧文件全文着色
+（规则状态跨行延续，块注释、模板字符串跨折叠 hunk 依然正确），未注册语言或超过
+2000 行的文件自动回退纯文本：
+
+```csharp
+var file = new DiffFile("a/Program.cs", oldText, "b/Program.cs", newText, [diffText]);
+file.Init();          // InitRaw + InitSyntax（语法一并就绪）
+
+var syntaxLine = file.GetNewSyntaxLine(12); // 未高亮时为 null
+// syntaxLine.Value — 原始行文本；syntaxLine.NodeList — 有序着色区间：
+//   { Node: { StartIndex, EndIndex（含端） }, Wrapper: { Properties: { Style } } }
+// Style 字符串同时携带两个主题的颜色："--diff-view-dark:#F97583;--diff-view-light:#D73A49"。
+```
+
+语言按文件名探测（`DiffTool.GetLang`）；已注册语言覆盖 C#、TypeScript/TSX、
+JavaScript/JSX、JSON、HTML、CSS、Markdown、Python、Java、Go、Rust、C、C++、
+shell、YAML、XML、Vue 与 diff 输出。用 `DiffFile.InitSyntax(myHighlighter)`
+（`IDiffHighlighter`）可替换引擎——AST 契约与上游 `DiffHighlighter` 接口对应，
+内置与注入引擎的区间都走同一套渲染。
+
 ## 使用注意
 
 - `DiffParser.Shared` 与 `TemplateOptions` 是全局有状态的（与 JS 原版一致），
@@ -197,10 +226,12 @@ dotnet test tests/Banned.CodeDiff.Tests/Banned.CodeDiff.Tests.csproj
 dotnet test tests/Banned.CodeDiff.Avalonia.Tests/Banned.CodeDiff.Avalonia.Tests.csproj
 ```
 
-577 个核心用例（NUnit，含与 JS 原版 `@git-diff-view/core` + `fast-diff@1.3.0` 逐字段对比的黄金基准）
-+ 22 个 headless Avalonia UI 测试（NUnit + Avalonia.Headless.NUnit，覆盖主题加载、模板实例化、
+589 个核心用例（NUnit，含与 JS 原版 `@git-diff-view/core` + `fast-diff@1.3.0`
+逐字段对比的黄金基准，以及用真实 shiki 引擎按 `@git-diff-view/shiki` 同款
+codeToHast 参数回放的语法黄金基准）
++ 28 个 headless Avalonia UI 测试（NUnit + Avalonia.Headless.NUnit，覆盖主题加载、模板实例化、
 两种视图行构建、模式切换、词级高亮区间与矩形计算、三方向 hunk 展开与按钮摆放规则、
-命令接线，以及万行级模型的行虚拟化）。
+命令接线、万行级模型的行虚拟化，以及语法着色接线与明暗主题取色）。
 
 ## 📜 更新日志
 

@@ -43,32 +43,44 @@ internal static class DiffSplitRowBuilder
                 continue;
             }
 
-            rows.Add(new DiffSplitContentRow(CreateCell(left, brushes), CreateCell(right, brushes), brushes.Splitter));
+            rows.Add(new DiffSplitContentRow(CreateCell(file, left, SplitSide.Old, variant, brushes),
+                                              CreateCell(file, right, SplitSide.New, variant, brushes),
+                                              brushes.Splitter));
         }
 
         return rows;
     }
 
-    private static DiffSplitCellModel CreateCell(SplitLineItem? item, DiffBrushSet brushes)
+    private static DiffSplitCellModel CreateCell(DiffFile file, SplitLineItem? item, SplitSide side,
+                                                 ThemeVariant variant, DiffBrushSet brushes)
     {
         // Placeholder half-rows (the opposite side holds an add/delete) are bare SplitLineItem
         // instances with no line number; content rows always carry their DiffLine.
         if (item == null || (item.Diff == null && item.LineNumber == null))
         {
-            return new DiffSplitCellModel(null, string.Empty, DiffCellKind.Empty, [], brushes);
+            return new DiffSplitCellModel(null, string.Empty, DiffCellKind.Empty, [], null, brushes);
         }
+
+        var text = (item.Value ?? item.Diff?.Text ?? string.Empty).TrimEnd('\r', '\n');
+
+        // Upstream picks the old file's syntax for the left column and the new file's for the
+        // right one, queried by the file-absolute line number.
+        var syntaxLine = side == SplitSide.Old && item.LineNumber is { } oldNumber
+            ? file.GetOldSyntaxLine(oldNumber)
+            : side == SplitSide.New && item.LineNumber is { } newNumber
+                ? file.GetNewSyntaxLine(newNumber)
+                : null;
+
+        var syntaxRuns = DiffSyntaxRuns.Extract(syntaxLine, text.Length, variant);
 
         // Raw gap lines revealed by expansion have no DiffLine — they render as plain context
         // cells from the file content.
         if (item.Diff is not { } diff)
         {
-            return new DiffSplitCellModel(item.LineNumber?.ToString(),
-                                          (item.Value ?? string.Empty).TrimEnd('\r', '\n'),
-                                          DiffCellKind.Context, [], brushes);
+            return new DiffSplitCellModel(item.LineNumber?.ToString(), text, DiffCellKind.Context,
+                                          [], syntaxRuns, brushes);
         }
 
-        var number = item.LineNumber?.ToString();
-        var text   = (item.Value ?? diff.Text)?.TrimEnd('\r', '\n') ?? string.Empty;
         var kind = diff.Type switch
         {
             DiffLineType.Add    => DiffCellKind.Add,
@@ -76,6 +88,7 @@ internal static class DiffSplitRowBuilder
             _                   => DiffCellKind.Context,
         };
 
-        return new DiffSplitCellModel(number, text, kind, DiffHighlights.Extract(diff, kind), brushes);
+        return new DiffSplitCellModel(item.LineNumber?.ToString(), text, kind,
+                                      DiffHighlights.Extract(diff, kind), syntaxRuns, brushes);
     }
 }

@@ -24,7 +24,7 @@ Development follows the milestones in [plan.md](./plan.md):
 | M2 | `Banned.CodeDiff.Avalonia` minimal split view | Done — `DiffView` control + demo |
 | M3 | Word-level highlight rendering | Done |
 | M4 | Hunk expand/collapse + virtualization | Done |
-| M5 | Syntax highlighting (TextMateSharp) | Next |
+| M5 | Syntax highlighting (TextMateSharp) | Done — golden-tested against shiki |
 | M6 | Themes, wrap mode, copy | Planned |
 
 ## Features
@@ -38,6 +38,9 @@ Development follows the milestones in [plan.md](./plan.md):
 - Hunk expansion — up / down / all expansion state machine with configurable step (default 40 lines)
   and an `Updated` notification the host uses to refresh the view
 - Global template switches — `TemplateOptions` toggles fast-diff word-level diff and template building
+- Syntax highlighting — a built-in TextMate engine (TextMateSharp + the shiki-bundled grammars and GitHub
+  light/dark themes) tokenizes the full old/new files and exposes per-line colored spans
+  (`DiffFile.InitSyntax` / `GetOldSyntaxLine` / `GetNewSyntaxLine`); pluggable via `IDiffHighlighter`
 - Zero UI dependencies in the core library
 - `DiffView` Avalonia control — read-only GitHub-style diff view with line-level add/delete
   backgrounds, word-level highlight blocks inside changed lines, collapsed hunk placeholders with
@@ -77,7 +80,9 @@ application (Avalonia does not auto-discover control-library themes), then place
 
 Assign a `DiffFile` (built or not — the control invokes `Init` / `Build*DiffLines` on demand) and
 it stays in sync through the model's `Updated` event. `ViewMode` switches between the default
-`Split` and `Unified` rendering. The control uses a monospace font by default, auto-sizes the
+`Split` and `Unified` rendering; `SyntaxHighlight` (default on) runs `InitSyntax` so lines render
+with syntax colors that follow the light/dark theme, and `Highlighter` injects a custom
+`IDiffHighlighter` engine. The control uses a monospace font by default, auto-sizes the
 line-number columns, renders collapsed hunk placeholder rows, switches its light/dark palette
 with `ActualThemeVariant`, and paints word-level highlight blocks inside changed lines when
 `DiffLine.DiffChanges` (fast-diff) or `DiffLine.Changes` (relative) ranges are available.
@@ -189,6 +194,30 @@ appropriate expand buttons, and `file.OnAllExpand` / `OnAllCollapse` can be boun
 actions (the demo does this). A leading `@@` header whose hidden range is empty (a hunk starting
 at line 1) is not rendered, matching GitHub and the upstream view components.
 
+## Syntax Highlighting
+
+The core library ships a built-in syntax engine: TextMateSharp tokenization with the same
+TextMate grammars and GitHub light/dark themes the upstream shiki engine bundles. `InitSyntax`
+tokenizes the *whole* old/new files (rule state carries across lines, so block comments and
+template literals keep their state across collapsed hunks) and falls back to plain text for
+unregistered languages or files over the 2000-line limit:
+
+```csharp
+var file = new DiffFile("a/Program.cs", oldText, "b/Program.cs", newText, [diffText]);
+file.Init();          // InitRaw + InitSyntax (syntax included)
+
+var syntaxLine = file.GetNewSyntaxLine(12); // null when the file is unhighlighted
+// syntaxLine.Value — the raw line text; syntaxLine.NodeList — ordered spans:
+//   { Node: { StartIndex, EndIndex (inclusive) }, Wrapper: { Properties: { Style } } }
+// Style strings carry both theme colors: "--diff-view-dark:#F97583;--diff-view-light:#D73A49".
+```
+
+The language is detected from the file name (`DiffTool.GetLang`); registered languages cover
+C#, TypeScript/TSX, JavaScript/JSX, JSON, HTML, CSS, Markdown, Python, Java, Go, Rust, C, C++,
+shell, YAML, XML, Vue, and diff output. Replace the engine with `DiffFile.InitSyntax(myHighlighter)`
+(`IDiffHighlighter`) — the AST contract mirrors the upstream `DiffHighlighter` interface, and
+spans from both built-in and injected engines feed the same renderer.
+
 ## Usage Notes
 
 - `DiffParser.Shared` and `TemplateOptions` are globally stateful (matching the JS original); do not
@@ -205,12 +234,13 @@ dotnet test tests/Banned.CodeDiff.Tests/Banned.CodeDiff.Tests.csproj
 dotnet test tests/Banned.CodeDiff.Avalonia.Tests/Banned.CodeDiff.Avalonia.Tests.csproj
 ```
 
-577 core cases (NUnit, golden tests comparing field-by-field against the JS original
-`@git-diff-view/core` + `fast-diff@1.3.0`) — plus 22 headless Avalonia UI tests (NUnit +
-Avalonia.Headless.NUnit) covering the control theme, template instantiation, row building in
-both view modes, mode switching, word-level highlight ranges and rectangle computation, hunk
-expansion in all directions with button-placement rules, command wiring, and row virtualization
-on a 10k-line model.
+589 core cases (NUnit; golden tests comparing field-by-field against the JS original
+`@git-diff-view/core` + `fast-diff@1.3.0`, plus syntax goldens replayed from the real shiki
+engine with the same codeToHast options as `@git-diff-view/shiki`) — plus 28 headless Avalonia
+UI tests (NUnit + Avalonia.Headless.NUnit) covering the control theme, template instantiation,
+row building in both view modes, mode switching, word-level highlight ranges and rectangle
+computation, hunk expansion in all directions with button-placement rules, command wiring, row
+virtualization on a 10k-line model, and syntax-run wiring with theme-switched colors.
 
 ## 📜 Changelog
 

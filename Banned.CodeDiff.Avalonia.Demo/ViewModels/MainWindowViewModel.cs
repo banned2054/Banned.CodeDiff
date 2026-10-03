@@ -13,19 +13,22 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     private string       _diffText = SampleDiff.ProgramCs;
     private DiffFile?    _diffFile;
     private bool         _isDark;
-    private DiffViewMode _viewMode   = DiffViewMode.Split;
-    private bool         _isFastDiff = true;
+    private DiffViewMode _viewMode      = DiffViewMode.Split;
+    private bool         _isFastDiff    = true;
+    private bool         _isSyntax      = true;
+    private string       _syntaxFile    = "store.cs";
 
     public MainWindowViewModel()
     {
         // Word-level ranges are computed at DiffFile.Init() time; the global switch must be set
         // before the first render. Toggling re-creates the file.
         TemplateOptions.SetEnableFastDiffTemplate(_isFastDiff);
-        RenderCommand          = new RelayCommand(Render);
-        LoadSampleCommand      = new RelayCommand(LoadSample);
-        LoadExpandableCommand  = new RelayCommand(LoadExpandable);
-        ExpandAllCommand       = new RelayCommand(ExpandAll);
-        CollapseAllCommand     = new RelayCommand(CollapseAll);
+        RenderCommand           = new RelayCommand(Render);
+        LoadSampleCommand       = new RelayCommand(LoadSample);
+        LoadExpandableCommand   = new RelayCommand(LoadExpandable);
+        LoadSyntaxSampleCommand = new RelayCommand(LoadNextSyntaxSample);
+        ExpandAllCommand        = new RelayCommand(ExpandAll);
+        CollapseAllCommand      = new RelayCommand(CollapseAll);
         Render();
     }
 
@@ -37,9 +40,18 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
 
     public ICommand LoadExpandableCommand { get; }
 
+    /// <summary>Cycles through the multi-language syntax samples (cs → ts → json).</summary>
+    public ICommand LoadSyntaxSampleCommand { get; }
+
     public ICommand ExpandAllCommand { get; }
 
     public ICommand CollapseAllCommand { get; }
+
+    public bool IsSyntax
+    {
+        get => _isSyntax;
+        set => Set(ref _isSyntax, value);
+    }
 
     public bool IsFastDiff
     {
@@ -158,6 +170,37 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         DiffFile = file;
     }
 
+    /// <summary>Cycles the syntax samples: store.cs → api.ts → config.json → …</summary>
+    private void LoadNextSyntaxSample()
+    {
+        var sample = _syntaxFile switch
+        {
+            "store.cs"    => SyntaxSample.TypeScript(),
+            "api.ts"      => SyntaxSample.Json(),
+            _             => SyntaxSample.CSharp(),
+        };
+
+        LoadSyntaxSample(sample);
+    }
+
+    private void LoadSyntaxSample((string FileName, string OldContent, string NewContent, string Diff) sample)
+    {
+        var (fileName, oldContent, newContent, diffText) = sample;
+
+        _syntaxFile = fileName;
+
+        DiffText = diffText;
+
+        // Real contents keep expansion enabled and give the syntax engine full files.
+        var file = new DiffFile(oldFileName : fileName, oldFileContent : oldContent,
+                                newFileName : fileName, newFileContent : newContent,
+                                diffList    : [diffText]);
+        file.Init();
+        file.BuildSplitDiffLines();
+        file.BuildUnifiedDiffLines();
+        DiffFile = file;
+    }
+
     private void ExpandAll() =>
         DiffFile?.OnAllExpand(_viewMode == DiffViewMode.Unified ? ExpandViewMode.Unified : ExpandViewMode.Split);
 
@@ -182,12 +225,50 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             return;
         }
 
-        var file = new DiffFile(oldFileName : "", oldFileContent : "", newFileName : "", newFileContent : "",
+        var file = new DiffFile(oldFileName : ExtractHeaderFile("--- "), oldFileContent : "",
+                                newFileName : ExtractHeaderFile("+++ "), newFileContent : "",
                                 diffList : [DiffText]);
         file.Init();
         file.BuildSplitDiffLines();
         file.BuildUnifiedDiffLines();
         DiffFile = file;
+    }
+
+    /// <summary>
+    /// Demo-side convenience: pull the file name out of the pasted diff headers so the
+    /// paste-only mode still knows the language (upstream expects callers to pass the
+    /// file name; the core never parses it out of the diff text).
+    /// </summary>
+    private string ExtractHeaderFile(string marker)
+    {
+        foreach (var raw in DiffText.Split('\n'))
+        {
+            var line = raw.TrimEnd('\r');
+
+            if (!line.StartsWith(marker, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            var name = line[marker.Length..].Trim();
+
+            if (name.StartsWith("a/") || name.StartsWith("b/"))
+            {
+                name = name[2..];
+            }
+
+            // Skip git's /dev/null and timestamp-only tails.
+            if (name.Length == 0 || name == "/dev/null")
+            {
+                continue;
+            }
+
+            var tab = name.IndexOf('\t');
+
+            return tab >= 0 ? name[..tab].Trim() : name;
+        }
+
+        return "";
     }
 
     private bool Set<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)

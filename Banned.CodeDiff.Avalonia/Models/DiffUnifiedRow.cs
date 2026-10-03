@@ -10,9 +10,11 @@ public abstract class DiffUnifiedRow : DiffRow;
 public sealed class DiffUnifiedContentRow : DiffUnifiedRow
 {
     internal DiffUnifiedContentRow(string? oldNumber, string? newNumber, string text, DiffCellKind kind,
-                                   IReadOnlyList<DiffHighlight> highlights, DiffBrushSet brushes)
+                                   IReadOnlyList<DiffHighlight> highlights,
+                                   IReadOnlyList<DiffSyntaxRun>? syntaxRuns, DiffBrushSet brushes)
     {
         Highlights = highlights;
+        SyntaxRuns = syntaxRuns;
         OldNumber  = oldNumber;
         NewNumber  = newNumber;
         Text       = text;
@@ -62,6 +64,10 @@ public sealed class DiffUnifiedContentRow : DiffUnifiedRow
 
     /// <summary>Gets the word-level highlight ranges within <see cref="Text"/>.</summary>
     public IReadOnlyList<DiffHighlight> Highlights { get; }
+
+    /// <summary>Gets the syntax-colored runs within <see cref="Text"/>, or <c>null</c> when the
+    /// line renders plain (no syntax data, or over the 150-span degradation guard).</summary>
+    public IReadOnlyList<DiffSyntaxRun>? SyntaxRuns { get; }
 
     /// <summary>Gets the word-level highlight brush, or <c>null</c> when there is nothing to highlight.</summary>
     public IBrush? HighlightBrush { get; }

@@ -17,8 +17,8 @@
 | M2 | 最小可看：split 视图渲染 | ✅ 已完成 |
 | M3 | 词级高亮渲染 | ✅ 已完成 |
 | M4 | hunk 展开/收起 UI + 虚拟化 | ✅ 已完成 |
-| M5 | 语法高亮 | ⬜ 下一步 |
-| M6 | 打磨 | ⬜ |
+| M5 | 语法高亮 | ✅ 已完成 |
+| M6 | 打磨 | ⬜ 下一步 |
 
 每个里程碑保持可构建、可测试、可演示；完成一个更新一次本文件状态与 `Docs/CHANGELOG.md`。
 
@@ -27,8 +27,8 @@
 - `Banned.CodeDiff` 核心库完成：解析（`DiffParser`）、split/unified 行模型（`DiffFile`）、
   词级区间（`ChangeRange` / `FastDiff`）、展开状态机、`TemplateOptions` 全局开关。
 - 目录已按 `Models` / `Services` / `Utils` 分类。
-- 577 个核心测试 + 22 个 Avalonia headless 测试全绿（构建 0 警告 0 错误），
-  含与 JS 原版逐字段对比的黄金基准。
+- 589 个核心测试 + 28 个 Avalonia headless 测试全绿（构建 0 警告 0 错误），
+  含与 JS 原版逐字段对比的黄金基准，以及与真实 shiki 引擎逐字段对比的语法黄金基准。
 - `Banned.CodeDiff.Avalonia`（`DiffView` split 控件 + Demo）已就位，详见第 4 节执行结果。
 
 ## 4. M2 最小可看
@@ -189,9 +189,48 @@
 
 **验收**：
 
-- [ ] 常见语言（C#/JS/TS/JSON 等）Demo 正确着色。
-- [ ] 语法高亮与词级/行级高亮正确叠加，不破坏 M4 性能基线。
-- [ ] NOTICE 补充 TextMateSharp 条目。
+- [x] 常见语言（C#/TS/JSON 等）Demo 正确着色。
+- [x] 语法高亮与词级/行级高亮正确叠加，不破坏 M4 性能基线。
+- [x] NOTICE 补充 TextMateSharp 条目。
+
+**执行结果（2026-10-03）**：
+
+- **核心库语法链路**：`Models/IDiffHighlighter`（对应上游 `DiffHighlighter` 接口形状）、
+  `Utils/HighlightAst`（`processAST` 逐行移植：多行 text 节点拆行、含端区间、空段语义）、
+  `SourceFile.DoSyntax`（2000 行熔断 + 幂等 + 引擎回退）、`DiffFile.InitSyntax/InitTheme/
+  GetOldSyntaxLine/GetNewSyntaxLine/GetHighlighterName`，`Init()` 补齐 initRaw+initSyntax。
+- **内置 TextMate 引擎**（`Services/TextMate/`）：TextMateSharp **2.0.4**（1.x 的 OnigSharp
+  不支持 csharp 语法的 lookbehind 正则，2.x 换 Onigwrap 后解决）；`ScopeThemeMatcher` 为
+  vscode-textmate 主题匹配的直接移植——TextMateSharp 自带 `Theme.Match` 对 scope 栈的
+  后代选择器有错配 bug（`source.cs` 命中 `string … embedded source`），不可用；着色语义
+  为「栈内自顶向下首个命中层，未命中层继承外层」（vscode metadata 通道），默认前景取
+  主题 `colors["editor.foreground"]`；相邻 token 以「颜色 + standardTokenType 相等」合并，
+  对齐 vscode 二进制 tokenizer 的合并行为；输出 style 双主题变量（dark 在前、大写 hex），
+  与 shiki `codeToHast` 输出逐字符一致。
+- **嵌入资源**：`Resources/TextMate/`（29 个 grammar + 2 个主题，提取自
+  @shikijs/langs/@shikijs/themes——主语言 + 依赖 grammar，vue 依赖 html-derivative/
+  vue-directives 等）。提取脚本对 TextMateSharp 做了两处规整：capture 字符串简写包
+  `{name}`、负向 `while:"^(?!X)"` 转 `end:"(?=X)"`（正向 while 如 `///` 续行块无等价
+  end，规则删除，样例不触发）；TextMateResources 动态枚举嵌入 grammar 建语言表
+  （name+alias → scope）。
+- **黄金基准**：`build-syntax.mjs` + `gen-syntax.ts`（esbuild external shiki，wasm 在 node
+  运行时解析）用真实 shiki + 上游 `processAST` 生成 `syntax-golden.json`（C#/TS/JSON/Vue
+  四用例，含块注释、插值模板、正则、转义字符串）。C# `SyntaxGoldenTests` 逐字段对比：
+  **447 个 span 中仅 3 行存在 TextMateSharp↔vscode-oniguruma 引擎级差异**
+  （C# 插值串 capture 边界、vue `<style>` 内 CSS 类选择器被误判 invalid），以显式豁免
+  清单钉住（计数断言防新增退化），其余全绿。
+- **Avalonia 渲染**：行模型携带 `SyntaxRuns`（`DiffSyntaxRuns.Extract`：解析双主题变量、
+  按当前 ThemeVariant 取色、钳制到去换行显示文本、相邻同色合并、>150 span 降级）；
+  `DiffSegmentText` 每语法段独立 TextLayout，x 坐标取整行 layout 的
+  `HitTestTextPosition`（词级高亮矩形计算不变，叠放于语法色之下）；`DiffView`
+  增 `SyntaxHighlight`（默认开）与 `Highlighter`（注入引擎）。
+- **Demo**：语法开关、粘贴模式从 diff 头提取文件名（核心库不解析 diff 头，与 JS 一致，
+  由调用方提供；Demo 层便利）、C#/TS/JSON 三语言样例循环（真实新旧文件内容 + git diff
+  生成）。
+- **验证**：589 核心 + 28 headless 全绿；Demo 实机截图中立提问视觉验证（C#/TS/JSON/
+  深色 5 张：多色着色与代码结构吻合、深色可读、词级高亮叠加正常；视觉模型个别行号
+  描述有误，以程序化断言为准）。known-divergence 与 JS 行为差异（无 lowlight 回退：
+  不支持语言保持纯文本）记录于 CHANGELOG。
 
 ## 8. M6 打磨
 

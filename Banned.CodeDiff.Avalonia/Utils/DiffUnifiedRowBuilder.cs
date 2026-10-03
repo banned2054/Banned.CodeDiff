@@ -37,17 +37,24 @@ internal static class DiffUnifiedRowBuilder
                 continue;
             }
 
+            var lineText = (line.Value ?? line.Diff?.Text ?? string.Empty).TrimEnd('\r', '\n');
+
+            // Upstream prefers the new file's syntax line, falling back to the old one.
+            var syntaxLine = line.NewLineNumber is { } newNumber ? file.GetNewSyntaxLine(newNumber)
+                             : line.OldLineNumber is { } oldNumber ? file.GetOldSyntaxLine(oldNumber)
+                             : null;
+
+            var syntaxRuns = DiffSyntaxRuns.Extract(syntaxLine, lineText.Length, variant);
+
             // Raw gap lines revealed by expansion have no DiffLine — they render as plain
             // context rows from the file content.
             if (line.Diff is not { } diff)
             {
                 rows.Add(new DiffUnifiedContentRow(line.OldLineNumber?.ToString(), line.NewLineNumber?.ToString(),
-                                                   (line.Value ?? string.Empty).TrimEnd('\r', '\n'),
-                                                   DiffCellKind.Context, [], brushes));
+                                                   lineText, DiffCellKind.Context, [], syntaxRuns, brushes));
                 continue;
             }
 
-            var lineText = (line.Value ?? diff.Text)?.TrimEnd('\r', '\n') ?? string.Empty;
             var kind = diff.Type switch
             {
                 DiffLineType.Add    => DiffCellKind.Add,
@@ -56,7 +63,8 @@ internal static class DiffUnifiedRowBuilder
             };
 
             rows.Add(new DiffUnifiedContentRow(line.OldLineNumber?.ToString(), line.NewLineNumber?.ToString(),
-                                               lineText, kind, DiffHighlights.Extract(diff, kind), brushes));
+                                               lineText, kind, DiffHighlights.Extract(diff, kind), syntaxRuns,
+                                               brushes));
         }
 
         return rows;

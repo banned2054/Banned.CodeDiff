@@ -5,5 +5,18 @@
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
 	</PropertyGroup>
+	<ItemGroup>
+		<PackageReference Include="TextMateSharp" Version="2.0.4" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<InternalsVisibleTo Include="Banned.CodeDiff.Tests" />
+		<InternalsVisibleTo Include="Banned.CodeDiff.Avalonia.Tests" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<EmbeddedResource Include="Resources/TextMate/grammars/*.json" />
+		<EmbeddedResource Include="Resources/TextMate/themes/*.json" />
+	</ItemGroup>
 
 </Project>

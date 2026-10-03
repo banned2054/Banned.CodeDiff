@@ -18,9 +18,11 @@
             <Button Command="{Binding RenderCommand}" Content="渲染 diff" />
             <Button Command="{Binding LoadSampleCommand}" Content="载入示例" />
             <Button Command="{Binding LoadExpandableCommand}" Content="载入可展开示例" />
+            <Button Command="{Binding LoadSyntaxSampleCommand}" Content="载入语法示例(cs/ts/json 循环)" />
             <Button Command="{Binding ExpandAllCommand}" Content="全部展开" IsEnabled="{Binding CanExpandHunks}" />
             <Button Command="{Binding CollapseAllCommand}" Content="全部收起" IsEnabled="{Binding CanExpandHunks}" />
             <ToggleButton Content="词级高亮" IsChecked="{Binding IsFastDiff}" />
+            <ToggleButton Content="语法高亮" IsChecked="{Binding IsSyntax}" />
             <ToggleButton Content="Unified 视图" IsChecked="{Binding IsUnified}" />
             <ToggleButton Content="深色主题" IsChecked="{Binding IsDark}" />
         </StackPanel>
@@ -37,7 +39,7 @@
         <Border Grid.Row="2"
                 BorderBrush="Gray"
                 BorderThickness="1">
-            <views:DiffView DiffFile="{Binding DiffFile}" ViewMode="{Binding ViewMode}" />
+            <views:DiffView DiffFile="{Binding DiffFile}" SyntaxHighlight="{Binding IsSyntax}" ViewMode="{Binding ViewMode}" />
         </Border>
 
         <TextBlock Grid.Row="3" Margin="0,8,0,0" Text="{Binding Stats}" />

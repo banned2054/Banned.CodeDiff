@@ -26,6 +26,7 @@
 
 	<ItemGroup>
 		<Content Include="Golden\golden.json" CopyToOutputDirectory="PreserveNewest" />
+		<Content Include="Golden\syntax-golden.json" CopyToOutputDirectory="PreserveNewest" />
 	</ItemGroup>
 
 </Project>
