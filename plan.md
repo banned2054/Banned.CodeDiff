@@ -15,7 +15,7 @@
 |---|---|---|
 | M1 | 纯逻辑库（解析 + 行模型 + 词级区间 + 展开状态机） | ✅ 已完成 |
 | M2 | 最小可看：split 视图渲染 | ✅ 已完成 |
-| M3 | 词级高亮渲染 | ⬜ 下一步 |
+| M3 | 词级高亮渲染 | ✅ 已完成 |
 | M4 | hunk 展开/收起 UI + 虚拟化 | ⬜ |
 | M5 | 语法高亮 | ⬜ |
 | M6 | 打磨 | ⬜ |
@@ -99,9 +99,28 @@
 
 **验收**：
 
-- [ ] 配对增/删行的变更部分有词级背景高亮，与行级背景正确叠加。
-- [ ] DemoData 与手造样例渲染正确（与 JS 原版截图对照）。
-- [ ] 性能在 spike 结论允许范围内。
+- [x] 配对增/删行的变更部分有词级背景高亮，与行级背景正确叠加。
+- [x] 样例渲染正确（中立截图分析：`return 1/2` 行内 `1`/`2` 字符有嵌套深色块，
+      `WriteLine` 行没有——与上游配对规则一致）。
+- [x] Spike 结论：Avalonia 文本 Run 无背景属性（仅 Foreground），per-run 背景不可行；
+      采用 `TextLayout` 自绘（`HitTestTextPosition(int)→Rect` 解析区间边界 x 坐标，
+      `Draw(context, origin)` 绘制文本），矩形计算有独立单测。
+- [ ] 万行级性能基线 → 归入 M4（虚拟化一起做）。
+
+**执行结果（2026-10-03）**：
+
+- 新增 `Views/DiffSegmentText`（TextLayout 自绘：文本 + 词级高亮矩形，圆角 2px，
+  缓存 layout、文本/字体/前景变化失效）、`Models/DiffHighlight`（区间 record）、
+  `Utils/DiffHighlights`（区间提取：fast-diff 多段优先，`Changes` 单区间回退；
+  增行取 Insert 段、删行取 Delete 段）、`DiffBrushes` 增补 `*-content-highlight` 色
+  （浅 #aceebb/#ffcecb，深 #2f5732/#713431，对齐上游变量）。
+- 关键移植事实：`DiffItem` 区间基于**含行尾换行的原始行文本**，`EndIndex` 为闭区间——
+  高亮统一按 `[StartIndex, StartIndex+Length)` 计算并对显示文本钳制；
+  `GetDiffRange` 仅在 hunk 内增删行数相等时整批配对（与 JS 上游一致）。
+- Demo 加「词级高亮」开关（fast-diff 多段 ↔ 相对单区间，切换重建模型）。
+- headless 测试扩至 11 个（区间断言、矩形计算、独立控件测量渲染、明暗画刷值）；
+  顺带修复：核心测试项目 csproj 缺 xunit 框架包（此前跑在过期 restore 缓存上）、
+  UI 测试改用 `xunit.v3.mtp-v2` 3.2.2 + `global.json` MTP runner 配置。
 
 ## 6. M4 hunk 展开/收起 + 虚拟化
 

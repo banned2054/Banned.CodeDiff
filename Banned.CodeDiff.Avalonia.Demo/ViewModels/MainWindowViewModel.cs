@@ -14,9 +14,13 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     private DiffFile?     _diffFile;
     private bool          _isDark;
     private DiffViewMode  _viewMode = DiffViewMode.Split;
+    private bool          _isFastDiff = true;
 
     public MainWindowViewModel()
     {
+        // Word-level ranges are computed at DiffFile.Init() time; the global switch must be set
+        // before the first render. Toggling re-creates the file.
+        TemplateOptions.SetEnableFastDiffTemplate(_isFastDiff);
         RenderCommand     = new RelayCommand(Render);
         LoadSampleCommand = new RelayCommand(LoadSample);
         Render();
@@ -27,6 +31,19 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     public ICommand RenderCommand { get; }
 
     public ICommand LoadSampleCommand { get; }
+
+    public bool IsFastDiff
+    {
+        get => _isFastDiff;
+        set
+        {
+            if (Set(ref _isFastDiff, value))
+            {
+                TemplateOptions.SetEnableFastDiffTemplate(value);
+                Render();
+            }
+        }
+    }
 
     public string DiffText
     {

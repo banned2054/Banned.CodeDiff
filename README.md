@@ -40,8 +40,9 @@ Development follows the milestones in [plan.md](./plan.md):
 - Global template switches — `TemplateOptions` toggles fast-diff word-level diff and template building
 - Zero UI dependencies in the core library
 - `DiffView` Avalonia control — read-only GitHub-style diff view with line-level add/delete
-  backgrounds, collapsed hunk placeholders, and light/dark palettes; renders split (two columns)
-  or unified (single column, dual line numbers, deleted lines above the added ones)
+  backgrounds, word-level highlight blocks inside changed lines, collapsed hunk placeholders, and
+  light/dark palettes; renders split (two columns) or unified (single column, dual line numbers,
+  deleted lines above the added ones)
 
 ## Installation
 
@@ -76,8 +77,9 @@ application (Avalonia does not auto-discover control-library themes), then place
 Assign a `DiffFile` (built or not — the control invokes `Init` / `Build*DiffLines` on demand) and
 it stays in sync through the model's `Updated` event. `ViewMode` switches between the default
 `Split` and `Unified` rendering. The control uses a monospace font by default, auto-sizes the
-line-number columns, renders collapsed hunk placeholder rows, and switches its light/dark palette
-with `ActualThemeVariant`.
+line-number columns, renders collapsed hunk placeholder rows, switches its light/dark palette
+with `ActualThemeVariant`, and paints word-level highlight blocks inside changed lines when
+`DiffLine.DiffChanges` (fast-diff) or `DiffLine.Changes` (relative) ranges are available.
 
 Run the included demo to paste a diff and see it rendered:
 
@@ -190,8 +192,9 @@ dotnet test tests/Banned.CodeDiff.Avalonia.Tests/Banned.CodeDiff.Avalonia.Tests.
 ```
 
 577 core cases — including golden tests comparing field-by-field against the JS original
-(`@git-diff-view/core` + `fast-diff@1.3.0`) — plus 6 headless Avalonia UI tests covering the
-control theme, template instantiation, row building in both view modes, and mode switching.
+(`@git-diff-view/core` + `fast-diff@1.3.0`) — plus 11 headless Avalonia UI tests covering the
+control theme, template instantiation, row building in both view modes, mode switching, and
+word-level highlight ranges and rectangle computation.
 
 ## 📜 Changelog
 

@@ -9,8 +9,9 @@ public abstract class DiffUnifiedRow : DiffRow;
 public sealed class DiffUnifiedContentRow : DiffUnifiedRow
 {
     internal DiffUnifiedContentRow(string? oldNumber, string? newNumber, string text, DiffCellKind kind,
-                                    DiffBrushSet brushes)
+                                    IReadOnlyList<DiffHighlight> highlights, DiffBrushSet brushes)
     {
+        Highlights = highlights;
         OldNumber = oldNumber;
         NewNumber = newNumber;
         Text = text;
@@ -34,6 +35,12 @@ public sealed class DiffUnifiedContentRow : DiffUnifiedRow
             DiffCellKind.Delete => brushes.DeleteContent,
             _ => brushes.ContextContent,
         };
+        HighlightBrush = kind switch
+        {
+            DiffCellKind.Add => brushes.AddContentHighlight,
+            DiffCellKind.Delete => brushes.DeleteContentHighlight,
+            _ => null,
+        };
         NumberForeground = brushes.NumberForeground;
     }
 
@@ -51,6 +58,12 @@ public sealed class DiffUnifiedContentRow : DiffUnifiedRow
 
     /// <summary>Gets the sign glyph ("+", "-", or " ") shown before the text.</summary>
     public string Sign { get; }
+
+    /// <summary>Gets the word-level highlight ranges within <see cref="Text"/>.</summary>
+    public IReadOnlyList<DiffHighlight> Highlights { get; }
+
+    /// <summary>Gets the word-level highlight brush, or <c>null</c> when there is nothing to highlight.</summary>
+    public IBrush? HighlightBrush { get; }
 
     /// <summary>Gets the line-number cells background.</summary>
     public IBrush NumberBackground { get; }

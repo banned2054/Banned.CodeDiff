@@ -52,7 +52,7 @@ internal static class DiffSplitRowBuilder
         // instances with a null Diff; content rows always carry their DiffLine.
         if (item?.Diff is not { } diff)
         {
-            return new DiffSplitCellModel(null, string.Empty, DiffCellKind.Empty, brushes);
+            return new DiffSplitCellModel(null, string.Empty, DiffCellKind.Empty, [], brushes);
         }
 
         var number = item.LineNumber?.ToString();
@@ -64,6 +64,6 @@ internal static class DiffSplitRowBuilder
             _                   => DiffCellKind.Context,
         };
 
-        return new DiffSplitCellModel(number, text, kind, brushes);
+        return new DiffSplitCellModel(number, text, kind, DiffHighlights.Extract(diff, kind), brushes);
     }
 }

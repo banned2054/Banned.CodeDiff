@@ -24,8 +24,10 @@ public abstract class DiffSplitRow : DiffRow;
 /// <summary>One side of a split content row: line number, text, and resolved brushes.</summary>
 public sealed class DiffSplitCellModel
 {
-    internal DiffSplitCellModel(string? number, string text, DiffCellKind kind, DiffBrushSet brushes)
+    internal DiffSplitCellModel(string? number, string text, DiffCellKind kind,
+                                IReadOnlyList<DiffHighlight> highlights, DiffBrushSet brushes)
     {
+        Highlights = highlights;
         Number = number;
         Text   = text;
         Kind   = kind;
@@ -43,6 +45,14 @@ public sealed class DiffSplitCellModel
             DiffCellKind.Context => (brushes.ContextNumber, brushes.ContextContent),
             _                    => (brushes.EmptyNumber, brushes.EmptyContent),
         };
+        HighlightBrush = highlights.Count > 0
+            ? kind switch
+              {
+                  DiffCellKind.Add    => brushes.AddContentHighlight,
+                  DiffCellKind.Delete => brushes.DeleteContentHighlight,
+                  _                   => (IBrush?)null,
+              }
+            : null;
         NumberForeground = brushes.NumberForeground;
     }
 
@@ -57,6 +67,12 @@ public sealed class DiffSplitCellModel
 
     /// <summary>Gets the sign glyph ("+", "-", or " ") shown before the text.</summary>
     public string Sign { get; }
+
+    /// <summary>Gets the word-level highlight ranges within <see cref="Text"/>.</summary>
+    public IReadOnlyList<DiffHighlight> Highlights { get; }
+
+    /// <summary>Gets the word-level highlight brush, or <c>null</c> when there is nothing to highlight.</summary>
+    public IBrush? HighlightBrush { get; }
 
     /// <summary>Gets the line-number cell background.</summary>
     public IBrush NumberBackground { get; }

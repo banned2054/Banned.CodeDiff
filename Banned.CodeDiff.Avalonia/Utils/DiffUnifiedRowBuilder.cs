@@ -43,7 +43,7 @@ internal static class DiffUnifiedRowBuilder
             };
 
             rows.Add(new DiffUnifiedContentRow(line.OldLineNumber?.ToString(), line.NewLineNumber?.ToString(),
-                                               lineText, kind, brushes));
+                                               lineText, kind, DiffHighlights.Extract(diff, kind), brushes));
         }
 
         return rows;

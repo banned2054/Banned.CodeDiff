@@ -40,8 +40,8 @@ hunk 展开以及语法高亮。
 - **全局模板开关** — `TemplateOptions` 控制 fast-diff 词级 diff 与模板构建的启用。
 - 核心库**零 UI 依赖**。
 - **`DiffView` Avalonia 控件** — 只读 GitHub 风格 diff 视图，行级增删背景色、
-  收起 hunk 占位行、明暗两套配色；支持 split（双栏）与 unified（单栏、双行号、
-  删除行在新增行上方）两种视图模式。
+  变更行内的词级高亮块、收起 hunk 占位行、明暗两套配色；支持 split（双栏）与
+  unified（单栏、双行号、删除行在新增行上方）两种视图模式。
 
 ## 安装
 
@@ -186,7 +186,7 @@ dotnet test tests/Banned.CodeDiff.Avalonia.Tests/Banned.CodeDiff.Avalonia.Tests.
 ```
 
 577 个核心用例（含与 JS 原版 `@git-diff-view/core` + `fast-diff@1.3.0` 逐字段对比的黄金基准）
-+ 6 个 headless Avalonia UI 测试（覆盖控件主题加载、模板实例化、两种视图的行构建与模式切换）。
++ 11 个 headless Avalonia UI 测试（覆盖主题加载、模板实例化、两种视图行构建、模式切换、词级高亮区间与矩形计算）。
 
 ## 📜 更新日志
 

@@ -82,6 +82,12 @@
   不能带 x:Key。
 - 新增控件的主题一律加入该字典，不另开第二入口；`TextBox.Watermark` 在 Avalonia 12 已改名
   `PlaceholderText`。
+- **运行时按 URI 加载编译 XAML 会报 "No precompiled XAML found"**（Demo 能工作是因为
+  编译期 include）——测试/宿主要引入库主题必须走**编译期** include：带 `x:Class` 的
+  `Styles` 子类 `AvaloniaXamlLoader.Load(this)`，不要用 C# 运行时构造 `StyleInclude`。
+- Avalonia 12 的 `FormattedText` 已无 `Text`/`Bounds`/`HitTestTextPosition`；自绘文本用
+  `TextLayout`（`HitTestTextPosition(int)→Rect`、`Draw(context, origin)`、
+  `TextLines[i].WidthIncludingTrailingWhitespace/Height`），`FillRectangle` 圆角参数是 float。
 - `DiffFile` 等核心类型位于 `Banned.CodeDiff.Services` 命名空间（不是 Models）。
 - UI 回归测试在 `tests/Banned.CodeDiff.Avalonia.Tests`（xunit.v3 + Avalonia.Headless.XUnit；
   该包依赖 **xunit.v3** 而非 xunit 2.x，注册方式为
@@ -100,7 +106,15 @@
 ## 构建与验证
 
 - 本地验证使用 `dotnet build Banned.CodeDiff.slnx`，需要时追加 `-c Release`。
-- 测试使用 `dotnet test tests/Banned.CodeDiff.Tests/Banned.CodeDiff.Tests.csproj`。
+- 测试使用 `dotnet test --project tests/Banned.CodeDiff.Tests/Banned.CodeDiff.Tests.csproj`
+  与 `dotnet test --project tests/Banned.CodeDiff.Avalonia.Tests/Banned.CodeDiff.Avalonia.Tests.csproj`
+  （.NET 10 SDK 的 `dotnet test` 走 MTP 模式，runner 由仓库根 `global.json` 的
+  `test.runner=Microsoft.Testing.Platform` 指定；不要移除该文件）。
+- **Avalonia UI 测试项目必须用 `xunit.v3.mtp-v2` 3.2.2**（Avalonia.Headless.XUnit 12.1.0
+  按此风味编译；用 `xunit.v3` 主包会 MissingMethodException，升 4.x 也一样）。核心测试
+  项目用 `xunit.v3` 3.2.2 + `xunit.runner.visualstudio` 4.0.0。
+- 改包引用后警惕**过期 restore 缓存的假绿**：csproj 删包后旧 assets 仍能让构建/测试通过，
+  必须实际触发还原再验证。
 - 测试已通过 `xunit.runner.json` 关闭并行（`DiffParser.Shared` 全局有状态所致），**不要移除该配置**。
 - 重新生成黄金数据：`cd tests/js-harness && node build.mjs`（需要 esbuild 与 `fast-diff@1.3.0`，
   源仓库路径可用 `GDV_REPO` 覆盖）。

@@ -36,7 +36,9 @@
                                                         VerticalAlignment="Center">
                                                 <TextBlock Margin="0,0,6,0"
                                                            Text="{Binding Left.Sign}" />
-                                                <TextBlock Text="{Binding Left.Text}" />
+                                                <v:DiffSegmentText Text="{Binding Left.Text}"
+                                                                   HighlightBrush="{Binding Left.HighlightBrush}"
+                                                                   Highlights="{Binding Left.Highlights}" />
                                             </StackPanel>
                                         </Border>
                                         <Rectangle Grid.Column="2"
@@ -58,7 +60,9 @@
                                                         VerticalAlignment="Center">
                                                 <TextBlock Margin="0,0,6,0"
                                                            Text="{Binding Right.Sign}" />
-                                                <TextBlock Text="{Binding Right.Text}" />
+                                                <v:DiffSegmentText Text="{Binding Right.Text}"
+                                                                   HighlightBrush="{Binding Right.HighlightBrush}"
+                                                                   Highlights="{Binding Right.Highlights}" />
                                             </StackPanel>
                                         </Border>
                                     </Grid>
@@ -114,7 +118,9 @@
                                         VerticalAlignment="Center">
                                 <TextBlock Margin="0,0,6,0"
                                            Text="{Binding Sign}" />
-                                <TextBlock Text="{Binding Text}" />
+                                <v:DiffSegmentText Text="{Binding Text}"
+                                                   HighlightBrush="{Binding HighlightBrush}"
+                                                   Highlights="{Binding Highlights}" />
                             </StackPanel>
                         </Border>
                     </Grid>

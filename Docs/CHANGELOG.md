@@ -24,6 +24,11 @@
   `Init`/`BuildSplitDiffLines` on demand and the view refreshes through the model's `Updated` event.
 - Demo app (`Banned.CodeDiff.Avalonia.Demo`): paste a unified diff text and render it, with a
   built-in sample, light/dark theme toggle, and add/delete statistics.
+- Word-level highlight rendering (M3): the changed ranges inside paired add/delete lines are
+  highlighted with nested background blocks (`DiffSegmentText`, a custom-drawn text control based
+  on `TextLayout.HitTestTextPosition` — Avalonia text runs expose no per-run background). Fast-diff
+  segments are preferred with the relative-changes single range as fallback; both view modes and
+  both palettes are covered, and the demo gains a highlight toggle.
 - Unified view mode: `DiffView.ViewMode` switches between split (default) and unified rendering —
   single column with dual (old/new) line-number columns, deleted lines above the added ones,
   matching the GitHub unified layout. The demo gains a mode toggle and dual-model statistics.

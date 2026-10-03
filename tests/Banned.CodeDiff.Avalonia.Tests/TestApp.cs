@@ -18,10 +18,7 @@ public class TestApp : Application
 {
     public override void Initialize()
     {
-        Styles.Add(new StyleInclude(new Uri("avares://Banned.CodeDiff.Avalonia.Tests/"))
-        {
-            Source = new Uri("avares://Banned.CodeDiff.Avalonia/Themes/Generic.axaml", UriKind.Absolute),
-        });
+        Styles.Add(new TestAppStyles());
     }
 
     public override void OnFrameworkInitializationCompleted()

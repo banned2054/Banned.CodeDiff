@@ -1,0 +1,5 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Banned.CodeDiff.Avalonia.Tests.TestAppStyles">
+    <StyleInclude Source="avares://Banned.CodeDiff.Avalonia/Themes/Generic.axaml" />
+</Styles>

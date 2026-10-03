@@ -23,6 +23,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Banned.CodeDiff.Avalonia.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Banned.CodeDiff\Banned.CodeDiff.csproj" />
   </ItemGroup>
 
