@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="Banned.CodeDiff/Banned.CodeDiff.csproj" />
+  <Project Path="tests/Banned.CodeDiff.Tests/Banned.CodeDiff.Tests.csproj" />
+</Solution>

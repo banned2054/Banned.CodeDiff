@@ -1,0 +1,39 @@
+Banned.CodeDiff
+Copyright (c) Banned
+
+This project is a C#/.NET port of the git-diff-view project, with an Avalonia
+rendering layer.
+
+Portions of the design, parsing logic, algorithms, and behavior are based on or
+derived from:
+
+git-diff-view
+Copyright (c) 2022 MrWangJustToDo
+Licensed under the MIT License
+https://github.com/MrWangJustToDo/git-diff-view
+
+The diff parser ported through git-diff-view (Services/DiffParser.cs) originates
+from GitHub Desktop:
+
+desktop
+Copyright (c) GitHub, Inc.
+Licensed under the MIT License
+https://github.com/desktop/desktop
+
+The HTML escaping utility ported through git-diff-view (Utils/EscapeHtml.cs)
+originates from the Vue.js core packages/shared/src/escape-html.ts, licensed
+under the MIT License.
+
+The character-level diff implementation (Services/FastDiff.cs) is a C# port of:
+
+fast-diff
+Copyright (c) Jason Chen <jhchen7@gmail.com>
+Licensed under the Apache License, Version 2.0
+https://github.com/jhchen/fast-diff
+
+fast-diff itself modifies the diff-match-patch library by Neil Fraser.
+
+The golden-test harness (tests/js-harness) bundles the TypeScript sources of
+git-diff-view and fast-diff@1.3.0 with esbuild to generate reference data at
+development time. These sources are test-only inputs and are not distributed
+with the compiled libraries or NuGet packages.

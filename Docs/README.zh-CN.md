@@ -1,0 +1,167 @@
+# Banned.CodeDiff
+
+[**English**](https://github.com/banned2054/Banned.CodeDiff/blob/master/README.md) | 简体中文
+
+[![NuGet](https://img.shields.io/nuget/v/Banned.CodeDiff.Avalonia.svg)](https://www.nuget.org/packages/Banned.CodeDiff.Avalonia) [![Downloads](https://img.shields.io/nuget/dt/Banned.CodeDiff.Avalonia.svg)](https://www.nuget.org/packages/Banned.CodeDiff.Avalonia) [![License](https://img.shields.io/badge/license-Apache_2.0-green)](https://github.com/banned2054/Banned.CodeDiff/blob/master/LICENSE)
+
+Avalonia 代码 diff 渲染控件库：GitHub 风格的 split / unified 视图，支持行级与词级高亮、
+hunk 展开以及语法高亮。
+
+宿主应用负责提供 diff 文本和外围 UI；本仓库负责 diff 解析、split / unified 行配对、
+词级变更区间、hunk 展开/收起状态和渲染。核心逻辑库零 UI 依赖，也可以驱动 WPF、
+控制台或其他任何 .NET 宿主。
+
+本项目是 [`git-diff-view`](https://github.com/MrWangJustToDo/git-diff-view) 的 C# 移植版；
+上游署名见 [NOTICE](https://github.com/banned2054/Banned.CodeDiff/blob/master/NOTICE)。
+
+## 状态
+
+开发按 [plan.md](https://github.com/banned2054/Banned.CodeDiff/blob/master/plan.md) 的里程碑推进：
+
+| 里程碑 | 范围 | 状态 |
+|---|---|---|
+| M1 | 核心逻辑库 `Banned.CodeDiff` | 已完成 — 577 测试全绿，含与 JS 原版对比的黄金基准 |
+| M2 | `Banned.CodeDiff.Avalonia` 最小 split 视图 | 下一步 |
+| M3 | 词级高亮渲染 | 计划中 |
+| M4 | hunk 展开/收起 + 虚拟化 | 计划中 |
+| M5 | 语法高亮（TextMateSharp） | 计划中 |
+| M6 | 深浅主题、wrap、复制 | 计划中 |
+
+## 功能
+
+- **统一 diff 解析** — GNU unified diff 文本 → 结构化 `RawDiff`（多文件、多 hunk，
+  支持 CRLF、`\ No newline at end of file`、二进制标记、bidi 隐藏字符检测）。
+- **split / unified 行模型** — 构建左右配对的双栏行与单栏行（行号、增/删/改类型、
+  收起占位），附带行号→索引查找等访问器，直接喂给列表控件渲染。
+- **行内词级 diff** — 配对的增/删行的字符级差异区间，提供 relative-changes 与
+  fast-diff 两种算法结果（`DiffLine.Changes` / `DiffLine.DiffChanges`），可直接驱动行内高亮。
+- **hunk 展开/收起** — up / down / all 方向的展开状态机，步长可配（默认 40 行）；
+  每次变更触发 `Updated` 事件，宿主刷新界面即可。
+- **全局模板开关** — `TemplateOptions` 控制 fast-diff 词级 diff 与模板构建的启用。
+- 核心库**零 UI 依赖**。
+
+## 安装
+
+```powershell
+dotnet add package Banned.CodeDiff.Avalonia
+```
+
+> 控件包尚未发布（M2 开发中）。在此之前请通过项目引用
+> `Banned.CodeDiff/Banned.CodeDiff.csproj` 使用核心逻辑库。`Banned.CodeDiff` 是否单独发布
+> NuGet 包尚未决定。
+
+## 基本用法
+
+把原始 diff 文本和完整的新旧文件内容交给 `DiffFile`，再读取构建好的行模型：
+
+```csharp
+using Banned.CodeDiff.Models;
+using Banned.CodeDiff.Services;
+
+const string diffText = """
+    diff --git a/Program.cs b/Program.cs
+    --- a/Program.cs
+    +++ b/Program.cs
+    @@ -1,2 +1,3 @@
+     using System;
+    -Console.WriteLine("Hello");
+    +Console.WriteLine("Hello, World!");
+    +Console.ReadLine();
+    """;
+
+const string oldText = "using System;\nConsole.WriteLine(\"Hello\");";
+const string newText = "using System;\nConsole.WriteLine(\"Hello, World!\");\nConsole.ReadLine();";
+
+var file = new DiffFile(
+    oldFileName: "a/Program.cs",
+    oldFileContent: oldText,
+    newFileName: "b/Program.cs",
+    newFileContent: newText,
+    diffList: [diffText]);
+
+file.Init();
+file.BuildSplitDiffLines();
+
+for (var i = 0; i < file.SplitLineLength; i++)
+{
+    var left = file.GetSplitLeftLine(i);
+    var right = file.GetSplitRightLine(i);
+
+    foreach (var item in new[] { left, right })
+    {
+        if (item?.Diff is not { } line)
+        {
+            continue; // 收起占位行等
+        }
+
+        Console.WriteLine($"{line.OldLineNumber}/{line.NewLineNumber} [{line.Type}] {item.Value?.TrimEnd('\r', '\n')}");
+    }
+}
+
+// 单栏视图同理：file.BuildUnifiedDiffLines(); file.GetUnifiedLine(i);
+```
+
+统计信息：`file.AdditionLength` / `DeletionLength`（增删行数）、`DiffLineLength`
+（diff 总行数）、`DiffTool.GetLang(fileName)`（由文件名探测语言）。
+
+## 词级变更
+
+在 `Init()` 前开启 fast-diff 词级区间（可选）：
+
+```csharp
+TemplateOptions.SetEnableFastDiffTemplate(true);
+```
+
+`Init()` 之后，配对的增/删行会携带可用于行内高亮的字符区间（Context 行为 `null`）。
+每个 `DiffItem` 包含操作类型 `Type`，以及行内文本的 `StartIndex` / `Length`：
+
+```csharp
+foreach (var item in line.DiffChanges?.Range ?? [])
+{
+    // item.Type：equal / insert / delete
+    // item.StartIndex .. item.StartIndex + item.Length：行内文本的区间
+}
+```
+
+`DiffLine.Changes` 保存用途相同的 relative-changes 算法结果。
+
+## hunk 展开
+
+收起的 hunk 可以在运行时展开；宿主在 `Updated` 回调里刷新：
+
+```csharp
+file.Updated += () => Console.WriteLine($"模型已更新（{file.UpdateCount}）");
+
+file.OnSplitHunkExpand(HunkExpandDirection.All, 0);
+// 单栏对应：file.OnUnifiedHunkExpand(HunkExpandDirection.Up, index);
+```
+
+## 使用注意
+
+- `DiffParser.Shared` 与 `TemplateOptions` 是全局有状态的（与 JS 原版一致），
+  请勿跨线程并发调用；并发场景请为每个线程创建独立的 `DiffParser` 实例。
+- 行文本（`SplitLineItem.Value` / `DiffLine.Text`）保留原始行尾换行符
+  （源文件最后一行除外），按原样渲染即可；拼接到其他字符串时注意 `TrimEnd`。
+- 字符级 diff（fast-diff）内置递归深度护栏：对病态输入抛出可捕获的
+  `InvalidOperationException`，而不是栈溢出。
+
+## 测试
+
+```powershell
+dotnet test tests/Banned.CodeDiff.Tests/Banned.CodeDiff.Tests.csproj
+```
+
+577 个用例，含与 JS 原版（`@git-diff-view/core` + `fast-diff@1.3.0`）逐字段对比的
+黄金基准测试。
+
+## 📜 更新日志
+
+[🧾 查看 CHANGELOG](https://github.com/banned2054/Banned.CodeDiff/blob/master/Docs/CHANGELOG.md)
+
+## ⚖️ 许可证
+
+Copyright (c) 2026 banned.
+
+本项目基于 Apache License 2.0 授权，详见
+[LICENSE](https://github.com/banned2054/Banned.CodeDiff/blob/master/LICENSE)。
+上游署名与第三方声明见 [NOTICE](https://github.com/banned2054/Banned.CodeDiff/blob/master/NOTICE)。
