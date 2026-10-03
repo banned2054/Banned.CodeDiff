@@ -1,6 +1,6 @@
 using Banned.CodeDiff.Services;
 using System.Text.Json.Nodes;
-using Xunit;
+using NUnit.Framework;
 
 namespace Banned.CodeDiff.Tests;
 
@@ -14,8 +14,8 @@ public class DiffFileGoldenTests
     public static IEnumerable<object[]> Cases =>
         GoldenSupport.Golden["diffFile"]!.AsArray().Select((c, i) => new object[] { i });
 
-    [Theory]
-    [MemberData(nameof(Cases))]
+    [Test]
+    [TestCaseSource(nameof(Cases))]
     public void MatchesDiffFilePipeline(int index)
     {
         var c      = GoldenSupport.Golden["diffFile"]![index]!.AsObject();
@@ -33,7 +33,8 @@ public class DiffFileGoldenTests
             var expected = models[m]!["model"]!.AsObject();
             var actual   = GoldenSupport.DumpModel(df);
             var diffs    = GoldenSupport.Compare(expected, actual);
-            Assert.True(diffs.Count == 0,
+            Assert.That(diffs.Count == 0,
+                        Is.True,
                         $"diffFile #{index} ({c["name"]}) model step {m}: {string.Join("\n", diffs)}");
         }
     }

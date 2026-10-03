@@ -2,12 +2,15 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Headless;
-using Avalonia.Headless.XUnit;
+using NUnit.Framework;
 using Avalonia.Markup.Xaml;
 using Avalonia.Markup.Xaml.Styling;
 using Avalonia.Styling;
 
 [assembly: AvaloniaTestApplication(typeof(Banned.CodeDiff.Avalonia.Tests.TestAppBuilder))]
+
+// DiffParser.Shared and TemplateOptions are global mutable state; keep tests sequential.
+[assembly: Parallelizable(ParallelScope.None)]
 
 namespace Banned.CodeDiff.Avalonia.Tests;
 

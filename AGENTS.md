@@ -106,13 +106,16 @@
 ## 构建与验证
 
 - 本地验证使用 `dotnet build Banned.CodeDiff.slnx`，需要时追加 `-c Release`。
-- 测试使用 `dotnet test --project tests/Banned.CodeDiff.Tests/Banned.CodeDiff.Tests.csproj`
-  与 `dotnet test --project tests/Banned.CodeDiff.Avalonia.Tests/Banned.CodeDiff.Avalonia.Tests.csproj`
-  （.NET 10 SDK 的 `dotnet test` 走 MTP 模式，runner 由仓库根 `global.json` 的
-  `test.runner=Microsoft.Testing.Platform` 指定；不要移除该文件）。
-- **Avalonia UI 测试项目必须用 `xunit.v3.mtp-v2` 3.2.2**（Avalonia.Headless.XUnit 12.1.0
-  按此风味编译；用 `xunit.v3` 主包会 MissingMethodException，升 4.x 也一样）。核心测试
-  项目用 `xunit.v3` 3.2.2 + `xunit.runner.visualstudio` 4.0.0。
+- 测试框架为 **NUnit 5.0.0**（约束模型断言 `Assert.That`，NUnit 5 无 ClassicAssert）+
+  `NUnit3TestAdapter` 6.3.0（VSTest 模式）：`dotnet test tests/Banned.CodeDiff.Tests/...csproj`
+  与 `dotnet test tests/Banned.CodeDiff.Avalonia.Tests/...csproj`。
+- **NUnit 5.0.0 已移除 `EnableNUnitRunner`/MTP 集成**（props 为空、零依赖），不要重新引入
+  `global.json` 的 MTP runner 配置（会用过然后已删除，VSTest 适配器路线才可用）。
+- UI 测试用 `Avalonia.Headless.NUnit`（其编译目标是 NUnit 4.5.1，在 NUnit 5.0.0 运行时
+  实测兼容），测试方法标 `[AvaloniaTest]`，应用注册仍是
+  `[assembly: AvaloniaTestApplication(typeof(Builder))]` + 静态 `BuildAvaloniaApp()`。
+- 两个测试项目都声明了 `[assembly: Parallelizable(ParallelScope.None)]`——
+  `DiffParser.Shared`/`TemplateOptions` 全局有状态，禁止并行，不要移除。
 - 改包引用后警惕**过期 restore 缓存的假绿**：csproj 删包后旧 assets 仍能让构建/测试通过，
   必须实际触发还原再验证。
 - 测试已通过 `xunit.runner.json` 关闭并行（`DiffParser.Shared` 全局有状态所致），**不要移除该配置**。

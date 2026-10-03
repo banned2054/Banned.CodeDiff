@@ -185,8 +185,9 @@ dotnet test tests/Banned.CodeDiff.Tests/Banned.CodeDiff.Tests.csproj
 dotnet test tests/Banned.CodeDiff.Avalonia.Tests/Banned.CodeDiff.Avalonia.Tests.csproj
 ```
 
-577 个核心用例（含与 JS 原版 `@git-diff-view/core` + `fast-diff@1.3.0` 逐字段对比的黄金基准）
-+ 11 个 headless Avalonia UI 测试（覆盖主题加载、模板实例化、两种视图行构建、模式切换、词级高亮区间与矩形计算）。
+577 个核心用例（NUnit，含与 JS 原版 `@git-diff-view/core` + `fast-diff@1.3.0` 逐字段对比的黄金基准）
++ 11 个 headless Avalonia UI 测试（NUnit + Avalonia.Headless.NUnit，覆盖主题加载、模板实例化、
+两种视图行构建、模式切换、词级高亮区间与矩形计算）。
 
 ## 📜 更新日志
 

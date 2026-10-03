@@ -191,10 +191,10 @@ dotnet test tests/Banned.CodeDiff.Tests/Banned.CodeDiff.Tests.csproj
 dotnet test tests/Banned.CodeDiff.Avalonia.Tests/Banned.CodeDiff.Avalonia.Tests.csproj
 ```
 
-577 core cases — including golden tests comparing field-by-field against the JS original
-(`@git-diff-view/core` + `fast-diff@1.3.0`) — plus 11 headless Avalonia UI tests covering the
-control theme, template instantiation, row building in both view modes, mode switching, and
-word-level highlight ranges and rectangle computation.
+577 core cases (NUnit, golden tests comparing field-by-field against the JS original
+`@git-diff-view/core` + `fast-diff@1.3.0`) — plus 11 headless Avalonia UI tests (NUnit +
+Avalonia.Headless.NUnit) covering the control theme, template instantiation, row building in
+both view modes, mode switching, and word-level highlight ranges and rectangle computation.
 
 ## 📜 Changelog
 

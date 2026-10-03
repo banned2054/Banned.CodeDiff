@@ -121,6 +121,9 @@
 - headless 测试扩至 11 个（区间断言、矩形计算、独立控件测量渲染、明暗画刷值）；
   顺带修复：核心测试项目 csproj 缺 xunit 框架包（此前跑在过期 restore 缓存上）、
   UI 测试改用 `xunit.v3.mtp-v2` 3.2.2 + `global.json` MTP runner 配置。
+  （后续按用户要求整体切换 **NUnit 5.0.0** + `NUnit3TestAdapter`：NUnit 5 无 MTP 集成，
+  移除了 `global.json`；`Avalonia.Headless.NUnit` 编译目标 4.5.1 但在 5.0.0 运行时实测兼容；
+  两项目以 `[assembly: Parallelizable(ParallelScope.None)]` 保证串行。约定详见 AGENTS.md。）
 
 ## 6. M4 hunk 展开/收起 + 虚拟化
 

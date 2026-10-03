@@ -1,7 +1,7 @@
 using Banned.CodeDiff.Services;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using Xunit;
+using NUnit.Framework;
 
 namespace Banned.CodeDiff.Tests;
 
@@ -16,8 +16,8 @@ public class FastDiffGoldenTests
     public static IEnumerable<object[]> Cases =>
         GoldenSupport.Golden["fastDiff"]!.AsArray().Select((c, i) => new object[] { i });
 
-    [Theory]
-    [MemberData(nameof(Cases))]
+    [Test]
+    [TestCaseSource(nameof(Cases))]
     public void MatchesFastDiffJs(int index)
     {
         var c = GoldenSupport.Golden["fastDiff"]![index]!.AsObject();
@@ -33,7 +33,7 @@ public class FastDiffGoldenTests
             var jsError = c["error"]?.GetValue<string>() ?? "";
             if (jsError.Contains("Maximum call stack"))
             {
-                Assert.ThrowsAny<Exception>(() => RunCase(c));
+                Assert.Catch<Exception>(() => RunCase(c));
             }
 
             return;
@@ -42,7 +42,8 @@ public class FastDiffGoldenTests
         var actual = RunCase(c);
 
         var diffs = GoldenSupport.Compare(c["out"], GoldenSupport.DumpFastDiffResult(actual));
-        Assert.True(diffs.Count == 0,
+        Assert.That(diffs.Count == 0,
+                    Is.True,
                     $"case #{index}: {string.Join("\n", diffs)}\ninput a={Truncate(a)} b={Truncate(b)}");
     }
 

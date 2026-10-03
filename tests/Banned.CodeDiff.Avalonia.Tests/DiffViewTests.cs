@@ -1,7 +1,7 @@
 using System.Globalization;
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Headless.XUnit;
+using Avalonia.Headless.NUnit;
 using Avalonia.Media;
 using Avalonia.Media.TextFormatting;
 using Avalonia.VisualTree;
@@ -9,7 +9,7 @@ using Banned.CodeDiff.Avalonia.Models;
 using Banned.CodeDiff.Avalonia.Views;
 using Banned.CodeDiff.Models;
 using Banned.CodeDiff.Services;
-using Xunit;
+using NUnit.Framework;
 
 namespace Banned.CodeDiff.Avalonia.Tests;
 
@@ -22,14 +22,14 @@ public class DiffViewTests
         @@ -1,6 +1,7 @@
          using System;
          using System.Text;
- 
+         
         -Console.WriteLine("Hello");
         +Console.WriteLine("Hello, World!");
         +var name = Console.ReadLine();
- 
+         
          if (args.Length > 0)
         @@ -10,3 +11,4 @@
-
+         
         -    return 1;
         +    return 2;
          }
@@ -45,117 +45,124 @@ public class DiffViewTests
         return file;
     }
 
-    [AvaloniaFact]
+    /// <summary>xunit's Assert.IsType returned the cast value; keep that pattern with exact-type semantics.</summary>
+    private static T As<T>(object? value) where T : class
+    {
+        Assert.That(value, Is.TypeOf<T>());
+        return (T)value!;
+    }
+
+    [AvaloniaTest]
     public void DiffView_BuildsExpectedRows_FromSampleDiff()
     {
         var view = new DiffView { DiffFile = CreateSampleFile() };
 
         // 11 content rows + 2 hunk placeholder rows.
-        Assert.Equal(13, view.Rows.Count);
-        Assert.Equal(2, view.Rows.OfType<DiffSplitHunkRow>().Count());
-        Assert.Equal(11, view.Rows.OfType<DiffSplitContentRow>().Count());
+        Assert.That(view.Rows.Count, Is.EqualTo(13));
+        Assert.That(view.Rows.OfType<DiffSplitHunkRow>().Count(), Is.EqualTo(2));
+        Assert.That(view.Rows.OfType<DiffSplitContentRow>().Count(), Is.EqualTo(11));
 
-        var firstHunk = Assert.IsType<DiffSplitHunkRow>(view.Rows[0]);
-        Assert.StartsWith("@@", firstHunk.HunkText);
+        var firstHunk = As<DiffSplitHunkRow>(view.Rows[0]);
+        Assert.That(firstHunk.HunkText, Does.StartWith("@@"));
 
         // Rows[0] is the hunk placeholder; content rows follow. Probe split index 3 pairs the
         // deleted and added Console.WriteLine lines, so it lands at Rows[4].
-        var pair = Assert.IsType<DiffSplitContentRow>(view.Rows[4]);
-        Assert.Equal(DiffCellKind.Delete, pair.Left.Kind);
-        Assert.Equal(DiffCellKind.Add, pair.Right.Kind);
+        var pair = As<DiffSplitContentRow>(view.Rows[4]);
+        Assert.That(pair.Left.Kind, Is.EqualTo(DiffCellKind.Delete));
+        Assert.That(pair.Right.Kind, Is.EqualTo(DiffCellKind.Add));
 
         // The add-only line (probe index 4 -> Rows[5]) has an empty left placeholder.
-        var addOnly = Assert.IsType<DiffSplitContentRow>(view.Rows[5]);
-        Assert.Equal(DiffCellKind.Empty, addOnly.Left.Kind);
-        Assert.Equal(DiffCellKind.Add, addOnly.Right.Kind);
+        var addOnly = As<DiffSplitContentRow>(view.Rows[5]);
+        Assert.That(addOnly.Left.Kind, Is.EqualTo(DiffCellKind.Empty));
+        Assert.That(addOnly.Right.Kind, Is.EqualTo(DiffCellKind.Add));
     }
 
-    [AvaloniaFact]
+    [AvaloniaTest]
     public void DiffView_AppliesControlTheme_And_InstantiatesTemplate()
     {
         var view = new DiffView { DiffFile = CreateSampleFile() };
         var window = new Window { Content = view };
         window.Show();
 
-        // The ControlTheme (loaded through the consumer-style StyleInclude in TestApp) must have
+        // The ControlTheme (loaded through the consumer-style include in TestAppStyles) must have
         // produced a visual tree: a ScrollViewer with an ItemsControl inside.
-        Assert.Contains(view.GetVisualDescendants(), d => d is ScrollViewer);
+        Assert.That(view.GetVisualDescendants(), Has.Some.InstanceOf<ScrollViewer>());
         var items = view.GetVisualDescendants().OfType<ItemsControl>().Single();
-        Assert.Equal(13, items.Items.Count());
+        Assert.That(items.Items.Count(), Is.EqualTo(13));
     }
 
-    [AvaloniaFact]
+    [AvaloniaTest]
     public void DiffView_UsesUpstreamLightPalette()
     {
         var view = new DiffView { DiffFile = CreateSampleFile() };
 
-        var pair = Assert.IsType<DiffSplitContentRow>(view.Rows[4]);
-        var addBrush = Assert.IsType<SolidColorBrush>(pair.Right.ContentBackground);
-        var deleteBrush = Assert.IsType<SolidColorBrush>(pair.Left.ContentBackground);
+        var pair = As<DiffSplitContentRow>(view.Rows[4]);
+        var addBrush = As<SolidColorBrush>(pair.Right.ContentBackground);
+        var deleteBrush = As<SolidColorBrush>(pair.Left.ContentBackground);
 
         // Upstream git-diff-view light values: --diff-add-content-- / --diff-del-content--.
-        Assert.Equal(Color.Parse("#dafbe1"), addBrush.Color);
-        Assert.Equal(Color.Parse("#ffebe9"), deleteBrush.Color);
+        Assert.That(addBrush.Color, Is.EqualTo(Color.Parse("#dafbe1")));
+        Assert.That(deleteBrush.Color, Is.EqualTo(Color.Parse("#ffebe9")));
     }
 
-    [AvaloniaFact]
+    [AvaloniaTest]
     public void DiffView_ClearsRows_WhenFileRemoved()
     {
         var view = new DiffView { DiffFile = CreateSampleFile() };
         view.DiffFile = null;
-        Assert.Empty(view.Rows);
+        Assert.That(view.Rows, Is.Empty);
     }
 
-    [AvaloniaFact]
+    [AvaloniaTest]
     public void DiffView_UnifiedMode_BuildsExpectedRows()
     {
         var view = new DiffView { DiffFile = CreateSampleFile(), ViewMode = DiffViewMode.Unified };
 
         // 13 content rows + 2 hunk placeholder rows; deletes and adds are separate rows.
-        Assert.Equal(15, view.Rows.Count);
-        Assert.Equal(2, view.Rows.OfType<DiffUnifiedHunkRow>().Count());
-        Assert.Equal(13, view.Rows.OfType<DiffUnifiedContentRow>().Count());
+        Assert.That(view.Rows.Count, Is.EqualTo(15));
+        Assert.That(view.Rows.OfType<DiffUnifiedHunkRow>().Count(), Is.EqualTo(2));
+        Assert.That(view.Rows.OfType<DiffUnifiedContentRow>().Count(), Is.EqualTo(13));
 
-        Assert.StartsWith("@@", Assert.IsType<DiffUnifiedHunkRow>(view.Rows[0]).HunkText);
+        Assert.That(As<DiffUnifiedHunkRow>(view.Rows[0]).HunkText, Does.StartWith("@@"));
 
         // Delete above add (probe unified indexes 3/4 -> visual rows 4/5 with the leading hunk row).
-        var delete = Assert.IsType<DiffUnifiedContentRow>(view.Rows[4]);
-        Assert.Equal(DiffCellKind.Delete, delete.Kind);
-        Assert.Equal("4", delete.OldNumber);
-        Assert.Null(delete.NewNumber);
+        var delete = As<DiffUnifiedContentRow>(view.Rows[4]);
+        Assert.That(delete.Kind, Is.EqualTo(DiffCellKind.Delete));
+        Assert.That(delete.OldNumber, Is.EqualTo("4"));
+        Assert.That(delete.NewNumber, Is.Null);
 
-        var add = Assert.IsType<DiffUnifiedContentRow>(view.Rows[5]);
-        Assert.Equal(DiffCellKind.Add, add.Kind);
-        Assert.Null(add.OldNumber);
-        Assert.Equal("4", add.NewNumber);
+        var add = As<DiffUnifiedContentRow>(view.Rows[5]);
+        Assert.That(add.Kind, Is.EqualTo(DiffCellKind.Add));
+        Assert.That(add.OldNumber, Is.Null);
+        Assert.That(add.NewNumber, Is.EqualTo("4"));
 
         // Second hunk placeholder above unified index 8.
-        Assert.IsType<DiffUnifiedHunkRow>(view.Rows[9]);
+        Assert.That(view.Rows[9], Is.TypeOf<DiffUnifiedHunkRow>());
 
         // 2 deletes and 4 adds render as separate rows (the sample's Deletion/Addition counts).
         var content = view.Rows.OfType<DiffUnifiedContentRow>().ToList();
-        Assert.Equal(2, content.Count(r => r.Kind == DiffCellKind.Delete));
-        Assert.Equal(4, content.Count(r => r.Kind == DiffCellKind.Add));
+        Assert.That(content.Count(r => r.Kind == DiffCellKind.Delete), Is.EqualTo(2));
+        Assert.That(content.Count(r => r.Kind == DiffCellKind.Add), Is.EqualTo(4));
 
-        var addBrush = Assert.IsType<SolidColorBrush>(add.ContentBackground);
-        Assert.Equal(Color.Parse("#dafbe1"), addBrush.Color);
+        var addBrush = As<SolidColorBrush>(add.ContentBackground);
+        Assert.That(addBrush.Color, Is.EqualTo(Color.Parse("#dafbe1")));
     }
 
-    [AvaloniaFact]
+    [AvaloniaTest]
     public void DiffView_SwitchesRows_OnModeChange()
     {
         var view = new DiffView { DiffFile = CreateSampleFile() };
 
-        Assert.Equal(13, view.Rows.Count);
+        Assert.That(view.Rows.Count, Is.EqualTo(13));
         view.ViewMode = DiffViewMode.Unified;
-        Assert.Equal(15, view.Rows.Count);
-        Assert.Empty(view.Rows.OfType<DiffSplitRow>());
+        Assert.That(view.Rows.Count, Is.EqualTo(15));
+        Assert.That(view.Rows.OfType<DiffSplitRow>(), Is.Empty);
         view.ViewMode = DiffViewMode.Split;
-        Assert.Equal(13, view.Rows.Count);
-        Assert.Empty(view.Rows.OfType<DiffUnifiedRow>());
+        Assert.That(view.Rows.Count, Is.EqualTo(13));
+        Assert.That(view.Rows.OfType<DiffUnifiedRow>(), Is.Empty);
     }
 
-    [AvaloniaFact]
+    [AvaloniaTest]
     public void DiffView_WordHighlights_FastDiffMode()
     {
         TemplateOptions.SetEnableFastDiffTemplate(true);
@@ -163,30 +170,30 @@ public class DiffViewTests
 
         // The "return 1;" -> "return 2;" pair is the only change with equal add/delete counts
         // in its hunk, so it is the only one with word-level ranges (upstream pairing rule).
-        var pair = Assert.IsType<DiffSplitContentRow>(view.Rows[10]);
-        Assert.Equal(new[] { new DiffHighlight(11, 1) }, pair.Left.Highlights);
-        Assert.Equal(new[] { new DiffHighlight(11, 1) }, pair.Right.Highlights);
+        var pair = As<DiffSplitContentRow>(view.Rows[10]);
+        Assert.That(pair.Left.Highlights, Is.EqualTo(new[] { new DiffHighlight(11, 1) }));
+        Assert.That(pair.Right.Highlights, Is.EqualTo(new[] { new DiffHighlight(11, 1) }));
 
         // Highlight brushes follow the line kind (upstream light values).
-        Assert.Equal(Color.Parse("#ffcecb"), Assert.IsType<SolidColorBrush>(pair.Left.HighlightBrush).Color);
-        Assert.Equal(Color.Parse("#aceebb"), Assert.IsType<SolidColorBrush>(pair.Right.HighlightBrush).Color);
+        Assert.That(As<SolidColorBrush>(pair.Left.HighlightBrush).Color, Is.EqualTo(Color.Parse("#ffcecb")));
+        Assert.That(As<SolidColorBrush>(pair.Right.HighlightBrush).Color, Is.EqualTo(Color.Parse("#aceebb")));
 
         // Unpaired add lines and context rows carry no word-level highlights.
-        Assert.Empty(Assert.IsType<DiffSplitContentRow>(view.Rows[5]).Right.Highlights);
-        Assert.Null(Assert.IsType<DiffSplitContentRow>(view.Rows[5]).Right.HighlightBrush);
-        Assert.Empty(Assert.IsType<DiffSplitContentRow>(view.Rows[1]).Left.Highlights);
+        Assert.That(As<DiffSplitContentRow>(view.Rows[5]).Right.Highlights, Is.Empty);
+        Assert.That(As<DiffSplitContentRow>(view.Rows[5]).Right.HighlightBrush, Is.Null);
+        Assert.That(As<DiffSplitContentRow>(view.Rows[1]).Left.Highlights, Is.Empty);
     }
 
-    [AvaloniaFact]
+    [AvaloniaTest]
     public void DiffView_WordHighlights_RelativeFallback()
     {
         TemplateOptions.SetEnableFastDiffTemplate(false);
         try
         {
             var view = new DiffView { DiffFile = CreateSampleFile() };
-            var pair = Assert.IsType<DiffSplitContentRow>(view.Rows[10]);
-            Assert.Equal(new[] { new DiffHighlight(11, 1) }, pair.Left.Highlights);
-            Assert.Equal(new[] { new DiffHighlight(11, 1) }, pair.Right.Highlights);
+            var pair = As<DiffSplitContentRow>(view.Rows[10]);
+            Assert.That(pair.Left.Highlights, Is.EqualTo(new[] { new DiffHighlight(11, 1) }));
+            Assert.That(pair.Right.Highlights, Is.EqualTo(new[] { new DiffHighlight(11, 1) }));
         }
         finally
         {
@@ -194,35 +201,37 @@ public class DiffViewTests
         }
     }
 
-    [AvaloniaFact]
+    [AvaloniaTest]
     public void DiffView_UnifiedWordHighlights()
     {
         TemplateOptions.SetEnableFastDiffTemplate(true);
         var view = new DiffView { DiffFile = CreateSampleFile(), ViewMode = DiffViewMode.Unified };
 
-        Assert.Equal(new[] { new DiffHighlight(11, 1) }, Assert.IsType<DiffUnifiedContentRow>(view.Rows[11]).Highlights);
-        Assert.Equal(new[] { new DiffHighlight(11, 1) }, Assert.IsType<DiffUnifiedContentRow>(view.Rows[12]).Highlights);
+        Assert.That(As<DiffUnifiedContentRow>(view.Rows[11]).Highlights, Is.EqualTo(new[] { new DiffHighlight(11, 1) }));
+        Assert.That(As<DiffUnifiedContentRow>(view.Rows[12]).Highlights, Is.EqualTo(new[] { new DiffHighlight(11, 1) }));
     }
 
-    [AvaloniaFact]
+    [AvaloniaTest]
     public void DiffSegmentText_ComputesHighlightRects()
     {
         const string line = "    return 1;";
         var layout = new TextLayout(line, new Typeface(FontFamily.Parse("Menlo, Consolas, monospace")), 14,
                                     Brushes.Black);
 
-        var rect = Assert.Single(DiffSegmentText.ComputeHighlightRects(layout, line.Length, [new DiffHighlight(11, 1)]));
-        Assert.True(rect.X > 0);
-        Assert.True(rect.Width > 0);
-        Assert.True(rect.Right <= layout.TextLines[0].WidthIncludingTrailingWhitespace + 0.01);
-        Assert.True(rect.Height > 0);
+        var rects = DiffSegmentText.ComputeHighlightRects(layout, line.Length, [new DiffHighlight(11, 1)]).ToList();
+        Assert.That(rects, Has.Count.EqualTo(1));
+        var rect = rects[0];
+        Assert.That(rect.X > 0, Is.True);
+        Assert.That(rect.Width > 0, Is.True);
+        Assert.That(rect.Right <= layout.TextLines[0].WidthIncludingTrailingWhitespace + 0.01, Is.True);
+        Assert.That(rect.Height > 0, Is.True);
 
         // Out-of-range and empty ranges produce no rectangles.
-        Assert.Empty(DiffSegmentText.ComputeHighlightRects(layout, line.Length, [new DiffHighlight(20, 5)]));
-        Assert.Empty(DiffSegmentText.ComputeHighlightRects(layout, line.Length, [new DiffHighlight(5, 0)]));
+        Assert.That(DiffSegmentText.ComputeHighlightRects(layout, line.Length, [new DiffHighlight(20, 5)]), Is.Empty);
+        Assert.That(DiffSegmentText.ComputeHighlightRects(layout, line.Length, [new DiffHighlight(5, 0)]), Is.Empty);
     }
 
-    [AvaloniaFact]
+    [AvaloniaTest]
     public void DiffSegmentText_MeasuresAndRenders()
     {
         var segment = new DiffSegmentText
@@ -239,7 +248,7 @@ public class DiffViewTests
         segment.Measure(new Size(1000, 200));
         segment.Arrange(new Rect(0, 0, 1000, 200));
 
-        Assert.True(segment.DesiredSize.Width > 0);
-        Assert.True(segment.DesiredSize.Height > 0);
+        Assert.That(segment.DesiredSize.Width > 0, Is.True);
+        Assert.That(segment.DesiredSize.Height > 0, Is.True);
     }
 }

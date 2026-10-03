@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Tests
+
+- Migrated both test suites from xunit to NUnit 5.0.0 (constraint-model asserts,
+  `NUnit3TestAdapter`/VSTest execution). Parallelization is disabled via
+  `[assembly: Parallelizable(ParallelScope.None)]` because the core library holds global state;
+  the Avalonia suite uses `Avalonia.Headless.NUnit` with `[AvaloniaTest]`. All 577 core cases and
+  11 UI cases pass unchanged.
+
 ### Banned.CodeDiff
 
 - Initial implementation of the core logic library, ported from

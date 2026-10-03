@@ -1,7 +1,7 @@
 using Banned.CodeDiff.Models;
 using Banned.CodeDiff.Services;
 using System.Text.Json.Nodes;
-using Xunit;
+using NUnit.Framework;
 
 namespace Banned.CodeDiff.Tests;
 
@@ -11,8 +11,8 @@ public class LinePairGoldenTests
     public static IEnumerable<object[]> Cases =>
         GoldenSupport.Golden["linePairs"]!.AsArray().Select((c, i) => new object[] { i });
 
-    [Theory]
-    [MemberData(nameof(Cases))]
+    [Test]
+    [TestCaseSource(nameof(Cases))]
     public void MatchesRelativeChangesAndDiffChanges(int index)
     {
         var c          = GoldenSupport.Golden["linePairs"]![index]!.AsObject();
@@ -44,7 +44,7 @@ public class LinePairGoldenTests
         };
 
         var diffs = GoldenSupport.Compare(c, actual);
-        Assert.True(diffs.Count == 0, $"linePair #{index}: {string.Join("\n", diffs)}");
+        Assert.That(diffs.Count == 0, Is.True, $"linePair #{index}: {string.Join("\n", diffs)}");
     }
 }
 
@@ -54,8 +54,8 @@ public class ParseGoldenTests
     public static IEnumerable<object[]> Cases =>
         GoldenSupport.Golden["parse"]!.AsArray().Select((c, i) => new object[] { i });
 
-    [Theory]
-    [MemberData(nameof(Cases))]
+    [Test]
+    [TestCaseSource(nameof(Cases))]
     public void MatchesDiffParserJs(int index)
     {
         var c     = GoldenSupport.Golden["parse"]![index]!.AsObject();
@@ -65,13 +65,13 @@ public class ParseGoldenTests
         if (error is not null)
         {
             // JS threw; the C# port must throw as well
-            Assert.ThrowsAny<Exception>(() => DiffParser.Shared.Parse(text));
+            Assert.Catch<Exception>(() => DiffParser.Shared.Parse(text));
             return;
         }
 
         var actual = GoldenSupport.DumpRawDiff(DiffParser.Shared.Parse(text));
         var diffs  = GoldenSupport.Compare(c["out"], actual);
-        Assert.True(diffs.Count == 0, $"parse #{index} ({c["name"]}): {string.Join("\n", diffs)}");
+        Assert.That(diffs.Count == 0, Is.True, $"parse #{index} ({c["name"]}): {string.Join("\n", diffs)}");
     }
 }
 
@@ -81,13 +81,13 @@ public class LangGoldenTests
     public static IEnumerable<object[]> Cases =>
         GoldenSupport.Golden["lang"]!.AsArray().Select((c, i) => new object[] { i });
 
-    [Theory]
-    [MemberData(nameof(Cases))]
+    [Test]
+    [TestCaseSource(nameof(Cases))]
     public void MatchesGetLangJs(int index)
     {
         var c        = GoldenSupport.Golden["lang"]![index]!.AsObject();
         var input    = c["input"]!.GetValue<string>();
         var expected = c["output"]!.GetValue<string>();
-        Assert.Equal(expected, DiffTool.GetLang(input));
+        Assert.That(DiffTool.GetLang(input), Is.EqualTo(expected));
     }
 }

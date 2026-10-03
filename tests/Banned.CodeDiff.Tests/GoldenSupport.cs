@@ -1,6 +1,9 @@
 using Banned.CodeDiff.Models;
 using Banned.CodeDiff.Services;
 using System.Text.Json.Nodes;
+using NUnit.Framework;
+
+[assembly: Parallelizable(ParallelScope.None)]
 
 namespace Banned.CodeDiff.Tests;
 
