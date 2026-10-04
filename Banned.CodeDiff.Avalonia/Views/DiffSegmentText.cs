@@ -222,7 +222,20 @@ public sealed class DiffSegmentText : Control
     protected override Size MeasureOverride(Size availableSize)
     {
         var layout = GetLayout(availableSize.Width);
-        var width  = layout.TextLines.Select(line => line.WidthIncludingTrailingWhitespace).Prepend(0.0).Max();
+
+        // Hand-rolled Select/Prepend/Max: same result (0 for an empty line list), no enumerator
+        // and closure allocations on this per-row hot path.
+        var width = 0.0;
+
+        foreach (var line in layout.TextLines)
+        {
+            var lineWidth = line.WidthIncludingTrailingWhitespace;
+
+            if (lineWidth > width)
+            {
+                width = lineWidth;
+            }
+        }
 
         return new Size(width, GetLayoutHeight(layout));
     }
