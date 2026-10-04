@@ -48,6 +48,39 @@
   | `GetSplitLineByLineNumber` 单次 worst | 0.09 ms | ~0.0009 ms |
   | `GetSplitLineIndexByLineNumber` 单次 worst | 0.91 ms | <0.00005 ms |
 
+### 性能 — 组装/词级 diff/高亮管线减遍历与减分配(行为零变化)
+
+- **`DiffFileUtils` 四方法去 `NumIterator` 中间列表**:`GetSplitLines`/`GetUnifiedLines`
+  与 `GetSplitContentLines`/`GetUnifiedContentLine` 不再先物化 `0..n-1` 整数列表再投影,
+  改为 for 循环直接构建结果(隐藏行筛选、输出字段与顺序不变);公开的
+  `DiffTool.NumIterator` 本身保留不动。
+- **`DiffFile.ComposeDiff` 分组列表复用**:additions/deletions 从每个 hunk、每个
+  context 边界新建改为跨 hunk 复用 + `Clear`(`GetDiffRange` 只按索引读取、不保留
+  列表引用;分组边界、配对规则与 `GetDiffRange` 调用序列不变)。
+- **`ChangeRange.DiffChanges` 单次遍历**:两次 `Where` 过滤 + `Any` 短路合并为一次
+  遍历,同步构建两侧 `DiffItem` 列表并内联 `hasLineChange`(两侧各自 offset 递增、
+  Operation 筛选、Range 起止与短路求值顺序逐项等价)。
+- **`TextMateHighlighter.Tokenize` 减分配**:逐行发射的 `Select` 闭包迭代器改直接
+  循环;`StandardTokenType` 的逐 scope `Split('.')`(段数组与子串仅用于等值比较,
+  每 token 每 scope 都分配)改右到左 span 扫描,含空段语义逐段等价。
+- **恢复 `DiffSegmentText.MeasureOverride` 手写循环取最大宽**:`1f8e112` 的测量
+  热路径优化被 `40bb434` 全项目格式化意外回退为 LINQ 链(代码注释仍在),按原
+  提交意图恢复。
+- 等价性:核心 624 + Avalonia headless 68 全绿;6 个 demo 用例全模型 dump
+  (行模型/HunkInfo/SplitInfo/Changes/DiffChanges/语法 span 全字段)SHA256 与
+  改动前逐字节一致。
+- 测量(临时 console harness 引 Release 产物、6 个 demo 用例;分配为
+  `GC.GetTotalAllocatedBytes` 确定性计数;计时中位数受测量机并发负载影响,
+  仅采信与噪声量级分离的项):
+
+  | 场景 | 分配/次 前→后 | 计时 |
+  |---|---|---|
+  | 6 demo 用例 `Init()`(含 tokenize) | 67.7 MB → 52.4 MB(−22.6%) | 未采信(负载噪声) |
+  | `GetSplitLines` 等四方法各一次(case a) | 64.8 KB → 39.7 KB(−38.9%) | 0.034 → 0.016 ms |
+  | DiffFile.cs(1346 行)tokenize | 20.6 MB → 17.7 MB(−14.5%) | 未采信(负载噪声) |
+  | `DiffChanges` × 200 对 | 1.53 MB → 1.51 MB(−0.9%;FastDiff 主导) | 未采信 |
+  | 6 demo 用例 `InitRaw` | 677 KB → 666 KB(−1.7%) | 未采信 |
+
 ### 重构 — JS 语法怪癖 .NET 化(行为不变,golden 测试护栏)
 
 - **删除零消费死代码**(公开 API 删除):`DiffLine` 的
