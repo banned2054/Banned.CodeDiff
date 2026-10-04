@@ -14,6 +14,7 @@
 		<PackageTags>diff;git;parser;syntax-highlighting</PackageTags>
 		<RepositoryUrl>https://github.com/banned2054/Banned.CodeDiff</RepositoryUrl>
 		<PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+		<PackageReadmeFile>README.md</PackageReadmeFile>
 	</PropertyGroup>
 	<ItemGroup>
 		<PackageReference Include="TextMateSharp" Version="2.0.4" />
@@ -30,6 +31,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
+		<None Update="README.md" Pack="true" PackagePath="\" />
 		<None Include="..\NOTICE" Pack="true" PackagePath="\" />
 	</ItemGroup>
 
