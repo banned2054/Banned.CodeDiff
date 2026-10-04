@@ -5,7 +5,8 @@ English | [**简体中文**](https://github.com/banned2054/Banned.CodeDiff/blob/
 [![NuGet](https://img.shields.io/nuget/v/Banned.CodeDiff.Avalonia.svg)](https://www.nuget.org/packages/Banned.CodeDiff.Avalonia) [![Downloads](https://img.shields.io/nuget/dt/Banned.CodeDiff.Avalonia.svg)](https://www.nuget.org/packages/Banned.CodeDiff.Avalonia) [![License](https://img.shields.io/badge/license-Apache_2.0-green)](./LICENSE)
 
 An Avalonia control library for rendering code diffs: GitHub-style split and unified views with
-line- and word-level highlighting, expandable hunks, and syntax highlighting.
+line- and word-level highlighting, expandable hunks, syntax highlighting, drag line selection,
+clipboard copy, and long-line wrapping.
 
 The host application owns the diff text and the surrounding UI. This repository handles diff parsing,
 split/unified line pairing, word-level change ranges, hunk expand/collapse state, and rendering.
@@ -25,7 +26,7 @@ Development follows the milestones in [plan.md](./plan.md):
 | M3 | Word-level highlight rendering | Done |
 | M4 | Hunk expand/collapse + virtualization | Done |
 | M5 | Syntax highlighting (TextMateSharp) | Done — golden-tested against shiki |
-| M6 | Themes, wrap mode, copy | Planned |
+| M6 | Themes, wrap mode, line selection, copy | Done |
 
 ## Features
 
@@ -41,12 +42,22 @@ Development follows the milestones in [plan.md](./plan.md):
 - Syntax highlighting — a built-in TextMate engine (TextMateSharp + the shiki-bundled grammars and GitHub
   light/dark themes) tokenizes the full old/new files and exposes per-line colored spans
   (`DiffFile.InitSyntax` / `GetOldSyntaxLine` / `GetNewSyntaxLine`); pluggable via `IDiffHighlighter`
+- Multi-select data layer — line-range selection queries over a built `DiffFile`
+  (`MultiSelectData`): 1-based line indices, hidden-line flags that survive hunk
+  expand/collapse, and range normalization, mirroring the upstream multiSelect semantics
 - Zero UI dependencies in the core library
 - `DiffView` Avalonia control — read-only GitHub-style diff view with line-level add/delete
   backgrounds, word-level highlight blocks inside changed lines, collapsed hunk placeholders with
   clickable expand affordances (expand up / down / all, matching GitHub's placement rules), row
   virtualization for large diffs, and light/dark palettes; renders split (two columns) or unified
   (single column, dual line numbers, deleted lines above the added ones)
+- Line selection — opt-in GitHub-style drag selection over the line-number columns
+  (`IsSelectionEnabled`), with `SelectionChanged` / `SelectionCompleted` events, a
+  preselected-lines API, and selection queries on the control
+- Copy — `CopySelectionCommand` / `CopyOldFileCommand` / `CopyNewFileCommand` (and async
+  method counterparts) copy the selected lines or the whole old/new files to the clipboard
+- Wrap — opt-in long-line wrapping (`Wrap`) at the view width that keeps row virtualization
+  intact; line-number columns stay fixed-width and split rows keep both sides equally tall
 
 ## Installation
 
@@ -82,10 +93,14 @@ Assign a `DiffFile` (built or not — the control invokes `Init` / `Build*DiffLi
 it stays in sync through the model's `Updated` event. `ViewMode` switches between the default
 `Split` and `Unified` rendering; `SyntaxHighlight` (default on) runs `InitSyntax` so lines render
 with syntax colors that follow the light/dark theme, and `Highlighter` injects a custom
-`IDiffHighlighter` engine. The control uses a monospace font by default, auto-sizes the
-line-number columns, renders collapsed hunk placeholder rows, switches its light/dark palette
-with `ActualThemeVariant`, and paints word-level highlight blocks inside changed lines when
-`DiffLine.DiffChanges` (fast-diff) or `DiffLine.Changes` (relative) ranges are available.
+`IDiffHighlighter` engine. `Wrap` (default off) wraps long lines at the view width without
+breaking virtualization — line-number columns stay fixed-width and split rows keep both sides
+the height of the taller one. `IsSelectionEnabled` (default off) turns on GitHub-style drag line
+selection (see [Line Selection](#line-selection)). The control uses a monospace font by default,
+auto-sizes the line-number columns, renders collapsed hunk placeholder rows, switches its
+light/dark palette with `ActualThemeVariant`, and paints word-level highlight blocks inside
+changed lines when `DiffLine.DiffChanges` (fast-diff) or `DiffLine.Changes` (relative) ranges
+are available.
 
 Hunk placeholder rows carry expand buttons (single Expand Up on the first hunk, Expand Down on
 the trailing strip, a stacked down+up pair or a single Expand All otherwise — mirroring the
@@ -100,6 +115,11 @@ Run the included demo to paste a diff and see it rendered:
 ```powershell
 dotnet run --project Banned.CodeDiff.Avalonia.Demo/Banned.CodeDiff.Avalonia.Demo.csproj
 ```
+
+The demo toolbar also toggles the M6 features on and off — "Enable line selection",
+"Auto wrap", and three copy buttons (copy selection / old file / new file) — with a status bar
+reporting the completed selection ("N lines (old 12-34)") and copy feedback. Ctrl+C is bound at
+the window level as an example of the host-side shortcut wiring (the control ships none).
 
 ## Basic Usage
 
@@ -218,6 +238,52 @@ shell, YAML, XML, Vue, and diff output. Replace the engine with `DiffFile.InitSy
 (`IDiffHighlighter`) — the AST contract mirrors the upstream `DiffHighlighter` interface, and
 spans from both built-in and injected engines feed the same renderer.
 
+## Line Selection
+
+`DiffView.IsSelectionEnabled` (default `false`, opt-in) turns on the port of the upstream
+multiSelect feature: dragging over line-number cells selects line ranges the GitHub way. In
+split view the drag locks to the side it started on and hovering the line content extends the
+selection too; in unified view only the line-number strip extends it. Context lines highlight
+both sides; a completed selection stays highlighted until the next interaction, and lines hidden
+behind a collapsed hunk keep their membership but light up only once revealed.
+
+```csharp
+view.SelectionCompleted += (_, e) =>
+{
+    // e.Result — MultiSelectResult? (null when released without a range):
+    //   Range: { Side (Old/New), StartLineNumber, EndLineNumber }
+    //   Lines: SelectedLine records — 1-based Index, LineNumber, Value, IsHide, IsAdd, IsDelete, IsContext
+};
+
+view.SetPreselectedLines(oldLines: [12, 34]); // preselect from existing annotations
+view.GetSelectionResult();  // live range during a drag; last completed range after release
+view.GetSelectionState();   // MultiSelectState — IsSelecting, StartInfo, CurrentRange
+view.ClearSelection();
+```
+
+`SetPreselectedLines` merges each side's list into one big min/max range (the upstream-known
+semantics — a scattered list highlights everything between its min and max). The data layer
+behind the feature lives in the core library (`MultiSelectData`: range normalization,
+selected-line queries for split and unified, selection-to-text), so selection results can be
+computed and asserted without any UI.
+
+## Copy to Clipboard
+
+`DiffView` exposes three copy operations, both as commands and as async methods:
+
+```csharp
+view.CopySelectionCommand.Execute(null); // or: await view.CopySelectionAsync();
+view.CopyOldFileCommand.Execute(null);   // or: await view.CopyOldFileAsync();
+view.CopyNewFileCommand.Execute(null);   // or: await view.CopyNewFileAsync();
+```
+
+Selection copy writes exactly what the view shows — one output line per selected line, hidden
+lines skipped, trailing newlines trimmed; whole-file copies pass the old/new file content
+through unchanged. `CopySelectionCommand` disables itself without a usable selection
+(`CanExecuteChanged` tracks selection and model changes). No keyboard shortcut is built in —
+hosts bind their own to `CopySelectionCommand` (the demo binds Ctrl+C at the window level) so
+the control never clashes with existing host bindings.
+
 ## Usage Notes
 
 - `DiffParser.Shared` and `TemplateOptions` are globally stateful (matching the JS original); do not
@@ -234,13 +300,16 @@ dotnet test tests/Banned.CodeDiff.Tests/Banned.CodeDiff.Tests.csproj
 dotnet test tests/Banned.CodeDiff.Avalonia.Tests/Banned.CodeDiff.Avalonia.Tests.csproj
 ```
 
-589 core cases (NUnit; golden tests comparing field-by-field against the JS original
+614 core cases (NUnit; golden tests comparing field-by-field against the JS original
 `@git-diff-view/core` + `fast-diff@1.3.0`, plus syntax goldens replayed from the real shiki
-engine with the same codeToHast options as `@git-diff-view/shiki`) — plus 28 headless Avalonia
-UI tests (NUnit + Avalonia.Headless.NUnit) covering the control theme, template instantiation,
-row building in both view modes, mode switching, word-level highlight ranges and rectangle
-computation, hunk expansion in all directions with button-placement rules, command wiring, row
-virtualization on a 10k-line model, and syntax-run wiring with theme-switched colors.
+engine with the same codeToHast options as `@git-diff-view/shiki`, plus multiSelect data-layer
+and selection-text unit tests) — plus 67 headless Avalonia UI tests (NUnit +
+Avalonia.Headless.NUnit) covering the control theme, template instantiation, row building in
+both view modes, mode switching, word-level highlight ranges and rectangle computation, hunk
+expansion in all directions with button-placement rules, command wiring, row virtualization on
+a 10k-line model, syntax-run wiring with theme-switched colors, selection drag semantics with
+events and preselection, clipboard copy of selections and whole files, and wrap layout with
+scrolling and virtualization intact under wrapping.
 
 ## 📜 Changelog
 

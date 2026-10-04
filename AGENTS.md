@@ -6,8 +6,9 @@
   最终交付 Avalonia diff viewer 控件库：传入统一 diff 文本 → 渲染 GitHub 风格 split/unified 视图。
 - JS 源仓库的本地克隆在 `C:\Code\JavaScript\git-diff-view`，是移植实现与黄金测试的对照基准。
   测试 harness 支持用环境变量 `GDV_REPO` 覆盖该路径。
-- 仓库结构：`Banned.CodeDiff`（核心逻辑库，M1 已完成）、`tests/Banned.CodeDiff.Tests` +
-  `tests/js-harness`（xUnit 与黄金测试）、规划中的 `Banned.CodeDiff.Avalonia`（控件库）与配套 Demo。
+- 仓库结构：`Banned.CodeDiff`（核心逻辑库）、`Banned.CodeDiff.Avalonia`（控件库）与配套
+  Demo、`tests/Banned.CodeDiff.Tests` + `tests/js-harness`（NUnit 与黄金测试）、
+  `tests/Banned.CodeDiff.Avalonia.Tests`（headless UI 测试）。
 - 发布计划：至少 `Banned.CodeDiff.Avalonia` 会发布到 NuGet；`Banned.CodeDiff` 是否单独发包**未决定**，
   未经用户明确要求不要为它添加打包/发布配置。
 - 里程碑计划与当前状态见 `plan.md`，完成一个里程碑后同步更新。
@@ -40,7 +41,11 @@
 - `DiffParser.Shared` 与 `TemplateOptions` 是全局有状态的（与 JS 原版一致），禁止并发使用。
 - 明确不移植的内容：`parse/template.ts` 的 HTML 模板构建（Avalonia 不消费 HTML 字符串，
   但其全局开关 `TemplateOptions` 已保留）、`cache.ts`（web 专用跨实例缓存）、
-  `multiSelect/*`（视 M6 需求再定）。
+  multiSelect 的 DOM 契约与宿主业务部分——dom.ts/visual.ts 的 DOM 形态分支、
+  `extendData` 评论流适配（`extendDataToPreselectedLines`）、`scopeToHunk` 钩子、
+  四套框架的包装组件（`DiffViewWithMultiSelect`）、「+」评论 widget（`diff-add-widget`
+  与 `renderExtendLine`）。multiSelect 的**选择语义本身已移植**（数据层进核心库，
+  状态机以 Avalonia 指针事件重实现，见移植对照表与 plan.md M6 去留结论）。
 
 ## 移植对照表
 
@@ -62,6 +67,10 @@
 | `Utils/EscapeHtml.cs` | `packages/core/src/escape-html.ts` |
 | `Utils/HighlightColors.cs` | `packages/utils/src/color.ts` |
 | `Utils/Symbol.cs` | `packages/utils/src/symbol.ts` |
+| `Models/MultiSelectModels.cs` | `packages/core/src/multiSelect/types.ts` |
+| `Utils/MultiSelectData.cs` | `packages/core/src/multiSelect/data.ts` + `dom.ts` 的 `normalizeRange` + `visual.ts` 的 `changePreselectedLinesToLineRange` |
+| `Banned.CodeDiff.Avalonia/Services/DiffSelection.cs` | `packages/core/src/multiSelect/manager.ts`（状态机，指针事件重实现） |
+| `Banned.CodeDiff.Avalonia/Services/DiffSelectionDom.cs` | `packages/core/src/multiSelect/dom.ts`（DOM 契约的视觉树等价物） |
 
 ## 目录与职责
 
@@ -69,8 +78,10 @@
   - `Models`：数据模型、状态、枚举、配置等纯数据类型，不依赖具体渲染。
   - `Services`：需要实例化、持有状态或生命周期的组件（`DiffFile`、`DiffParser` 等）。
   - `Utils`：无状态、以 static 提供的解析、转换和辅助逻辑。
-- `Banned.CodeDiff.Avalonia`（规划）按 MVVM 组织：`Views`（控件与 `.axaml`）、
-  `ViewModels`（可绑定状态与命令）、`Services`、`Models`；不为单个新增功能创建新的一级目录。
+- `Banned.CodeDiff.Avalonia` 按类型组织：`Views`（控件）、`Models`（行模型、画刷、
+  事件参数等纯数据）、`Services`（持有状态的组件，如 `DiffSelection`）、
+  `Utils`（行构建等无状态逻辑）、`Themes`（`Generic.axaml` 主题入口）；
+  MVVM 的 `ViewModels` 只出现在 Demo 工程；不为单个新增功能创建新的一级目录。
 - 文件移动与公开 namespace 修改分开评估；单纯整理目录默认保持公开 namespace，
   调整公开 API 必须由用户明确授权。
 - 每个 `public` 顶级类型放独立文件；只服务于单个实现的私有类型保留在所属类中。
@@ -93,11 +104,9 @@
   `TextLayout`（`HitTestTextPosition(int)→Rect`、`Draw(context, origin)`、
   `TextLines[i].WidthIncludingTrailingWhitespace/Height`），`FillRectangle` 圆角参数是 float。
 - `DiffFile` 等核心类型位于 `Banned.CodeDiff.Services` 命名空间（不是 Models）。
-- UI 回归测试在 `tests/Banned.CodeDiff.Avalonia.Tests`（xunit.v3 + Avalonia.Headless.XUnit；
-  该包依赖 **xunit.v3** 而非 xunit 2.x，注册方式为
-  `[assembly: AvaloniaTestApplication(typeof(Builder))]` + 静态 `BuildAvaloniaApp()`，
-  测试方法用 `[AvaloniaFact]`）。TestApp 以消费方同款 StyleInclude 加载主题，
-  控件模板/渲染改动的验证以这些测试为准，不依赖截图。
+- UI 回归测试在 `tests/Banned.CodeDiff.Avalonia.Tests`（NUnit 5.0.0 + `Avalonia.Headless.NUnit`，
+  测试方法标 `[AvaloniaTest]`，注册方式见下节「构建与验证」）。TestApp 以消费方同款
+  StyleInclude 加载主题，控件模板/渲染改动的验证以这些测试为准，不依赖截图。
 
 ## 验证纪律（血泪教训）
 
@@ -122,7 +131,6 @@
   `DiffParser.Shared`/`TemplateOptions` 全局有状态，禁止并行，不要移除。
 - 改包引用后警惕**过期 restore 缓存的假绿**：csproj 删包后旧 assets 仍能让构建/测试通过，
   必须实际触发还原再验证。
-- 测试已通过 `xunit.runner.json` 关闭并行（`DiffParser.Shared` 全局有状态所致），**不要移除该配置**。
 - 重新生成黄金数据：`cd tests/js-harness && node build.mjs`（需要 esbuild 与 `fast-diff@1.3.0`，
   源仓库路径可用 `GDV_REPO` 覆盖）。
 - 重新生成 Demo 数据：`cd tests/js-harness && node gen-demodata.mjs`

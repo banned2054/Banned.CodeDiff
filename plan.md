@@ -18,7 +18,7 @@
 | M3 | 词级高亮渲染 | ✅ 已完成 |
 | M4 | hunk 展开/收起 UI + 虚拟化 | ✅ 已完成 |
 | M5 | 语法高亮 | ✅ 已完成 |
-| M6 | 打磨 | ⬜ 下一步 |
+| M6 | 打磨 | ✅ 已完成 |
 
 每个里程碑保持可构建、可测试、可演示；完成一个更新一次本文件状态与 `Docs/CHANGELOG.md`。
 
@@ -27,9 +27,11 @@
 - `Banned.CodeDiff` 核心库完成：解析（`DiffParser`）、split/unified 行模型（`DiffFile`）、
   词级区间（`ChangeRange` / `FastDiff`）、展开状态机、`TemplateOptions` 全局开关。
 - 目录已按 `Models` / `Services` / `Utils` 分类。
-- 589 个核心测试 + 28 个 Avalonia headless 测试全绿（构建 0 警告 0 错误），
+- 614 个核心测试 + 67 个 Avalonia headless 测试全绿（构建 0 警告 0 错误），
   含与 JS 原版逐字段对比的黄金基准，以及与真实 shiki 引擎逐字段对比的语法黄金基准。
-- `Banned.CodeDiff.Avalonia`（`DiffView` split 控件 + Demo）已就位，详见第 4 节执行结果。
+- `Banned.CodeDiff.Avalonia` 已就位：`DiffView` 控件（split/unified 视图、词级高亮、
+  语法高亮、hunk 展开/收起 + 虚拟化、明暗主题、行选择、复制、长行 wrap）与配套 Demo，
+  详见第 4~8 节执行结果。
 
 ## 4. M2 最小可看
 
@@ -245,10 +247,60 @@
 
 **验收**：
 
-- [ ] 深浅主题切换正确，颜色符合设计。
-- [ ] wrap 开关生效且不破坏滚动与虚拟化。
-- [ ] 复制功能可用。
-- [ ] 决定 multiSelect/widget 的去留并记录结论。
+- [x] 深浅主题切换正确，颜色符合设计（light/dark 画笔逐项核对上游 `_com.css` 的
+      `--diff-*--` token，既有值全部一致；唯一修正是展开揭示行改用
+      `--diff-expand-content--`，批次 1a）。
+- [x] wrap 开关生效且不破坏滚动与虚拟化（headless 实证：extent 随实现行高度精化，
+      滚到底部/中部目标行可见、不丢行，仍只实化可见切片）。
+- [x] 复制功能可用（选区行/新旧整文件复制到剪贴板，Demo 含 Ctrl+C 宿主接入示例）。
+- [x] 决定 multiSelect/widget 的去留并记录结论（见下方执行结果）。
+
+**执行结果（2026-10-04）**：
+
+- **主题颜色对齐上游（批次 1a）**：`DiffBrushes` 的 light/dark 两套画笔逐项核对上游
+  `_com.css` 的 `--diff-*--` token（react/vue/solid 一致），既有值全部一致。唯一修正：
+  展开 hunk 揭示的原始行（无 `DiffLine`）此前沿用 plain context 背景，现改用上游
+  `--diff-expand-content--`（light `#fafafa` / dark `#161b22`）。
+- **展开后视口锚定（批次 1b，M4 遗留）**：展开命令先记录锚点（点击的占位行索引、滚动
+  偏移、占位行与相邻内容行的实化高度），`DiffFile.Updated` 重建行后按各方向的实际插行
+  几何补偿 `ScrollViewer.Offset`（Up 存活时偏移不动；Up 全揭示/All 时偏移 += 揭示高度 −
+  占位行高；Down 时偏移 += 插入高度），偏移设置延迟到 extent 更新后应用以避开
+  coerce 钳制。行为对标上游 web 端依赖的浏览器 scroll anchoring，消除展开后视口跳变。
+- **行选择（批次 2，上游 multiSelect 移植）**：`DiffView.IsSelectionEnabled`（默认
+  false，opt-in）开启后，从行号列拖拽即按 GitHub 风格选择行区间（split 锁定起始侧、
+  拖拽悬停内容行也延伸；unified 悬停行号区才延伸；context 行双侧高亮）。公开 API：
+  `SelectionChanged` / `SelectionCompleted` 事件、`GetSelectionResult()` /
+  `GetSelectionState()` / `ClearSelection()` / `SetPreselectedLines(oldLines, newLines)`。
+  隐藏行保留在选区数据里但不高亮，展开后自动补齐；新拖拽清空上次选区。
+- **复制（批次 3，原生新功能，上游无对应实现）**：`DiffView` 新增
+  `CopySelectionCommand` / `CopyOldFileCommand` / `CopyNewFileCommand` 与
+  `CopySelectionAsync()` / `CopyOldFileAsync()` / `CopyNewFileAsync()`。选区复制 =
+  用户所见（跳过隐藏行、去尾换行、`\n` 连接，核心库
+  `MultiSelectData.GetSelectedTextFromResult`）；整文件复制原样传出新旧文件内容。
+  不内置键盘快捷键（避免与宿主绑定冲突），由宿主/Demo 自行绑定（Demo 绑 Ctrl+C）。
+- **wrap（批次 4，上游 diffViewWrap 移植）**：`DiffView.Wrap`（默认 false，opt-in——
+  上游包装层默认开启，端口不沿用）开启后长行在视图宽度处换行，不破坏虚拟化（行高随
+  内容增长）；行号列定宽不参与换行；split 同一行左右 cell 等高（取较高者）。换行策略
+  用 Avalonia `TextWrapping.Wrap`（词级断行），对应浏览器 `pre-wrap` 的可见效果。
+  跨行的词级高亮矩形按行分段（对齐浏览器 inline box 背景行为）。
+- **Demo**：新增「启用行选择」「自动换行」开关、三个复制按钮（选中行随选区状态可用）
+  与选区状态栏反馈（「已选 N 行(old 12-34)」/「已复制 N 行」）。
+- **multiSelect / widget 去留结论**（验收硬性要求）：
+  - **已移植——选择语义**：数据层逐结构对应进核心库（`Models/MultiSelectModels.cs` ↔
+    `multiSelect/types.ts`，`Utils/MultiSelectData.cs` ↔ `multiSelect/data.ts`，含
+    `dom.ts` 的 `normalizeRange`、`visual.ts` 的 `changePreselectedLinesToLineRange`
+    两个纯函数）；状态机（`manager.ts`）以 Avalonia 指针事件重实现
+    （`Services/DiffSelection.cs`，`DiffSelectionDom.cs` 为 dom.ts DOM 契约的视觉树
+    等价物）；视觉（`visual.ts` + `_com.css` 选区配色）用行模型标志位 + 画刷实现。
+  - **不移植——DOM 契约与宿主业务**：dom.ts/visual.ts 的 DOM 形态分支（wrap/nowrap
+    双 tr 等，以模型行 + side 为键替代）、`extendData` 评论流适配
+    （`extendDataToPreselectedLines`）、`scopeToHunk` 钩子（上游默认恒等函数）、
+    四套框架的包装组件（react/vue/solid/svelte 的 `DiffViewWithMultiSelect`——其职责
+    在端口里由 `DiffView` 的指针路由与事件承担）。
+  - **「widget」结论**：实指上游「+」评论按钮（`diff-add-widget`）与 `renderExtendLine`
+    评论流，属宿主业务而非 diff 渲染，**不移植**；宿主可经 `SelectionCompleted` 事件
+    自行扩展等价功能。
+- **基线**：614 核心 + 67 headless 测试全绿，Debug/Release 构建 0 警告 0 错误。
 
 ## 9. 通用验收（每个里程碑）
 
@@ -261,7 +313,7 @@
 ## 10. 未决事项
 
 - `Banned.CodeDiff` 是否单独发布 NuGet 包（`Banned.CodeDiff.Avalonia` 确定发布）。
-- 仓库尚未初始化 git；README/文档中的 GitHub 链接按 `banned2054/Banned.CodeDiff` 预填，待确认。
+- README/文档中的 GitHub 链接按 `banned2054/Banned.CodeDiff` 预填，待确认。
 - 版本号与 CHANGELOG 策略随首次发布确定。
 
 ---
