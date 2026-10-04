@@ -11,7 +11,7 @@
 		<Version>0.1.0</Version>
 		<Title>Banned.CodeDiff.Avalonia</Title>
 		<Authors>banned</Authors>
-		<Description>Avalonia diff viewer controls rendering GitHub-style split and unified views.</Description>
+		<Description>Avalonia controls for rendering unified diffs in split and unified layouts.</Description>
 		<PackageTags>avalonia;diff;viewer;git;split;unified</PackageTags>
 		<RepositoryUrl>https://github.com/banned2054/Banned.CodeDiff</RepositoryUrl>
 		<PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
