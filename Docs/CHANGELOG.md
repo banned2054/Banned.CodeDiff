@@ -2,6 +2,52 @@
 
 ## Unreleased
 
+### 修复 — fast-diff 负 cursor 后缀切片对齐 JS slice 钳制
+
+- `FastDiff.FindCursorEditDiff` 的 editAfter 分支:`cursor < 0` 时两个 before 串同为
+  空串即可通过 `newBefore != oldBefore` 早退,`suffixLength = min(oldLen,newLen)+|cursor|`
+  可超过 `oldAfter/newAfter.Length`;JS 原版 `slice(len - n)` 越界钳制到整串/空串,
+  C# 的 range 运算符在该域抛 `ArgumentOutOfRangeException`(golden 集合 cursor 最小值
+  为 0,从未覆盖;库内调用方 `ChangeRange` 只传 0,但公开 API `FastDiff.Diff` 接受任意
+  int)。新增 `JsSliceSuffix`/`JsSliceWithoutSuffix` 复刻 slice 钳制语义,三组
+  node 实证用例(`diff('abc','abcdefghij',-5)` 等)修复后逐字段一致;
+  新增 `FastDiffInvariantTests` 锚定(cursor 后缀 7 例、commonOverlap 探测循环 4 例、
+  lossless 位移循环 2 例,期望值来自 fast-diff@1.3.0 node 实测)。
+
+### 性能 — 大样例热路径优化(行为零变化,golden 全量护栏)
+
+- **行查询字典化 + 选区链路去 O(n²)**:`DiffFile` 四个 `*ByLineNumber` 查询
+  (线性扫描)改为构建时字典 O(1);`DiffView.CanCopySelection` 不再每次指针移动
+  全量物化选区结果;`ApplySplitSelection` 每行 O(rows) 查找改行号字典。
+- **`ComposeFile` 拼接改 StringBuilder**:缺失侧从 diff 结果合成文件内容时的
+  逐行 `+=`(O(n²) 拷贝)改区间拼接。
+- **TextMate 高亮结果 LRU 缓存与减分配**:`SourceFile.DoSyntax` 内建有界 LRU(容量 8,
+  键 = 内容/语言/文件名/引擎/主题,Class 引擎主题无关)记忆化 tokenize 结果——非上游
+  `cache.ts` 的跨实例整实例缓存(仍不移植),保持「syntax 仅在 DoSyntax 后存在」的
+  可观测行为;引擎配置变更(Transform/忽略列表/阈值)清空缓存;逐 token 拼接与
+  style 字符串 memoize 减分配。
+- **`DiffSegmentText` 测量改手写循环取最大宽**:段内逐行测量取 `TextLines[i]` 宽度
+  最大值,去掉逐段 `TextLayout` 重建。
+- **fast-diff 分配优化**:`DiffCleanupSemanticLossless` 的逐字符右移探测(JS 每步重建
+  三串,O(k²))改为只记最佳偏移量 + 三段只读视图打分、终了一次切片重构(位移超过
+  edit 长度后尾段是 equality2 上的滑动窗而非增长前缀);`DiffCleanupMerge` 的
+  `textDelete/textInsert` 逐 tuple `+=` 改段累积、每个 equality 边界一次物化;
+  `DiffCommonOverlap` 探测循环不变量注释钉住。等价性:golden 全量 + 12000 例
+  node 差分模糊(混合/高重复/窗口密集三组语料)逐字段一致。
+- 复测(10312 行大样例 `CreateLargeSample(98,100)`,Release,Stopwatch 中位数 +
+  `GC.GetAllocatedBytesForCurrentThread`;「前」为 2026-10 性能批次开始前基线):
+
+  | 场景 | 前 | 后 |
+  |---|---|---|
+  | multiSelect 全选重算 split | 314–450 ms | 0.3 ms |
+  | multiSelect 全选重算 unified | 258–367 ms | 0.3–0.4 ms |
+  | 指针 move 选区数据层重算 ×2 | ~0.6–0.9 s | 0.6–0.7 ms |
+  | ComposeFile 单侧合成 10312 行 | 582 ms / 4.4 GB | ~1 ms / <5 MB |
+  | TextMate 同文件重复 tokenize | 505 ms | 0.08–0.09 ms(LRU 命中;冷 321–352 ms) |
+  | fast-diff DiffChanges ×2000 对 | 24 ms / 15.3 MB | 8 ms / 3.8 MB |
+  | `GetSplitLineByLineNumber` 单次 worst | 0.09 ms | ~0.0009 ms |
+  | `GetSplitLineIndexByLineNumber` 单次 worst | 0.91 ms | <0.00005 ms |
+
 ### 重构 — JS 语法怪癖 .NET 化(行为不变,golden 测试护栏)
 
 - **删除零消费死代码**(公开 API 删除):`DiffLine` 的
