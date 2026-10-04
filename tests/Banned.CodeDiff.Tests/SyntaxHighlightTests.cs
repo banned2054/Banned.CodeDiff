@@ -294,4 +294,130 @@ public class SyntaxHighlightTests
         Assert.That(df.GetOldSyntaxLine(1), Is.Not.Null);
         Assert.That(df.GetNewSyntaxLine(1), Is.Not.Null);
     }
+
+    // ---- SourceFile.DoSyntax syntax-result LRU (the getFile counterpart) ----
+
+    [Test]
+    public void DoSyntax_SameContentTwice_AdoptsMemoizedResult()
+    {
+        try
+        {
+            const string content = "using System;\n\n// a comment\nvar x = 1;\n";
+
+            var first = new SourceFile(content, "cs", "cached.cs");
+            first.DoRaw();
+            first.DoSyntax();
+
+            var second = new SourceFile(content, "cs", "cached.cs");
+            second.DoRaw();
+            second.DoSyntax();
+
+            Assert.That(second.HasDoSyntax, Is.True);
+            Assert.That(second.SyntaxFile, Is.SameAs(first.SyntaxFile),
+                        "same inputs reuse the memoized tokenization result");
+        }
+        finally
+        {
+            SourceFile.ClearFileCache();
+        }
+    }
+
+    [Test]
+    public void DoSyntax_ClearedAndRebuilt_SyntaxResultsAreIdentical()
+    {
+        try
+        {
+            const string content = "using System;\nnamespace N\n{\n    /* block */\n    var s = \"txt\";\n}\n";
+
+            var first = new SourceFile(content, "cs", "twice.cs");
+            first.DoRaw();
+            first.DoSyntax();
+
+            SourceFile.ClearFileCache();
+
+            var second = new SourceFile(content, "cs", "twice.cs");
+            second.DoRaw();
+            second.DoSyntax();
+
+            Assert.That(second.SyntaxFile, Is.Not.SameAs(first.SyntaxFile));
+
+            // Same content re-tokenized from scratch must reproduce every span field.
+            Assert.That(second.SyntaxFile!.Keys, Is.EqualTo(first.SyntaxFile!.Keys));
+
+            foreach (var (lineNumber, firstLine) in first.SyntaxFile)
+            {
+                var secondLine = second.SyntaxFile[lineNumber];
+
+                Assert.That(secondLine.Value, Is.EqualTo(firstLine.Value), $"line {lineNumber} value");
+
+                var firstSpans  = firstLine.NodeList!;
+                var secondSpans = secondLine.NodeList!;
+
+                Assert.That(secondSpans.Count, Is.EqualTo(firstSpans.Count), $"line {lineNumber} span count");
+
+                for (var i = 0; i < firstSpans.Count; i++)
+                {
+                    Assert.That(secondSpans[i].Node.Value, Is.EqualTo(firstSpans[i].Node.Value),
+                                $"line {lineNumber} span {i} value");
+                    Assert.That(secondSpans[i].Wrapper?.Properties?.Style,
+                                Is.EqualTo(firstSpans[i].Wrapper?.Properties?.Style),
+                                $"line {lineNumber} span {i} style");
+                }
+            }
+        }
+        finally
+        {
+            SourceFile.ClearFileCache();
+        }
+    }
+
+    [Test]
+    public void DoSyntax_ClassAst_AnyThemeHitsTheMemoizedResult()
+    {
+        try
+        {
+            const string content = "var themed = true;\n";
+
+            var light = new SourceFile(content, "cs", "themed.cs");
+            light.DoRaw();
+            light.DoSyntax(theme: "light");
+
+            var dark = new SourceFile(content, "cs", "themed.cs");
+            dark.DoRaw();
+            dark.DoSyntax(theme: "dark");
+
+            Assert.That(dark.SyntaxFile, Is.SameAs(light.SyntaxFile),
+                        "class ASTs carry both theme colors — a theme flip reuses the memoized result");
+        }
+        finally
+        {
+            SourceFile.ClearFileCache();
+        }
+    }
+
+    [Test]
+    public void DoSyntax_EngineConfigChange_DropsMemoizedResults()
+    {
+        try
+        {
+            const string content = "var cfg = 1;\n";
+
+            var first = new SourceFile(content, "cs", "cfg.cs");
+            first.DoRaw();
+            first.DoSyntax();
+
+            TextMateHighlighter.Instance.SetIgnoreSyntaxHighlightList([]);
+
+            var second = new SourceFile(content, "cs", "cfg.cs");
+            second.DoRaw();
+            second.DoSyntax();
+
+            Assert.That(second.SyntaxFile, Is.Not.SameAs(first.SyntaxFile),
+                        "config changes must re-tokenize");
+        }
+        finally
+        {
+            SourceFile.ClearFileCache();
+        }
+    }
 }

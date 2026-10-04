@@ -4,11 +4,87 @@ namespace Banned.CodeDiff.Models;
 
 /// <summary>
 /// Port of packages/core/src/file.ts — raw + syntax state of one source file.
-/// The cross-instance file cache (Cache/`getFile`) is a web-specific perf
-/// optimization and is intentionally not ported; every source file is fresh.
+/// The upstream module-level cross-instance cache (cache.ts + getFile) is not ported
+/// as-is; the expensive part — the syntax tokenization result — is memoized instead
+/// through a bounded LRU inside <see cref="DoSyntax"/>, recorded as a performance
+/// enhancement (see Docs/CHANGELOG.md). Caching at the doSyntax level (rather than
+/// sharing whole File instances like getFile does) keeps the observable rule "syntax
+/// exists only after doSyntax ran on this file" intact.
 /// </summary>
 public sealed class SourceFile(string row, string lang, string? fileName = null)
 {
+    /// <summary>The cache key of one memoized doSyntax outcome, plus the outcome itself.</summary>
+    private sealed record SyntaxResultEntry(
+        (string Raw, string Lang, string? FileName, string EngineName, HighlighterType EngineType, string? Theme) Key,
+        SyntaxNode Ast, Dictionary<int, SyntaxLine> SyntaxFile, int SyntaxLength);
+
+    /// <summary>
+    /// Bounded LRU of recent syntax results (most recent first), keyed by the inputs that
+    /// determine them: content, lang, file name, engine identity, and theme — except for
+    /// <c>Class</c>-typed engines (the built-in one), whose ASTs carry both themes
+    /// (the upstream otherThemeKey reuse generalized). Like
+    /// <c>DiffParser.Shared</c>/<c>TemplateOptions</c> this is global mutable state shared
+    /// across <see cref="Services.DiffFile"/> instances — single-threaded use by design.
+    /// </summary>
+    private static readonly LinkedList<SyntaxResultEntry> SyntaxResultOrder = [];
+    private static readonly Dictionary<(string Raw, string Lang, string? FileName, string EngineName,
+        HighlighterType EngineType, string? Theme), LinkedListNode<SyntaxResultEntry>> SyntaxResultMap = new();
+
+    private const int SyntaxResultCapacity = 8;
+
+    /// <summary>
+    /// Drops every memoized syntax result. Called when global engine configuration changes
+    /// (transform function, syntax ignore list / threshold) so the next doSyntax reflects the
+    /// new settings — without memoization every run recomputed, and that observable behavior
+    /// is preserved.
+    /// </summary>
+    public static void ClearFileCache()
+    {
+        SyntaxResultOrder.Clear();
+        SyntaxResultMap.Clear();
+    }
+
+    /// <summary>The theme component of the cache key: <c>null</c> for class engines
+    /// (theme-independent ASTs), the requested theme otherwise.</summary>
+    private static string? ThemeKey(IDiffHighlighter engine, string? theme) =>
+        engine.Type == Banned.CodeDiff.Models.HighlighterType.Class ? null : theme;
+
+    private static SyntaxResultEntry? TryGetSyntaxResult(string raw, string lang, string? fileName,
+                                                         IDiffHighlighter engine, string? theme)
+    {
+        var key = (raw, lang, fileName, engine.Name, engine.Type, ThemeKey(engine, theme));
+
+        if (!SyntaxResultMap.TryGetValue(key, out var node))
+        {
+            return null;
+        }
+
+        SyntaxResultOrder.Remove(node);
+        SyntaxResultOrder.AddFirst(node);
+
+        return node.Value;
+    }
+
+    private static void CacheSyntaxResult(string raw, string lang, string? fileName, IDiffHighlighter engine,
+                                          string? theme, SyntaxNode ast, Dictionary<int, SyntaxLine> syntaxFile,
+                                          int syntaxLength)
+    {
+        var entry = new SyntaxResultEntry(
+            (raw, lang, fileName, engine.Name, engine.Type, ThemeKey(engine, theme)), ast, syntaxFile, syntaxLength);
+
+        var node = SyntaxResultOrder.AddFirst(entry);
+
+        SyntaxResultMap[entry.Key] = node;
+
+        if (SyntaxResultMap.Count > SyntaxResultCapacity)
+        {
+            var last = SyntaxResultOrder.Last!;
+
+            SyntaxResultOrder.RemoveLast();
+            SyntaxResultMap.Remove(last.Value.Key);
+        }
+    }
+
     public string  Raw      { get; } = Transform.ProcessTransformForFile(row);
     public string  Lang     { get; } = lang;
     public string? FileName { get; } = fileName;
@@ -108,6 +184,21 @@ public sealed class SourceFile(string row, string lang, string? fileName = null)
             return;
         }
 
+        // A memoized result for the same inputs replaces the re-tokenization (the expensive
+        // part of this method); the adopted fields are exactly what a fresh run produced.
+        if (TryGetSyntaxResult(Raw, Lang, FileName, supportEngine, theme) is { } hit)
+        {
+            Ast             = hit.Ast;
+            Theme           = theme;
+            SyntaxFile      = hit.SyntaxFile;
+            SyntaxLength    = hit.SyntaxLength;
+            HighlighterName = supportEngine.Name;
+            HighlighterType = supportEngine.Type;
+            HasDoSyntax     = true;
+
+            return;
+        }
+
         Ast = supportEngine.GetAst(Raw, FileName, Lang, theme);
 
         Theme = theme;
@@ -129,6 +220,9 @@ public sealed class SourceFile(string row, string lang, string? fileName = null)
         HighlighterName = supportEngine.Name;
 
         HighlighterType = supportEngine.Type;
+
+        CacheSyntaxResult(Raw, Lang, FileName, supportEngine, theme, Ast, SyntaxFile,
+                          result.SyntaxFileLineNumber);
 
         // JS additionally runs a dev-only #doCheck() comparing syntax lines with raw lines;
         // the C# port covers that equivalence through golden tests instead.

@@ -1,3 +1,5 @@
+using Banned.CodeDiff.Models;
+
 namespace Banned.CodeDiff.Services;
 
 /// <summary>Port of packages/core/src/parse/transform.ts.</summary>
@@ -30,6 +32,10 @@ public static class Transform
         _transformFile = fn ?? throw new InvalidOperationException("Transform must be a function");
 
         EnableTransform = true;
+
+        // Cached source files carry the previously transformed raw — drop them so the next
+        // construction picks up the new transform (fresh-instance behavior without the cache).
+        SourceFile.ClearFileCache();
     }
 
     /// <summary>Resets all transformation functions to their default state and disables transformation.</summary>
@@ -40,6 +46,8 @@ public static class Transform
         _transformContent = Default;
 
         _transformFile = Default;
+
+        SourceFile.ClearFileCache();
     }
 
     /// <summary>Checks whether content transformation is currently enabled.</summary>

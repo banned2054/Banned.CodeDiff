@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.RegularExpressions;
 using Banned.CodeDiff.Models;
 using Banned.CodeDiff.Utils;
@@ -35,6 +36,10 @@ public sealed class TextMateHighlighter : IDiffHighlighter
     public void SetMaxLineToIgnoreSyntax(int value)
     {
         _maxLineToIgnoreSyntax = value;
+
+        // Cached files may now be over (or back under) the threshold — drop them so a fresh
+        // DiffFile sees the new setting, exactly as it would without the cache.
+        SourceFile.ClearFileCache();
     }
 
     public void SetIgnoreSyntaxHighlightList(IReadOnlyList<IgnorePattern> items)
@@ -42,6 +47,8 @@ public sealed class TextMateHighlighter : IDiffHighlighter
         _ignoreSyntaxHighlightList.Clear();
 
         _ignoreSyntaxHighlightList.AddRange(items);
+
+        SourceFile.ClearFileCache();
     }
 
     public bool HasRegisteredCurrentLang(string lang)
@@ -87,6 +94,14 @@ public sealed class TextMateHighlighter : IDiffHighlighter
     }
 
     /// <summary>
+    /// Style strings shared by every wrapper of the same (light, dark) color pair — the themes
+    /// resolve to a small fixed palette, so each distinct pair is built once per process.
+    /// Strings are immutable, so sharing is safe; the mutable
+    /// <see cref="SyntaxNodeProperties"/> wrapper stays per-node.
+    /// </summary>
+    private static readonly Dictionary<(string? Light, string? Dark), string> StylePalette = new();
+
+    /// <summary>
     /// Tokenizes the full file from line 1 (rule stack carried across lines, so
     /// block comments / template literals spanning collapsed hunks keep their
     /// state — same "highlight the whole raw file" contract as upstream), and
@@ -112,9 +127,14 @@ public sealed class TextMateHighlighter : IDiffHighlighter
 
         var lines = raw.Split('\n');
 
-        // Per line: (token text, light color, dark color, standard token type)
-        // with equal-appearance merging.
-        var spans = new List<(string Value, string? Light, string? Dark, int TokenType)>();
+        // Per line: (span start/length in lineBuilder, light color, dark color, standard token
+        // type) with equal-appearance merging — the merged value is sliced once at emission
+        // instead of being re-concatenated on every merge.
+        var spans = new List<(int Start, int Length, string? Light, string? Dark, int TokenType)>();
+
+        // Reused across lines (Clear keeps the capacity) — the whole line's token text is
+        // appended exactly once per character.
+        var lineBuilder = new StringBuilder();
 
         IStateStack? ruleStack = null;
 
@@ -127,6 +147,7 @@ public sealed class TextMateHighlighter : IDiffHighlighter
             ruleStack = result.RuleStack;
 
             spans.Clear();
+            lineBuilder.Clear();
 
             foreach (var token in result.Tokens)
             {
@@ -134,9 +155,9 @@ public sealed class TextMateHighlighter : IDiffHighlighter
                 var start = Math.Clamp(token.StartIndex, 0, line.Length);
                 var end   = Math.Clamp(token.EndIndex, start, line.Length);
 
-                var value = line.Substring(start, end - start);
+                var length = end - start;
 
-                if (value.Length == 0)
+                if (length == 0)
                 {
                     continue;
                 }
@@ -148,17 +169,19 @@ public sealed class TextMateHighlighter : IDiffHighlighter
                 if (spans.Count > 0 && spans[^1].Light == light && spans[^1].Dark == dark &&
                     spans[^1].TokenType == tokenType)
                 {
-                    spans[^1] = (spans[^1].Value + value, light, dark, tokenType);
+                    spans[^1] = (spans[^1].Start, spans[^1].Length + length, light, dark, tokenType);
                 }
                 else
                 {
-                    spans.Add((value, light, dark, tokenType));
+                    spans.Add((lineBuilder.Length, length, light, dark, tokenType));
                 }
+
+                lineBuilder.Append(line, start, length);
             }
 
-            foreach (var (value, light, dark, _) in spans)
+            foreach (var span in spans)
             {
-                children.Add(BuildWrapper(value, light, dark));
+                children.Add(BuildWrapper(lineBuilder.ToString(span.Start, span.Length), span.Light, span.Dark));
             }
 
             if (i < lines.Length - 1)
@@ -209,7 +232,26 @@ public sealed class TextMateHighlighter : IDiffHighlighter
         // cssVariablePrefix: "--diff-view-" }) output: dark variable first,
         // no trailing semicolon; unmatched tokens keep the theme default
         // foreground, so a token span always carries both colors.
-        var style = "";
+        var style = GetStyle(light, dark);
+
+        return new SyntaxNode
+        {
+            Type       = "element",
+            Properties = style.Length > 0 ? new SyntaxNodeProperties { Style = style } : null,
+            Children   = [new SyntaxNode { Type = "text", Value = value }],
+        };
+    }
+
+    /// <summary>The style string for a color pair, memoized in <see cref="StylePalette"/>
+    /// (bounded by the themes' color palette).</summary>
+    private static string GetStyle(string? light, string? dark)
+    {
+        var key = (light, dark);
+
+        if (StylePalette.TryGetValue(key, out var style))
+        {
+            return style;
+        }
 
         if (dark != null && light != null)
         {
@@ -223,12 +265,13 @@ public sealed class TextMateHighlighter : IDiffHighlighter
         {
             style = $"--diff-view-light:{light}";
         }
-
-        return new SyntaxNode
+        else
         {
-            Type       = "element",
-            Properties = style.Length > 0 ? new SyntaxNodeProperties { Style = style } : null,
-            Children   = [new SyntaxNode { Type = "text", Value = value }],
-        };
+            style = "";
+        }
+
+        StylePalette[key] = style;
+
+        return style;
     }
 }
