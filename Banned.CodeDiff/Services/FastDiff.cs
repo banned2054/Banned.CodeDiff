@@ -1228,6 +1228,37 @@ public static class FastDiff
         return start >= s.Length ? "" : s[start..];
     }
 
+    /// <summary>
+    /// JS slice(s.length - n) — the suffix slice of findCursorEditDiff's editAfter branch.
+    /// A negative start (n &gt; s.Length) clamps to 0 and returns the whole string; a start
+    /// past the end (n &lt; 0) returns the empty string. Unlike the C# range operators,
+    /// slice never throws on out-of-range bounds.
+    /// </summary>
+    private static string JsSliceSuffix(string s, int n)
+    {
+        if (n < 0)
+        {
+            return "";
+        }
+
+        return n >= s.Length ? s : s[(s.Length - n)..];
+    }
+
+    /// <summary>
+    /// JS slice(0, s.length - n) — the middle slice of findCursorEditDiff's editAfter branch.
+    /// A negative end (n &gt; s.Length) clamps to 0 and returns the empty string; an end
+    /// past the length (n &lt; 0) returns the whole string.
+    /// </summary>
+    private static string JsSliceWithoutSuffix(string s, int n)
+    {
+        if (n < 0)
+        {
+            return s;
+        }
+
+        return n >= s.Length ? "" : s[..(s.Length - n)];
+    }
+
     private static List<DiffTuple>? FindCursorEditDiff(string oldText, string newText, CursorInfo cursorPos)
     {
         // note: this runs after equality check has ruled out exact equality
@@ -1301,16 +1332,25 @@ public static class FastDiff
                         return null;
                     }
 
+                    // Invariant (non-local): suffixLength >= 0 is pinned by the
+                    // newBefore != oldBefore early-out above — cursor > min(oldLength, newLength)
+                    // would give the two before-strings different lengths (or two whole texts,
+                    // which diff_main's text1 == text2 early-return already ruled out), so the
+                    // guard always returns first in that case. cursor < 0 is NOT excluded: it
+                    // passes the guard on two empty before-strings, and suffixLength can then
+                    // exceed oldAfter/newAfter.Length — where the JS original's slice clamps to
+                    // the whole/empty string while the C# range operators throw. The two
+                    // JsSlice* helpers replicate that clamping.
                     var suffixLength = Math.Min(oldLength - cursor, newLength - cursor);
-                    var oldSuffix    = oldAfter[^suffixLength..];
-                    var newSuffix    = newAfter[^suffixLength..];
+                    var oldSuffix    = JsSliceSuffix(oldAfter, suffixLength);
+                    var newSuffix    = JsSliceSuffix(newAfter, suffixLength);
                     if (oldSuffix != newSuffix)
                     {
                         return null;
                     }
 
-                    var oldMiddle = oldAfter[..^suffixLength];
-                    var newMiddle = newAfter[..^suffixLength];
+                    var oldMiddle = JsSliceWithoutSuffix(oldAfter, suffixLength);
+                    var newMiddle = JsSliceWithoutSuffix(newAfter, suffixLength);
                     return MakeEditSplice(oldBefore, oldMiddle, newMiddle, oldSuffix);
                 }
             }
