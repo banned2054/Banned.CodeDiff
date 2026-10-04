@@ -2,77 +2,42 @@
 
 English | [**简体中文**](https://github.com/banned2054/Banned.CodeDiff/blob/master/Docs/README.zh-CN.md)
 
-[![NuGet](https://img.shields.io/nuget/v/Banned.CodeDiff.Avalonia.svg)](https://www.nuget.org/packages/Banned.CodeDiff.Avalonia) [![Downloads](https://img.shields.io/nuget/dt/Banned.CodeDiff.Avalonia.svg)](https://www.nuget.org/packages/Banned.CodeDiff.Avalonia) [![License](https://img.shields.io/badge/license-Apache_2.0-green)](./LICENSE)
+[![NuGet](https://img.shields.io/nuget/v/Banned.CodeDiff.Avalonia.svg)](https://www.nuget.org/packages/Banned.CodeDiff.Avalonia) [![Downloads](https://img.shields.io/nuget/dt/Banned.CodeDiff.Avalonia.svg)](https://www.nuget.org/packages/Banned.CodeDiff.Avalonia) [![License](https://img.shields.io/badge/license-Apache_2.0-green)](https://github.com/banned2054/Banned.CodeDiff/blob/master/LICENSE)
 
-An Avalonia control library for rendering code diffs: GitHub-style split and unified views with
-line- and word-level highlighting, expandable hunks, syntax highlighting, drag line selection,
-clipboard copy, and long-line wrapping.
+An Avalonia diff viewer for unified diff text. It renders split or unified views with line and word
+highlights, expandable hunks, syntax highlighting, line selection, copy, and long-line wrapping.
 
-The host application owns the diff text and the surrounding UI. This repository handles diff parsing,
-split/unified line pairing, word-level change ranges, hunk expand/collapse state, and rendering.
-The core logic library has no UI dependency, so it can also drive WPF, console, or any other .NET host.
+The first package version is `0.1.0`; both packages target .NET 10.0. The built-in visual style
+currently follows GitHub diff conventions and includes light and dark palettes. Additional styles
+may be added in future releases. The core package has no UI dependency and can be used by other
+.NET applications.
 
-The project is a C# port of [`git-diff-view`](https://github.com/MrWangJustToDo/git-diff-view); see
-[NOTICE](./NOTICE) for upstream acknowledgements.
-
-## Status
-
-Development follows the milestones in [plan.md](./plan.md):
-
-| Milestone | Scope | State |
-|---|---|---|
-| M1 | Core logic library `Banned.CodeDiff` | Done — 577 tests green, golden-tested against the JS original |
-| M2 | `Banned.CodeDiff.Avalonia` minimal split view | Done — `DiffView` control + demo |
-| M3 | Word-level highlight rendering | Done |
-| M4 | Hunk expand/collapse + virtualization | Done |
-| M5 | Syntax highlighting (TextMateSharp) | Done — golden-tested against shiki |
-| M6 | Themes, wrap mode, line selection, copy | Done |
+This project is a C# port of [`git-diff-view`](https://github.com/MrWangJustToDo/git-diff-view).
+See [NOTICE](./NOTICE) for upstream acknowledgements.
 
 ## Features
 
-- Unified diff parsing — GNU unified diff text into a structured `RawDiff` (multi-file, multi-hunk,
-  CRLF support, `\ No newline at end of file`, binary markers, bidi hidden-character detection)
-- Split / unified line models — left/right paired rows and single-column rows with line numbers,
-  add/delete/modify types, and collapsed placeholders, ready to feed a list control
-- Word-level changes — character-level ranges for paired added/removed lines, from two algorithms:
-  relative-changes (`DiffLine.Changes`) and fast-diff (`DiffLine.DiffChanges`)
-- Hunk expansion — up / down / all expansion state machine with configurable step (default 40 lines)
-  and an `Updated` notification the host uses to refresh the view
-- Global template switches — `TemplateOptions` toggles fast-diff word-level diff and template building
-- Syntax highlighting — a built-in TextMate engine (TextMateSharp + the shiki-bundled grammars and GitHub
-  light/dark themes) tokenizes the full old/new files and exposes per-line colored spans
-  (`DiffFile.InitSyntax` / `GetOldSyntaxLine` / `GetNewSyntaxLine`); pluggable via `IDiffHighlighter`
-- Multi-select data layer — line-range selection queries over a built `DiffFile`
-  (`MultiSelectData`): 1-based line indices, hidden-line flags that survive hunk
-  expand/collapse, and range normalization, mirroring the upstream multiSelect semantics
-- Zero UI dependencies in the core library
-- `DiffView` Avalonia control — read-only GitHub-style diff view with line-level add/delete
-  backgrounds, word-level highlight blocks inside changed lines, collapsed hunk placeholders with
-  clickable expand affordances (expand up / down / all, matching GitHub's placement rules), row
-  virtualization for large diffs, and light/dark palettes; renders split (two columns) or unified
-  (single column, dual line numbers, deleted lines above the added ones)
-- Line selection — opt-in GitHub-style drag selection over the line-number columns
-  (`IsSelectionEnabled`), with `SelectionChanged` / `SelectionCompleted` events, a
-  preselected-lines API, and selection queries on the control
-- Copy — `CopySelectionCommand` / `CopyOldFileCommand` / `CopyNewFileCommand` (and async
-  method counterparts) copy the selected lines or the whole old/new files to the clipboard
-- Wrap — opt-in long-line wrapping (`Wrap`) at the view width that keeps row virtualization
-  intact; line-number columns stay fixed-width and split rows keep both sides equally tall
+- Parse unified diff text and build split or unified line models.
+- Calculate character-level changes for paired added and removed lines.
+- Render virtualized diffs with hunk expansion, syntax highlighting, and light/dark palettes.
+- Select lines, copy selected or complete file contents, and wrap long lines.
+- Use the core parser and models without Avalonia, or provide a custom `IDiffHighlighter`.
 
 ## Installation
+
+Install the Avalonia control package:
 
 ```powershell
 dotnet add package Banned.CodeDiff.Avalonia
 ```
 
-> The control package is not published yet. Until then, consume the libraries via project references
-> (`Banned.CodeDiff.Avalonia` brings the core library with it). Whether `Banned.CodeDiff` also ships
-> as a standalone NuGet package has not been decided yet.
+`Banned.CodeDiff.Avalonia` depends on `Banned.CodeDiff`; NuGet restores the core package automatically.
+The core package can also be installed alone for diff parsing and data processing. When building from
+source, reference either project directly.
 
-## Avalonia Control
+## Quick start
 
-`DiffView` renders a `DiffFile` as a read-only split view. Include the control theme once in your
-application (Avalonia does not auto-discover control-library themes), then place the control:
+Include the control library's theme in your application. Avalonia does not load it automatically:
 
 ```xml
 <Application xmlns="https://github.com/avaloniaui">
@@ -83,241 +48,71 @@ application (Avalonia does not auto-discover control-library themes), then place
 </Application>
 ```
 
+Create a `DiffFile` from the diff and full old/new file contents:
+
+```csharp
+using Banned.CodeDiff.Services;
+
+const string diffText = """
+diff --git a/Program.cs b/Program.cs
+--- a/Program.cs
++++ b/Program.cs
+@@ -1 +1 @@
+-Console.WriteLine("old");
++Console.WriteLine("new");
+""";
+
+var file = new DiffFile(
+    "a/Program.cs",
+    "Console.WriteLine(\"old\");",
+    "b/Program.cs",
+    "Console.WriteLine(\"new\");",
+    [diffText]);
+
+file.Init();
+file.BuildSplitDiffLines();
+```
+
+Bind it to the Avalonia control:
+
 ```xml
-<Window xmlns:views="clr-namespace:Banned.CodeDiff.Avalonia.Views;assembly=Banned.CodeDiff.Avalonia">
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:views="clr-namespace:Banned.CodeDiff.Avalonia.Views;assembly=Banned.CodeDiff.Avalonia">
     <views:DiffView DiffFile="{Binding DiffFile}" />
 </Window>
 ```
 
-Assign a `DiffFile` (built or not — the control invokes `Init` / `Build*DiffLines` on demand) and
-it stays in sync through the model's `Updated` event. `ViewMode` switches between the default
-`Split` and `Unified` rendering; `SyntaxHighlight` (default on) runs `InitSyntax` so lines render
-with syntax colors that follow the light/dark theme, and `Highlighter` injects a custom
-`IDiffHighlighter` engine. `Wrap` (default off) wraps long lines at the view width without
-breaking virtualization — line-number columns stay fixed-width and split rows keep both sides
-the height of the taller one. `IsSelectionEnabled` (default off) turns on GitHub-style drag line
-selection (see [Line Selection](#line-selection)). The control uses a monospace font by default,
-auto-sizes the line-number columns, renders collapsed hunk placeholder rows, switches its
-light/dark palette with `ActualThemeVariant`, and paints word-level highlight blocks inside
-changed lines when `DiffLine.DiffChanges` (fast-diff) or `DiffLine.Changes` (relative) ranges
-are available.
+## Optional features
 
-Hunk placeholder rows carry expand buttons (single Expand Up on the first hunk, Expand Down on
-the trailing strip, a stacked down+up pair or a single Expand All otherwise — mirroring the
-upstream git-diff-view placement rules) wired to the model's expand API through the control's
-`ExpandHunkUpCommand` / `ExpandHunkDownCommand` / `ExpandHunkAllCommand`. Expansion requires a
-model built with real old/new file contents: paste-only diffs (empty file contents) compose from
-the diff text itself and cannot expand. Rows render through a `VirtualizingStackPanel`, so large
-diffs realize only the visible slice of containers.
+- Enable fast word-level ranges before `Init()` with `TemplateOptions.SetEnableFastDiffTemplate(true)`.
+- Set `DiffView.ViewMode` to `Unified` for a single-column view.
+- `DiffFile.InitSyntax()` uses the built-in TextMate highlighter; pass an `IDiffHighlighter` to use another engine.
+- Set `DiffView.IsSelectionEnabled` to enable line selection; use `SelectionCompleted` to read the result.
+- Use `CopySelectionAsync()`, `CopyOldFileAsync()`, or `CopyNewFileAsync()` to copy content. Bind keyboard shortcuts in the host application.
+- Set `DiffView.Wrap` to wrap long lines while preserving row virtualization.
+- Expand hunks with `OnSplitHunkExpand` or `OnUnifiedHunkExpand`. Expansion requires full old/new file contents.
 
-Run the included demo to paste a diff and see it rendered:
+`DiffParser.Shared` and `TemplateOptions` hold global state. Avoid using them concurrently across threads.
+
+## Demo and tests
+
+Run the demo:
 
 ```powershell
 dotnet run --project Banned.CodeDiff.Avalonia.Demo/Banned.CodeDiff.Avalonia.Demo.csproj
 ```
 
-The demo toolbar also toggles the M6 features on and off — "Enable line selection",
-"Auto wrap", and three copy buttons (copy selection / old file / new file) — with a status bar
-reporting the completed selection ("N lines (old 12-34)") and copy feedback. Ctrl+C is bound at
-the window level as an example of the host-side shortcut wiring (the control ships none).
-
-## Basic Usage
-
-Feed the raw diff text plus the full old/new file contents into `DiffFile`, then read the built
-line models:
-
-```csharp
-using Banned.CodeDiff.Models;
-using Banned.CodeDiff.Services;
-
-const string diffText = """
-    diff --git a/Program.cs b/Program.cs
-    --- a/Program.cs
-    +++ b/Program.cs
-    @@ -1,2 +1,3 @@
-     using System;
-    -Console.WriteLine("Hello");
-    +Console.WriteLine("Hello, World!");
-    +Console.ReadLine();
-    """;
-
-const string oldText = "using System;\nConsole.WriteLine(\"Hello\");";
-const string newText = "using System;\nConsole.WriteLine(\"Hello, World!\");\nConsole.ReadLine();";
-
-var file = new DiffFile(
-    oldFileName: "a/Program.cs",
-    oldFileContent: oldText,
-    newFileName: "b/Program.cs",
-    newFileContent: newText,
-    diffList: [diffText]);
-
-file.Init();
-file.BuildSplitDiffLines();
-
-for (var i = 0; i < file.SplitLineLength; i++)
-{
-    var left = file.GetSplitLeftLine(i);
-    var right = file.GetSplitRightLine(i);
-
-    foreach (var item in new[] { left, right })
-    {
-        if (item?.Diff is not { } line)
-        {
-            continue; // collapsed placeholder row, etc.
-        }
-
-        Console.WriteLine($"{line.OldLineNumber}/{line.NewLineNumber} [{line.Type}] {item.Value?.TrimEnd('\r', '\n')}");
-    }
-}
-
-// Unified view: file.BuildUnifiedDiffLines(); file.GetUnifiedLine(i);
-```
-
-Statistics: `file.AdditionLength` / `DeletionLength` (added/removed line counts), `DiffLineLength`
-(total diff lines), and `DiffTool.GetLang(fileName)` (language detection from a file name).
-
-## Word-Level Changes
-
-Enable the fast-diff word-level ranges before `Init()` (optional):
-
-```csharp
-TemplateOptions.SetEnableFastDiffTemplate(true);
-```
-
-After `Init()`, paired added/removed lines expose character ranges that drive inline highlighting
-(`null` on context lines). Each `DiffItem` carries the operation `Type` plus `StartIndex` / `Length`
-within the line text:
-
-```csharp
-foreach (var item in line.DiffChanges?.Range ?? [])
-{
-    // item.Type: equal / insert / delete
-    // item.StartIndex .. item.StartIndex + item.Length: span inside the line text
-}
-```
-
-`DiffLine.Changes` holds the alternative relative-changes result with the same purpose.
-
-## Hunk Expansion
-
-Collapsed hunks can be expanded at runtime; the host refreshes on `Updated`:
-
-```csharp
-file.Updated += () => Console.WriteLine($"model updated ({file.UpdateCount})");
-
-file.OnSplitHunkExpand(HunkExpandDirection.All, 0);
-// unified counterpart: file.OnUnifiedHunkExpand(HunkExpandDirection.Up, index);
-```
-
-The `DiffView` control wires this automatically: each hunk placeholder row exposes the
-appropriate expand buttons, and `file.OnAllExpand` / `OnAllCollapse` can be bound to toolbar
-actions (the demo does this). A leading `@@` header whose hidden range is empty (a hunk starting
-at line 1) is not rendered, matching GitHub and the upstream view components.
-
-## Syntax Highlighting
-
-The core library ships a built-in syntax engine: TextMateSharp tokenization with the same
-TextMate grammars and GitHub light/dark themes the upstream shiki engine bundles. `InitSyntax`
-tokenizes the *whole* old/new files (rule state carries across lines, so block comments and
-template literals keep their state across collapsed hunks) and falls back to plain text for
-unregistered languages or files over the 2000-line limit:
-
-```csharp
-var file = new DiffFile("a/Program.cs", oldText, "b/Program.cs", newText, [diffText]);
-file.Init();          // InitRaw + InitSyntax (syntax included)
-
-var syntaxLine = file.GetNewSyntaxLine(12); // null when the file is unhighlighted
-// syntaxLine.Value — the raw line text; syntaxLine.NodeList — ordered spans:
-//   { Node: { StartIndex, EndIndex (inclusive) }, Wrapper: { Properties: { Style } } }
-// Style strings carry both theme colors: "--diff-view-dark:#F97583;--diff-view-light:#D73A49".
-```
-
-The language is detected from the file name (`DiffTool.GetLang`); registered languages cover
-C#, TypeScript/TSX, JavaScript/JSX, JSON, HTML, CSS, Markdown, Python, Java, Go, Rust, C, C++,
-shell, YAML, XML, Vue, and diff output. Replace the engine with `DiffFile.InitSyntax(myHighlighter)`
-(`IDiffHighlighter`) — the AST contract mirrors the upstream `DiffHighlighter` interface, and
-spans from both built-in and injected engines feed the same renderer.
-
-## Line Selection
-
-`DiffView.IsSelectionEnabled` (default `false`, opt-in) turns on the port of the upstream
-multiSelect feature: dragging over line-number cells selects line ranges the GitHub way. In
-split view the drag locks to the side it started on and hovering the line content extends the
-selection too; in unified view only the line-number strip extends it. Context lines highlight
-both sides; a completed selection stays highlighted until the next interaction, and lines hidden
-behind a collapsed hunk keep their membership but light up only once revealed.
-
-```csharp
-view.SelectionCompleted += (_, e) =>
-{
-    // e.Result — MultiSelectResult? (null when released without a range):
-    //   Range: { Side (Old/New), StartLineNumber, EndLineNumber }
-    //   Lines: SelectedLine records — 1-based Index, LineNumber, Value, IsHide, IsAdd, IsDelete, IsContext
-};
-
-view.SetPreselectedLines(oldLines: [12, 34]); // preselect from existing annotations
-view.GetSelectionResult();  // live range during a drag; last completed range after release
-view.GetSelectionState();   // MultiSelectState — IsSelecting, StartInfo, CurrentRange
-view.ClearSelection();
-```
-
-`SetPreselectedLines` merges each side's list into one big min/max range (the upstream-known
-semantics — a scattered list highlights everything between its min and max). The data layer
-behind the feature lives in the core library (`MultiSelectData`: range normalization,
-selected-line queries for split and unified, selection-to-text), so selection results can be
-computed and asserted without any UI.
-
-## Copy to Clipboard
-
-`DiffView` exposes three copy operations, both as commands and as async methods:
-
-```csharp
-view.CopySelectionCommand.Execute(null); // or: await view.CopySelectionAsync();
-view.CopyOldFileCommand.Execute(null);   // or: await view.CopyOldFileAsync();
-view.CopyNewFileCommand.Execute(null);   // or: await view.CopyNewFileAsync();
-```
-
-Selection copy writes exactly what the view shows — one output line per selected line, hidden
-lines skipped, trailing newlines trimmed; whole-file copies pass the old/new file content
-through unchanged. `CopySelectionCommand` disables itself without a usable selection
-(`CanExecuteChanged` tracks selection and model changes). No keyboard shortcut is built in —
-hosts bind their own to `CopySelectionCommand` (the demo binds Ctrl+C at the window level) so
-the control never clashes with existing host bindings.
-
-## Usage Notes
-
-- `DiffParser.Shared` and `TemplateOptions` are globally stateful (matching the JS original); do not
-  call them concurrently across threads. Create a dedicated `DiffParser` instance per thread instead.
-- Line text (`SplitLineItem.Value` / `DiffLine.Text`) keeps the original trailing newline (except on
-  the source file's last line); render as-is and `TrimEnd` when concatenating elsewhere.
-- The character-level diff (fast-diff) has a recursion-depth guard: pathological inputs throw a
-  catchable `InvalidOperationException` instead of overflowing the stack.
-
-## Testing
+Run all tests:
 
 ```powershell
-dotnet test tests/Banned.CodeDiff.Tests/Banned.CodeDiff.Tests.csproj
-dotnet test tests/Banned.CodeDiff.Avalonia.Tests/Banned.CodeDiff.Avalonia.Tests.csproj
+dotnet test Banned.CodeDiff.slnx --configuration Release
 ```
 
-614 core cases (NUnit; golden tests comparing field-by-field against the JS original
-`@git-diff-view/core` + `fast-diff@1.3.0`, plus syntax goldens replayed from the real shiki
-engine with the same codeToHast options as `@git-diff-view/shiki`, plus multiSelect data-layer
-and selection-text unit tests) — plus 67 headless Avalonia UI tests (NUnit +
-Avalonia.Headless.NUnit) covering the control theme, template instantiation, row building in
-both view modes, mode switching, word-level highlight ranges and rectangle computation, hunk
-expansion in all directions with button-placement rules, command wiring, row virtualization on
-a 10k-line model, syntax-run wiring with theme-switched colors, selection drag semantics with
-events and preselection, clipboard copy of selections and whole files, and wrap layout with
-scrolling and virtualization intact under wrapping.
+## Changelog
 
-## 📜 Changelog
+See the [CHANGELOG](https://github.com/banned2054/Banned.CodeDiff/blob/master/Docs/CHANGELOG.md).
 
-[🧾 View CHANGELOG](./Docs/CHANGELOG.md)
+## License
 
-## ⚖️ License
-
-Copyright (c) 2026 banned.
-
-This project is licensed under the Apache License 2.0. See the [LICENSE](./LICENSE) file for details.
-See [NOTICE](./NOTICE) for upstream acknowledgements and third-party notices.
+Copyright (c) 2026 banned. Licensed under the Apache License 2.0; see [LICENSE](https://github.com/banned2054/Banned.CodeDiff/blob/master/LICENSE).
+Upstream acknowledgements and third-party notices are in [NOTICE](./NOTICE).

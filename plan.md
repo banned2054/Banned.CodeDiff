@@ -310,11 +310,16 @@
 - `README.md` / `Docs/README.zh-CN.md` / `Docs/CHANGELOG.md` 同步更新。
 - 新增上游衍生代码时同步更新 `NOTICE`。
 
-## 10. 未决事项
+## 10. 首发支持范围与待决事项
 
-- `Banned.CodeDiff` 是否单独发布 NuGet 包（`Banned.CodeDiff.Avalonia` 确定发布）。
+- **NuGet 包**：首发同时发布 `Banned.CodeDiff` 与 `Banned.CodeDiff.Avalonia`，版本均为 `0.1.0`；
+  Avalonia 包是控件用户的直接入口，并依赖核心包，核心包也可单独用于 diff 解析与数据处理。
+- **.NET 支持范围**：两个包首发均以 `net10.0` 为目标框架。
+- **diff 与视觉范围**：核心库处理 unified diff 文本及 Git diff 常见扩展；Avalonia 控件首发提供
+  当前 GitHub 风格的布局约定和明暗配色。产品定位不限定于 GitHub 视觉风格，其他预设样式可在
+  后续版本扩展，首发不承诺额外样式。
+- **版本记录**：首发版本为 `0.1.0`；发布时从 `Unreleased` 整理首发用户可见的变更记录。
 - README/文档中的 GitHub 链接按 `banned2054/Banned.CodeDiff` 预填，待确认。
-- 版本号与 CHANGELOG 策略随首次发布确定。
 
 ---
 
