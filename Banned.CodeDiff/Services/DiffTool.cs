@@ -7,10 +7,8 @@ public static class TemplateOptions
 {
     private static bool _enableFastDiffTemplate;
 
-    public static bool GetEnableFastDiffTemplate()
-    {
-        return _enableFastDiffTemplate;
-    }
+    /// <summary>JS: getEnableFastDiffTemplate.</summary>
+    public static bool EnableFastDiffTemplate => _enableFastDiffTemplate;
 
     public static void SetEnableFastDiffTemplate(bool enable)
     {
@@ -24,10 +22,8 @@ public static class TemplateOptions
 
     private static bool _enableBuildTemplate = true;
 
-    public static bool GetEnableBuildTemplate()
-    {
-        return _enableBuildTemplate;
-    }
+    /// <summary>JS: getEnableBuildTemplate.</summary>
+    public static bool EnableBuildTemplate => _enableBuildTemplate;
 
     public static void SetEnableBuildTemplate(bool enable)
     {
@@ -178,8 +174,8 @@ public static class DiffTool
                 deletion.Changes         = delRange;
             }
 
-            var buildTemplate = TemplateOptions.GetEnableBuildTemplate();
-            if (!TemplateOptions.GetEnableFastDiffTemplate())
+            var buildTemplate = TemplateOptions.EnableBuildTemplate;
+            if (!TemplateOptions.EnableFastDiffTemplate)
             {
                 // M2: getPlainDiffTemplate / getSyntaxDiffTemplate calls happen here
                 _ = buildTemplate;

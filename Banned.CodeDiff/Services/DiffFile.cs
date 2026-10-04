@@ -16,7 +16,8 @@ public sealed class DiffFile
     /// <summary>JS module-level composeLen.</summary>
     private static int _composeLen = 40;
 
-    public static int GetCurrentComposeLength() => _composeLen;
+    /// <summary>JS: getCurrentComposeLength.</summary>
+    public static int CurrentComposeLength => _composeLen;
 
     public static void ChangeDefaultComposeLength(int compose)
     {
@@ -532,13 +533,13 @@ public sealed class DiffFile
     }
 
     /// <summary>JS: _getTheme.</summary>
-    public string? GetTheme() => _theme;
+    public string? Theme => _theme;
 
     /// <summary>JS: _getHighlighterName.</summary>
-    public string? GetHighlighterName() => _highlighterName;
+    public string? HighlighterName => _highlighterName;
 
     /// <summary>JS: _getHighlighterType.</summary>
-    public HighlighterType? GetHighlighterType() => _highlighterType;
+    public HighlighterType? HighlighterType => _highlighterType;
 
     /// <summary>Port of initSyntax({ registerHighlighter }).</summary>
     public void InitSyntax(IDiffHighlighter? registerHighlighter = null)
@@ -1051,7 +1052,8 @@ public sealed class DiffFile
 
     // ---- expansion ----
 
-    public bool GetExpandEnabled() => !_composeByDiff && !_composeByRange;
+    /// <summary>JS: getExpandEnabled.</summary>
+    public bool IsExpandEnabled => !_composeByDiff && !_composeByRange;
 
 
     public bool HasExpandSplitAll => _hasExpandSplitAll;
@@ -1087,7 +1089,7 @@ public sealed class DiffFile
 
     public void OnSplitHunkExpand(HunkExpandDirection dir, int index, bool needTrigger = true)
     {
-        if (!GetExpandEnabled())
+        if (!IsExpandEnabled)
         {
             return;
         }
@@ -1195,7 +1197,7 @@ public sealed class DiffFile
 
     public void OnUnifiedHunkExpand(HunkExpandDirection dir, int index, bool needTrigger = true)
     {
-        if (!GetExpandEnabled())
+        if (!IsExpandEnabled)
         {
             return;
         }
@@ -1301,7 +1303,7 @@ public sealed class DiffFile
     /// <summary>Port of onAllExpand(mode: "split" | "unified").</summary>
     public void OnAllExpand(ExpandViewMode mode)
     {
-        if (!GetExpandEnabled())
+        if (!IsExpandEnabled)
         {
             return;
         }
@@ -1331,7 +1333,7 @@ public sealed class DiffFile
     /// <summary>Port of onAllCollapse(mode: "split" | "unified").</summary>
     public void OnAllCollapse(ExpandViewMode mode)
     {
-        if (!GetExpandEnabled())
+        if (!IsExpandEnabled)
         {
             return;
         }
@@ -1419,21 +1421,22 @@ public sealed class DiffFile
 
     // ---- misc accessors ----
 
-    public string? GetOldFileContent()
-    {
-        return _oldFileResult?.Raw;
-    }
+    /// <summary>
+    /// JS: getOldFileContent — the transform-processed raw of the old file
+    /// (<c>null</c> before <see cref="InitRaw"/>). Distinct from the
+    /// <see cref="OldFileContent"/> input property.
+    /// </summary>
+    public string? OldFileRaw => _oldFileResult?.Raw;
 
-    public string? GetNewFileContent()
-    {
-        return _newFileResult?.Raw;
-    }
+    /// <summary>
+    /// JS: getNewFileContent — the transform-processed raw of the new file
+    /// (<c>null</c> before <see cref="InitRaw"/>). Distinct from the
+    /// <see cref="NewFileContent"/> input property.
+    /// </summary>
+    public string? NewFileRaw => _newFileResult?.Raw;
 
     /// <summary>JS: _getIsPureDiffRender.</summary>
-    public bool GetIsPureDiffRender()
-    {
-        return _composeByDiff;
-    }
+    public bool IsPureDiffRender => _composeByDiff;
 
     public void NotifyAll(bool skipSyncExternal = false)
     {

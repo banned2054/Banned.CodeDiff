@@ -233,12 +233,12 @@ public class DiffCopyTests
         view.CopyOldFileCommand.Execute(null);
 
         // Trailing newline kept as-is — the content is not re-processed.
-        Assert.That(ClipboardText(window), Is.EqualTo(file.GetOldFileContent()));
+        Assert.That(ClipboardText(window), Is.EqualTo(file.OldFileRaw));
         Assert.That(ClipboardText(window)!.EndsWith("\n"), Is.True);
 
         view.CopyNewFileCommand.Execute(null);
 
-        Assert.That(ClipboardText(window), Is.EqualTo(file.GetNewFileContent()));
+        Assert.That(ClipboardText(window), Is.EqualTo(file.NewFileRaw));
         Assert.That(ClipboardText(window)!.EndsWith("ctx 100\n"), Is.True);
     }
 
@@ -250,10 +250,10 @@ public class DiffCopyTests
         var (window, _) = ShownInView(view);
 
         Assert.That(view.CopyOldFileAsync().Result, Is.True);
-        Assert.That(ClipboardText(window), Is.EqualTo(file.GetOldFileContent()));
+        Assert.That(ClipboardText(window), Is.EqualTo(file.OldFileRaw));
 
         Assert.That(view.CopyNewFileAsync().Result, Is.True);
-        Assert.That(ClipboardText(window), Is.EqualTo(file.GetNewFileContent()));
+        Assert.That(ClipboardText(window), Is.EqualTo(file.NewFileRaw));
     }
 
     [AvaloniaTest]

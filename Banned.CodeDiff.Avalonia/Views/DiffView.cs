@@ -97,9 +97,9 @@ public sealed class DiffView : TemplatedControl
 
         var copySelection = new DiffCopyCommand(this, static v => v.CanCopySelection(),
                                                 static v => v.CopySelectionAsync());
-        var copyOldFile   = new DiffCopyCommand(this, static v => v.DiffFile?.GetOldFileContent() != null,
+        var copyOldFile   = new DiffCopyCommand(this, static v => v.DiffFile?.OldFileRaw != null,
                                                 static v => v.CopyOldFileAsync());
-        var copyNewFile   = new DiffCopyCommand(this, static v => v.DiffFile?.GetNewFileContent() != null,
+        var copyNewFile   = new DiffCopyCommand(this, static v => v.DiffFile?.NewFileRaw != null,
                                                 static v => v.CopyNewFileAsync());
 
         CopySelectionCommand = copySelection;
@@ -280,18 +280,18 @@ public sealed class DiffView : TemplatedControl
     }
 
     /// <summary>
-    /// Copies the whole old-side file content (<c>DiffFile.GetOldFileContent</c>) to the
+    /// Copies the whole old-side file content (<c>DiffFile.OldFileRaw</c>) to the
     /// clipboard, its trailing newline kept as-is. Returns <c>false</c> — without touching the
     /// clipboard — when the model has no old-side content.
     /// </summary>
-    public Task<bool> CopyOldFileAsync() => CopyFileContentAsync(DiffFile?.GetOldFileContent());
+    public Task<bool> CopyOldFileAsync() => CopyFileContentAsync(DiffFile?.OldFileRaw);
 
     /// <summary>
-    /// Copies the whole new-side file content (<c>DiffFile.GetNewFileContent</c>) to the
+    /// Copies the whole new-side file content (<c>DiffFile.NewFileRaw</c>) to the
     /// clipboard, its trailing newline kept as-is. Returns <c>false</c> — without touching the
     /// clipboard — when the model has no new-side content.
     /// </summary>
-    public Task<bool> CopyNewFileAsync() => CopyFileContentAsync(DiffFile?.GetNewFileContent());
+    public Task<bool> CopyNewFileAsync() => CopyFileContentAsync(DiffFile?.NewFileRaw);
 
     private async Task<bool> CopyFileContentAsync(string? content)
     {
@@ -967,7 +967,7 @@ public sealed class DiffView : TemplatedControl
         }
 
         public bool CanExecute(object? parameter) =>
-            owner.DiffFile?.GetExpandEnabled() == true && parameter is DiffSplitHunkRow or DiffUnifiedHunkRow;
+            owner.DiffFile?.IsExpandEnabled == true && parameter is DiffSplitHunkRow or DiffUnifiedHunkRow;
 
         public void Execute(object? parameter)
         {

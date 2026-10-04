@@ -127,7 +127,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     }
 
     /// <summary>Gets whether the current model still has collapsed hunks that can be expanded.</summary>
-    public bool CanExpandHunks => DiffFile?.HasSomeLineCollapsed == true && DiffFile.GetExpandEnabled();
+    public bool CanExpandHunks => DiffFile?.HasSomeLineCollapsed == true && DiffFile.IsExpandEnabled;
 
     public DiffViewMode ViewMode
     {

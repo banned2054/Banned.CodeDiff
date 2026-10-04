@@ -23,11 +23,11 @@ internal static class DiffSplitRowBuilder
         for (var index = 0; index <= file.SplitLineLength; index++)
         {
             if (file.GetSplitHunkLine(index) is { } hunk &&
-                DiffHunkExpand.IsRendered(hunk.SplitInfo, file.GetIsPureDiffRender()))
+                DiffHunkExpand.IsRendered(hunk.SplitInfo, file.IsPureDiffRender))
             {
                 var text = hunk.SplitInfo?.PlainText is { Length: > 0 } plainText ? plainText : hunk.Text;
-                rows.Add(new DiffSplitHunkRow(index, hunk, file.GetExpandEnabled(),
-                                              DiffFile.GetCurrentComposeLength(), text.TrimEnd(), brushes));
+                rows.Add(new DiffSplitHunkRow(index, hunk, file.IsExpandEnabled,
+                                              DiffFile.CurrentComposeLength, text.TrimEnd(), brushes));
             }
 
             var left  = file.GetSplitLeftLine(index);

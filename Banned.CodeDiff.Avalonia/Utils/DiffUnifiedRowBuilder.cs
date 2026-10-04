@@ -23,11 +23,11 @@ internal static class DiffUnifiedRowBuilder
         for (var index = 0; index <= file.UnifiedLineLength; index++)
         {
             if (file.GetUnifiedHunkLine(index) is { } hunk &&
-                DiffHunkExpand.IsRendered(hunk.UnifiedInfo, file.GetIsPureDiffRender()))
+                DiffHunkExpand.IsRendered(hunk.UnifiedInfo, file.IsPureDiffRender))
             {
                 var text = hunk.UnifiedInfo?.PlainText is { Length: > 0 } plainText ? plainText : hunk.Text;
-                rows.Add(new DiffUnifiedHunkRow(index, hunk, file.GetExpandEnabled(),
-                                                DiffFile.GetCurrentComposeLength(), text.TrimEnd(), brushes));
+                rows.Add(new DiffUnifiedHunkRow(index, hunk, file.IsExpandEnabled,
+                                                DiffFile.CurrentComposeLength, text.TrimEnd(), brushes));
             }
 
             var line = file.GetUnifiedLine(index);

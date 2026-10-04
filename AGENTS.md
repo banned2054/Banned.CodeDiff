@@ -31,13 +31,29 @@
   （现有代码均已如此，新文件保持一致）。
 - 不“顺手修正”原版行为。任何与 JS 原版的行为差异都必须有黄金测试证据并单独说明；
   行为对齐由 golden 测试保证，不靠目测。
-- JS 语义怪癖必须在 C# 里显式复刻，已知清单：
-  - JS 用字符串枚举（如 `DiffHunkExpansionType`），沿用其语义而不是改造成位标志。
-  - JS 除法是浮点：fast-diff 的 `length / 2` 在 C# 必须写成 `/ 2.0`。
-  - JS `substring` / `slice` 对越界参数会钳制或交换，C# 需显式复刻该行为。
-  - `equalities` 稀疏数组允许负索引，用 `Dictionary` 复刻。
-  - fast-diff 对个别输入无限递归，C# 用 depth 1000 护栏抛 `InvalidOperationException`。
-  - `Number(undefined) = NaN` 这类转换用可空值类型表达（见 `Models/DiffFileModels.cs` 注释）。
+- JS 语义怪癖分两层处理（2026-10「语法层 .NET 化」重构后的现行约定）：
+  - **语法/表达层怪癖已 .NET 化**（该次重构完成，行为零变化，golden 全绿锁定）：
+    JS 的 `_xxx` 快照字段用 `*Snapshot` 命名（如 `OldStartIndexSnapshot`）；
+    `"class"/"style"` 字符串与 fast-diff `-1/0/1` 数字操作码改为封闭枚举
+    `HighlighterType` / `DiffOp`（显式赋值保值）；`(string | RegExp)[]` 弱类型忽略列表
+    改为 `IgnorePattern` 判别联合；核心库无参 `Get*()` JS 访问器改为只读属性
+    （带参 `Get*()` 保留方法形态）。新增移植代码沿用 .NET 惯用表达，不再复刻
+    JS 命名怪癖；行为层怪癖见下。
+  - **行为锚点必须显式保留**（改动即行为变化，由 golden 测试锁定，不得“顺手修正”）：
+    - JS 除法是浮点：fast-diff 的 `length / 2` 在 C# 必须写成 `/ 2.0`。
+    - JS `substring` / `slice` 对越界参数会钳制或交换，C# 需显式复刻该行为
+      （`JsSubstring` 等）。
+    - `equalities` 稀疏数组允许负索引，用 `Dictionary` 复刻。
+    - fast-diff 对个别输入无限递归，C# 用 depth 1000 护栏抛 `InvalidOperationException`。
+    - `Number(undefined) = NaN` 这类转换用可空值类型表达（见
+      `Models/DiffFileModels.cs` 注释）。
+    - JS 侧仍为字符串枚举/字符串标签的（如 `DiffHunkExpansionType` 的 dump 值、
+      `SyntaxNode.Type` 的 `"text"/"element"/"root"`），沿用其字符串语义而不是改造成
+      位标志。
+  - **红线：可空模型字段（`bool?`/`int?` 等）一律保持可空，不得「简化」成非空默认值**。
+    `IsLast`/`HasLineChange`/`HunkLineInfo.OldLength` 等的 null 由测试侧
+    `GoldenSupport.PruneNulls` 剪枝锚定 golden 输出；`HunkLineInfo`（int?）与
+    `HunkInfo`（int）同名字段的可空性差异**是行为**，不许统一。
 - `DiffParser.Shared` 与 `TemplateOptions` 是全局有状态的（与 JS 原版一致），禁止并发使用。
 - 明确不移植的内容：`parse/template.ts` 的 HTML 模板构建（Avalonia 不消费 HTML 字符串，
   但其全局开关 `TemplateOptions` 已保留）、`cache.ts`（web 专用跨实例缓存）、

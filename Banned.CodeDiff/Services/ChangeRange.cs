@@ -19,10 +19,8 @@ public static class ChangeRange
         _maxLengthToIgnoreLineDiff = 1000;
     }
 
-    public static int GetMaxLengthToIgnoreLineDiff()
-    {
-        return _maxLengthToIgnoreLineDiff;
-    }
+    /// <summary>JS: getMaxLengthToIgnoreLineDiff.</summary>
+    public static int MaxLengthToIgnoreLineDiff => _maxLengthToIgnoreLineDiff;
 
     /// <summary>Get the maximum position in the range.</summary>
     private static int RangeMax(TextRange range)

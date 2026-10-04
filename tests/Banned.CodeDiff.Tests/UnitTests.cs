@@ -116,7 +116,7 @@ public class UnitTests
         try
         {
             ChangeRange.ChangeMaxLengthToIgnoreLineDiff(5);
-            Assert.That(ChangeRange.GetMaxLengthToIgnoreLineDiff(), Is.EqualTo(5));
+            Assert.That(ChangeRange.MaxLengthToIgnoreLineDiff, Is.EqualTo(5));
             var addition = new DiffLine("abcdef\n", DiffLineType.Add, null, null, 1);
             var deletion = new DiffLine("abcXef\n", DiffLineType.Delete, null, 1, null);
             var (addRange, delRange) = ChangeRange.RelativeChanges(addition, deletion);
@@ -128,7 +128,7 @@ public class UnitTests
             ChangeRange.ResetMaxLengthToIgnoreLineDiff();
         }
 
-        Assert.That(ChangeRange.GetMaxLengthToIgnoreLineDiff(), Is.EqualTo(1000));
+        Assert.That(ChangeRange.MaxLengthToIgnoreLineDiff, Is.EqualTo(1000));
     }
 
     [Test]
@@ -145,8 +145,8 @@ public class UnitTests
     {
         var df = new DiffFile("", "", "f.txt", "", ["--- a/f.txt\n+++ b/f.txt\n@@ -1,1 +1,1 @@\n-old\n+new\n"]);
         df.InitRaw();
-        Assert.That(df.GetIsPureDiffRender(), Is.True);
-        Assert.That(df.GetExpandEnabled(), Is.False);
+        Assert.That(df.IsPureDiffRender, Is.True);
+        Assert.That(df.IsExpandEnabled, Is.False);
         Assert.That(df.AdditionLength, Is.EqualTo(1));
         Assert.That(df.DeletionLength, Is.EqualTo(1));
         Assert.That(df.OldFileContent, Is.EqualTo("old\n"));

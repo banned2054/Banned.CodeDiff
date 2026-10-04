@@ -11,9 +11,9 @@
 - **`IDiffHighlighter.Type` enum 化**:`string`("class"/"style")→
   `Banned.CodeDiff.Models.HighlighterType { Class, Style }`(新文件
   `Models/HighlighterType.cs`);`SourceFile.HighlighterType` 与
-  `DiffFile` 的 `_highlighterType`/`GetHighlighterType()` 同步改为
-  `HighlighterType?`(null 取代原空串"未设置"语义)。契约收窄:引擎只能返回
-  Class/Style,不再接受任意字符串。
+  `DiffFile` 的 `_highlighterType` 同步改为
+  `HighlighterType?`(null 取代原空串"未设置"语义;访问器重命名见下)。契约收窄:引擎只能
+  返回 Class/Style,不再接受任意字符串。
 - **`IDiffHighlighter.IgnoreSyntaxHighlightList` 强类型化**:`IReadOnlyList<object>`
   (string | RegExp 混装)→ 判别联合 `IgnorePattern`(新文件 `Models/IgnorePattern.cs`:
   `abstract record IgnorePattern` + `FileNameIgnorePattern(string FileName)` +
@@ -28,6 +28,31 @@
 - **注释微改善**(不改代码):FastDiff `/ 2.0` 处注明 JS 浮点除法语义;
   `DiffFile` hunk 头解析 `?? 0` 兜底处注明被 `DiffHeaderRegex` 纯数字捕获保证不可达;
   `HighlightAst` `int.MaxValue` 占位处注明立即被覆盖、不参与运算。
+- **核心库无参 `Get*()` JS 访问器改为 .NET 惯用属性**(带参 `Get*()` 如
+  `GetSplitLeftLine(index)`/`GetOldSyntaxLine(lineNumber)` 保留方法形态;仅
+  `Banned.CodeDiff` 的 JS 移植访问器,`Banned.CodeDiff.Avalonia` 控件库自身 API
+  不受影响)。完整映射:
+
+  | 旧 | 新 |
+  |---|---|
+  | `DiffFile.GetTheme()` | `DiffFile.Theme` |
+  | `DiffFile.GetHighlighterName()` | `DiffFile.HighlighterName` |
+  | `DiffFile.GetHighlighterType()` | `DiffFile.HighlighterType`(`HighlighterType?`) |
+  | `DiffFile.GetExpandEnabled()` | `DiffFile.IsExpandEnabled` |
+  | `DiffFile.GetIsPureDiffRender()` | `DiffFile.IsPureDiffRender` |
+  | `DiffFile.GetOldFileContent()` | `DiffFile.OldFileRaw` |
+  | `DiffFile.GetNewFileContent()` | `DiffFile.NewFileRaw` |
+  | `DiffFile.GetCurrentComposeLength()`(静态) | `DiffFile.CurrentComposeLength`(静态) |
+  | `ChangeRange.GetMaxLengthToIgnoreLineDiff()`(静态) | `ChangeRange.MaxLengthToIgnoreLineDiff`(静态) |
+  | `TemplateOptions.GetEnableFastDiffTemplate()`(静态) | `TemplateOptions.EnableFastDiffTemplate`(静态) |
+  | `TemplateOptions.GetEnableBuildTemplate()`(静态) | `TemplateOptions.EnableBuildTemplate`(静态) |
+
+  其中 `GetOldFileContent()`/`GetNewFileContent()` 未沿用 `OldFileContent`/`NewFileContent`
+  属性名:后者是构造入参(可在纯 diff 模式下被重组),前者是 `SourceFile.Raw`
+  (经 `Transform.ProcessTransformForFile` 处理、`InitRaw` 前为 null),语义不同
+  (JS 原版即两个不同成员:`_oldFileContent` 与 `getOldFileContent()`),故改名为
+  `OldFileRaw`/`NewFileRaw` 而非合并。消费点(Avalonia RowBuilder/DiffView、Demo VM、
+  两个测试项目)已全部同步。
 
 - **`_Xxx` 快照字段改为快照语义命名**(`Banned.CodeDiff.Models`,公开 API 重命名,行为不变):
   `HunkInfo`/`HunkLineInfo` 的 `_OldStartIndex/_OldLength/_NewStartIndex/_NewLength` →

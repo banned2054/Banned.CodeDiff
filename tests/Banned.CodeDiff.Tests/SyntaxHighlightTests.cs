@@ -255,7 +255,7 @@ public class SyntaxHighlightTests
         df.InitTheme("light");
         df.Init();
 
-        Assert.That(df.GetHighlighterName(), Is.EqualTo("textmate"));
+        Assert.That(df.HighlighterName, Is.EqualTo("textmate"));
 
         var oldSyntax = df.GetOldSyntaxLine(1);
         var newSyntax = df.GetNewSyntaxLine(1);
