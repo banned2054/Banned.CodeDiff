@@ -25,12 +25,22 @@ public class UnitTests
     [Test]
     public void FastDiff_SemanticCleanupMergesEdits()
     {
-        var result = FastDiff.Diff("The cat came.", "The came.", (int?)null, cleanup : true);
+        var result = FastDiff.Diff("The cat came.", "The came.", (int?)null, true);
         Assert.That(result.Select(t => (t.Op, t.Text)).ToArray(), Is.EqualTo([
             (DiffOp.Equal, "The "),
             (DiffOp.Delete, "cat "),
             (DiffOp.Equal, "came.")
         ]));
+    }
+
+    [Test]
+    public void CurrentComposeLength_TracksChangeAndReset()
+    {
+        Assert.That(DiffFile.CurrentComposeLength, Is.EqualTo(40));
+        DiffFile.ChangeDefaultComposeLength(80);
+        Assert.That(DiffFile.CurrentComposeLength, Is.EqualTo(80));
+        DiffFile.ResetDefaultComposeLength();
+        Assert.That(DiffFile.CurrentComposeLength, Is.EqualTo(40));
     }
 
     [Test]
@@ -187,7 +197,7 @@ public class UnitTests
     [Test]
     public void DiffFile_LineNumberLookups_MissReturnsNullAndMinusOne()
     {
-        var oldLines = string.Join("\n", Enumerable.Range(1, 12).Select(i => $"old{i}")) + "\n";
+        var oldLines = string.Join("\n", Enumerable.Range(1, 12).Select(i => $"old{i}"))                   + "\n";
         var newLines = string.Join("\n", Enumerable.Range(1, 12).Select(i => i == 5 ? "new5" : $"old{i}")) + "\n";
         var df = new DiffFile("f.txt", oldLines, "f.txt", newLines,
                               ["--- a/f.txt\n+++ b/f.txt\n@@ -5,1 +5,1 @@\n-old5\n+new5\n"]);
