@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless.NUnit;
 using Avalonia.Media;
@@ -99,6 +100,118 @@ public class DiffExpandTests
     {
         Assert.That(window.GetLayoutManager(), Is.Not.Null);
         window.GetLayoutManager()!.ExecuteLayoutPass();
+    }
+
+    /// <summary>Viewport-relative top edge of a realized row container.</summary>
+    private static double ViewportTopOf(ItemsControl items, ScrollViewer scroller, object row)
+    {
+        var container = items.ContainerFromItem(row);
+
+        Assert.That(container, Is.Not.Null, "row container must be realized");
+        Assert.That(container!.TransformToVisual(scroller), Is.Not.Null);
+
+        return container.TransformToVisual(scroller)!.Value.Transform(new Point()).Y;
+    }
+
+    /// <summary>Shows the view in a short window (roughly ten rows) so the content scrolls.</summary>
+    private static (Window Window, ScrollViewer Scroller, ItemsControl Items) ShownInView(DiffView view)
+    {
+        var window = new Window { Content = view, Width = 900, Height = 220 };
+        window.Show();
+        RunLayoutPass(window);
+
+        return (window,
+                view.GetVisualDescendants().OfType<ScrollViewer>().Single(),
+                view.GetVisualDescendants().OfType<ItemsControl>().Single());
+    }
+
+    [AvaloniaTest]
+    public void ExpandDown_KeepsClickedPlaceholderAnchored()
+    {
+        var view = new DiffView { DiffFile = CreateExpandableFile() };
+        var (window, scroller, items) = ShownInView(view);
+        var middle = As<DiffSplitHunkRow>(view.Rows[8]);
+
+        // Scroll so the clicked placeholder sits two rows below the viewport top (the offset is 0
+        // before, so the viewport top of a row equals its position in the scroll content).
+        var rowHeight = items.ContainerFromItem(view.Rows[7])!.Bounds.Height;
+        var anchorY = 2 * rowHeight;
+        var offsetBefore = ViewportTopOf(items, scroller, middle) - anchorY;
+        scroller.Offset = new Vector(0, offsetBefore);
+        RunLayoutPass(window);
+
+        Assert.That(ViewportTopOf(items, scroller, middle), Is.EqualTo(anchorY).Within(1));
+
+        view.ExpandHunkDownCommand.Execute(middle);
+
+        // The 40 revealed rows land above the placeholder, so the offset must follow them (once
+        // the rebuild's extent change has been laid out) to keep the clicked row at its viewport
+        // position instead of jumping 40 rows down.
+        RunLayoutPass(window);
+        Assert.That(scroller.Offset.Y, Is.EqualTo(offsetBefore + 40 * rowHeight).Within(0.5));
+
+        RunLayoutPass(window);
+
+        // The placeholder must be back at its viewport position (a few pixels of slack for the
+        // VirtualizingStackPanel's estimated heights of unrealized rows).
+        var shrunk = As<DiffSplitHunkRow>(view.Rows[48]);
+        Assert.That(ViewportTopOf(items, scroller, shrunk), Is.EqualTo(anchorY).Within(6));
+    }
+
+    [AvaloniaTest]
+    public void ExpandUp_OnFirstHunk_KeepsFollowingRowAnchored()
+    {
+        var view = new DiffView { DiffFile = CreateExpandableFile() };
+        var (window, scroller, items) = ShownInView(view);
+
+        // Expanding the first hunk removes its placeholder; the row that followed it (ctx 038)
+        // becomes the anchor that must keep its viewport position.
+        var top = As<DiffSplitHunkRow>(view.Rows[0]);
+        var following = view.Rows[1];
+        var rowHeight = items.ContainerFromItem(following)!.Bounds.Height;
+        var placeholderHeight = items.ContainerFromItem(top)!.Bounds.Height;
+        var anchorY = ViewportTopOf(items, scroller, following);
+
+        Assert.That(scroller.Offset.Y, Is.EqualTo(0));
+        Assert.That(anchorY, Is.EqualTo(placeholderHeight).Within(1));
+
+        view.ExpandHunkUpCommand.Execute(top);
+
+        // The 37 revealed rows land where the placeholder was — above the anchor row: the offset
+        // must grow by their height minus the placeholder that disappeared (applied once the
+        // rebuild's extent change has been laid out).
+        RunLayoutPass(window);
+        Assert.That(scroller.Offset.Y, Is.EqualTo(37 * rowHeight - placeholderHeight).Within(0.5));
+
+        RunLayoutPass(window);
+
+        var ctx038 = view.Rows.OfType<DiffSplitContentRow>().Single(r => r.Left.Text == "ctx 038");
+        Assert.That(ViewportTopOf(items, scroller, ctx038), Is.EqualTo(anchorY).Within(6));
+    }
+
+    [AvaloniaTest]
+    public void ExpandUp_OnMiddleHunk_KeepsOffsetStable()
+    {
+        var view = new DiffView { DiffFile = CreateExpandableFile() };
+        var (window, scroller, items) = ShownInView(view);
+
+        var rowHeight = items.ContainerFromItem(view.Rows[7])!.Bounds.Height;
+        var anchorY = 2 * rowHeight;
+        var offsetBefore = ViewportTopOf(items, scroller, view.Rows[8]) - anchorY;
+        scroller.Offset = new Vector(0, offsetBefore);
+        RunLayoutPass(window);
+
+        // The middle placeholder survives an up expansion in place (its rows above never move),
+        // so the offset must stay untouched.
+        view.ExpandHunkUpCommand.Execute(As<DiffSplitHunkRow>(view.Rows[8]));
+
+        Assert.That(scroller.Offset.Y, Is.EqualTo(offsetBefore).Within(0.5));
+
+        RunLayoutPass(window);
+
+        var moved = As<DiffSplitHunkRow>(view.Rows[8]);
+        Assert.That(moved.HunkIndex, Is.EqualTo(47));
+        Assert.That(ViewportTopOf(items, scroller, moved), Is.EqualTo(anchorY).Within(6));
     }
 
     [AvaloniaTest]

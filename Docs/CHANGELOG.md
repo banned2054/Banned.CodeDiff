@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### M6 — 展开 hunk 后的视口锚定(M4 遗留)
+
+- **`Banned.CodeDiff.Avalonia`**:点击展开按钮后视口不再跳变。展开命令先记录锚点
+  (点击的占位行索引、滚动偏移、占位行与相邻内容行的实化高度),`DiffFile.Updated`
+  重建 Rows 后按各方向的实际插行几何补偿 `ScrollViewer.Offset`:Up 存活时占位行
+  flat 索引不变(偏移不动);Up 揭示全隐藏区间 / All 时占位行消失、揭示行落在其后
+  行上方(偏移 += 揭示高度 − 占位行高);Down 时占位行下移(偏移 += 插入高度);
+  尾部折叠条消失时行追加在末尾(偏移不动)。偏移设置延迟到重建后的
+  `ScrollViewer.ScrollChanged`(extent 更新)再应用,避开 `Offset` 对旧 extent 的
+  coerce 钳制。行为对标上游 web 端依赖的浏览器 scroll anchoring。
+
 ### M6 — 主题颜色对齐上游(批次 1)
 
 - **`Banned.CodeDiff.Avalonia`**: light/dark 两套画笔逐项核对上游 `_com.css` 的

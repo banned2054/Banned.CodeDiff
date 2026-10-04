@@ -15,9 +15,11 @@
                 <Setter Property="Template">
                     <Setter.Value>
                         <ControlTemplate>
-                            <ScrollViewer Background="{TemplateBinding Background}"
+                            <ScrollViewer x:Name="PART_ScrollViewer"
+                                          Background="{TemplateBinding Background}"
                                           HorizontalScrollBarVisibility="Disabled">
-                                <ItemsControl FontFamily="{TemplateBinding FontFamily}"
+                                <ItemsControl x:Name="PART_Items"
+                                              FontFamily="{TemplateBinding FontFamily}"
                                               FontSize="{TemplateBinding FontSize}"
                                               Foreground="{TemplateBinding Foreground}"
                                               ItemsSource="{Binding Rows, RelativeSource={RelativeSource TemplatedParent}}">

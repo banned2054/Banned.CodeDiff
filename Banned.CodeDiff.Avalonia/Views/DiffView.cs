@@ -1,5 +1,6 @@
 using System.Windows.Input;
 using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Media;
 using Banned.CodeDiff.Avalonia.Models;
@@ -55,6 +56,9 @@ public sealed class DiffView : TemplatedControl
     private IReadOnlyList<DiffRow> _rows              = [];
     private double                 _numberColumnWidth = NumberColumnMinWidth;
     private bool                   _rebuilding;
+    private ScrollViewer?          _scrollViewer;
+    private ItemsControl?          _items;
+    private Vector?                _pendingExpandOffset;
 
     /// <summary>Initializes a new instance of the <see cref="DiffView"/> class.</summary>
     public DiffView()
@@ -119,6 +123,14 @@ public sealed class DiffView : TemplatedControl
     /// <summary>Gets the command that fully expands a hunk row; the command parameter is the
     /// <see cref="DiffSplitHunkRow"/> or <see cref="DiffUnifiedHunkRow"/>.</summary>
     public ICommand ExpandHunkAllCommand { get; }
+
+    /// <inheritdoc />
+    protected override void OnApplyTemplate(TemplateAppliedEventArgs e)
+    {
+        base.OnApplyTemplate(e);
+        _scrollViewer = e.NameScope.Find<ScrollViewer>("PART_ScrollViewer");
+        _items        = e.NameScope.Find<ItemsControl>("PART_Items");
+    }
 
     /// <inheritdoc />
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
@@ -230,7 +242,190 @@ public sealed class DiffView : TemplatedControl
         SetAndRaise(NumberColumnWidthProperty, ref _numberColumnWidth, width);
     }
 
-    /// <summary>Relays a hunk-row expand click to the model's expand API for the active view mode.</summary>
+    /// <summary>
+    /// Captures the scroll state needed to keep the viewport anchored across the row rebuild an
+    /// expansion triggers: the clicked row's flat index, the scroll offset, and the realized
+    /// heights of the clicked placeholder and of a neighboring content row (expansions insert
+    /// only content rows). Returns <c>null</c> when the row or its containers cannot be resolved.
+    /// </summary>
+    private ExpandAnchor? CaptureExpandAnchor(DiffRow row)
+    {
+        if (_scrollViewer == null || _items == null)
+        {
+            return null;
+        }
+
+        var index = IndexOfRow(row);
+
+        if (index < 0)
+        {
+            return null;
+        }
+
+        if (_items.ContainerFromItem(row) is not { Bounds.Height: > 0 } placeholderContainer)
+        {
+            return null;
+        }
+
+        var contentRowHeight = FindRealizedContentRowHeight(index);
+
+        if (contentRowHeight <= 0)
+        {
+            return null;
+        }
+
+        return new ExpandAnchor(_scrollViewer.Offset.Y, contentRowHeight, placeholderContainer.Bounds.Height,
+                                index, _rows.Count);
+    }
+
+    /// <summary>
+    /// Re-anchors the viewport after an expansion rebuilt the rows, mirroring the browser scroll
+    /// anchoring the upstream web views rely on: the clicked hunk row — or, when the expansion
+    /// removes it, the row that followed it — keeps its pre-click viewport position.
+    /// </summary>
+    private void ApplyExpandAnchor(ExpandAnchor anchor, HunkExpandDirection direction, int hunkIndex)
+    {
+        if (_scrollViewer == null || _rows.Count == anchor.OldCount)
+        {
+            return; // nothing was revealed
+        }
+
+        int insertedAbove;
+        bool placeholderReplaced;
+
+        if (direction == HunkExpandDirection.Up)
+        {
+            // Rows above the placeholder never move: a surviving placeholder keeps its flat
+            // index (no scroll delta); when the whole hidden range is revealed the placeholder
+            // disappears and the revealed rows land where it was, above the row after it.
+            placeholderReplaced = anchor.OldIndex >= _rows.Count ||
+                                  _rows[anchor.OldIndex] is not (DiffSplitHunkRow or DiffUnifiedHunkRow);
+            insertedAbove = placeholderReplaced ? _rows.Count - anchor.OldCount + 1 : 0;
+        }
+        else if (direction == HunkExpandDirection.Down)
+        {
+            // Down reveals rows above the placeholder, whose hunk key is unchanged — it moves
+            // down by the inserted count. The trailing strip disappears instead and appends its
+            // rows below everything visible.
+            var movedTo = FindHunkRowIndex(hunkIndex);
+
+            placeholderReplaced = false;
+            insertedAbove = movedTo > anchor.OldIndex ? movedTo - anchor.OldIndex : 0;
+        }
+        else
+        {
+            // All removes the placeholder and reveals the whole range above the row after it.
+            placeholderReplaced = true;
+            insertedAbove = _rows.Count - anchor.OldCount + 1;
+        }
+
+        if (insertedAbove <= 0 && !placeholderReplaced)
+        {
+            return;
+        }
+
+        // A replaced placeholder contributes its own height back to the content above the anchor.
+        var delta = insertedAbove * anchor.ContentRowHeight -
+                    (placeholderReplaced ? anchor.PlaceholderHeight : 0);
+
+        if (Math.Abs(delta) < 0.01)
+        {
+            return;
+        }
+
+        // ScrollViewer.Offset is coerced against the current extent, which still reflects the old
+        // rows until the next layout pass — defer the adjustment to the rebuild's extent change,
+        // then restore the captured offset plus the inserted height.
+        _pendingExpandOffset = new Vector(_scrollViewer.Offset.X, anchor.OffsetY + delta);
+        _scrollViewer.ScrollChanged -= OnScrollChanged;
+        _scrollViewer.ScrollChanged += OnScrollChanged;
+    }
+
+    private void OnScrollChanged(object? sender, ScrollChangedEventArgs e)
+    {
+        if (_pendingExpandOffset is not { } target || sender is not ScrollViewer scroller)
+        {
+            return;
+        }
+
+        _pendingExpandOffset = null;
+        scroller.ScrollChanged -= OnScrollChanged;
+        scroller.Offset = target;
+    }
+
+    private int IndexOfRow(DiffRow row)
+    {
+        for (var index = 0; index < _rows.Count; index++)
+        {
+            if (ReferenceEquals(_rows[index], row))
+            {
+                return index;
+            }
+        }
+
+        return -1;
+    }
+
+    /// <summary>Height of the nearest realized content row around the clicked placeholder — the
+    /// expansion inserts only content rows of that same template.</summary>
+    private double FindRealizedContentRowHeight(int anchorIndex)
+    {
+        var maxDistance = Math.Max(anchorIndex, _rows.Count - 1 - anchorIndex);
+
+        for (var distance = 1; distance <= maxDistance; distance++)
+        {
+            if (TryGetContentRowHeight(anchorIndex - distance, out var height) ||
+                TryGetContentRowHeight(anchorIndex + distance, out height))
+            {
+                return height;
+            }
+        }
+
+        return 0;
+
+        bool TryGetContentRowHeight(int index, out double height)
+        {
+            height = 0;
+
+            if (index < 0 || index >= _rows.Count ||
+                _rows[index] is not (DiffSplitContentRow or DiffUnifiedContentRow))
+            {
+                return false;
+            }
+
+            if (_items?.ContainerFromItem(_rows[index]) is not { Bounds.Height: > 0 } container)
+            {
+                return false;
+            }
+
+            height = container.Bounds.Height;
+
+            return true;
+        }
+    }
+
+    private int FindHunkRowIndex(int hunkIndex)
+    {
+        for (var index = 0; index < _rows.Count; index++)
+        {
+            var key = _rows[index] switch
+            {
+                DiffSplitHunkRow split     => split.HunkIndex,
+                DiffUnifiedHunkRow unified => unified.HunkIndex,
+                _                          => int.MinValue,
+            };
+
+            if (key == hunkIndex)
+            {
+                return index;
+            }
+        }
+
+        return -1;
+    }
+
+    /// <summary>Relays a hunk-row expand click to the model's expand API for the active view mode
+    /// and re-anchors the viewport after the rebuild shifts the clicked row.</summary>
     private sealed class HunkExpandCommand(DiffView owner, HunkExpandDirection direction) : ICommand
     {
         // Availability is encoded in the row's button visibility, so there is no per-row state to
@@ -246,15 +441,35 @@ public sealed class DiffView : TemplatedControl
 
         public void Execute(object? parameter)
         {
+            if (parameter is not (DiffSplitHunkRow or DiffUnifiedHunkRow))
+            {
+                return;
+            }
+
+            var row = (DiffRow)parameter;
+            var hunkIndex = parameter is DiffSplitHunkRow split
+                ? split.HunkIndex
+                : ((DiffUnifiedHunkRow)parameter).HunkIndex;
+            var anchor = owner.CaptureExpandAnchor(row);
+
             switch (parameter)
             {
-                case DiffSplitHunkRow split :
-                    owner.DiffFile?.OnSplitHunkExpand(direction, split.HunkIndex);
+                case DiffSplitHunkRow splitRow :
+                    owner.DiffFile?.OnSplitHunkExpand(direction, splitRow.HunkIndex);
                     break;
-                case DiffUnifiedHunkRow unified :
-                    owner.DiffFile?.OnUnifiedHunkExpand(direction, unified.HunkIndex);
+                case DiffUnifiedHunkRow unifiedRow :
+                    owner.DiffFile?.OnUnifiedHunkExpand(direction, unifiedRow.HunkIndex);
                     break;
+            }
+
+            if (anchor is { } captured)
+            {
+                owner.ApplyExpandAnchor(captured, direction, hunkIndex);
             }
         }
     }
+
+    /// <summary>Pre-expansion scroll state used to anchor the viewport across a row rebuild.</summary>
+    private readonly record struct ExpandAnchor(double OffsetY, double ContentRowHeight, double PlaceholderHeight,
+                                                int OldIndex, int OldCount);
 }
