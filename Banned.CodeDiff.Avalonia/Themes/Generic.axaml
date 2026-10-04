@@ -37,7 +37,8 @@
                                                         Width="{Binding $parent[v:DiffView].NumberColumnWidth}"
                                                         Background="{Binding Left.NumberBackground}">
                                                     <Panel>
-                                                        <TextBlock Margin="10,2"
+                                                        <TextBlock Classes="diff-line-number"
+                                                                   Margin="10,2"
                                                                    Foreground="{Binding Left.NumberForeground}"
                                                                    Text="{Binding Left.Number}"
                                                                    TextAlignment="Right"
@@ -59,16 +60,21 @@
                                                         Background="{Binding Left.ContentBackground}"
                                                         ClipToBounds="True">
                                                     <Panel>
-                                                        <StackPanel Margin="4,2,0,2"
-                                                                    Orientation="Horizontal"
-                                                                    VerticalAlignment="Center">
+                                                        <!-- Auto,* grid: the star column gives the
+                                                             segment text a finite wrap width. -->
+                                                        <Grid Classes="diff-content-layout"
+                                                              Margin="4,2,0,2"
+                                                              ColumnDefinitions="Auto,*"
+                                                              VerticalAlignment="Center">
                                                             <TextBlock Margin="0,0,6,0"
                                                                        Text="{Binding Left.Sign}" />
-                                                            <v:DiffSegmentText Text="{Binding Left.Text}"
+                                                            <v:DiffSegmentText Grid.Column="1"
+                                                                               Text="{Binding Left.Text}"
                                                                                HighlightBrush="{Binding Left.HighlightBrush}"
                                                                                Highlights="{Binding Left.Highlights}"
-                                                                               SyntaxRuns="{Binding Left.SyntaxRuns}" />
-                                                        </StackPanel>
+                                                                               SyntaxRuns="{Binding Left.SyntaxRuns}"
+                                                                               Wrap="{Binding $parent[v:DiffView].Wrap}" />
+                                                        </Grid>
                                                         <Rectangle Fill="{Binding Left.SelectionOverlay}"
                                                                    IsVisible="{Binding Left.IsSelected}" />
                                                     </Panel>
@@ -80,7 +86,8 @@
                                                         Width="{Binding $parent[v:DiffView].NumberColumnWidth}"
                                                         Background="{Binding Right.NumberBackground}">
                                                     <Panel>
-                                                        <TextBlock Margin="10,2"
+                                                        <TextBlock Classes="diff-line-number"
+                                                                   Margin="10,2"
                                                                    Foreground="{Binding Right.NumberForeground}"
                                                                    Text="{Binding Right.Number}"
                                                                    TextAlignment="Right"
@@ -98,16 +105,19 @@
                                                         Background="{Binding Right.ContentBackground}"
                                                         ClipToBounds="True">
                                                     <Panel>
-                                                        <StackPanel Margin="4,2,0,2"
-                                                                    Orientation="Horizontal"
-                                                                    VerticalAlignment="Center">
+                                                        <Grid Classes="diff-content-layout"
+                                                              Margin="4,2,0,2"
+                                                              ColumnDefinitions="Auto,*"
+                                                              VerticalAlignment="Center">
                                                             <TextBlock Margin="0,0,6,0"
                                                                        Text="{Binding Right.Sign}" />
-                                                            <v:DiffSegmentText Text="{Binding Right.Text}"
+                                                            <v:DiffSegmentText Grid.Column="1"
+                                                                               Text="{Binding Right.Text}"
                                                                                HighlightBrush="{Binding Right.HighlightBrush}"
                                                                                Highlights="{Binding Right.Highlights}"
-                                                                               SyntaxRuns="{Binding Right.SyntaxRuns}" />
-                                                        </StackPanel>
+                                                                               SyntaxRuns="{Binding Right.SyntaxRuns}"
+                                                                               Wrap="{Binding $parent[v:DiffView].Wrap}" />
+                                                        </Grid>
                                                         <Rectangle Fill="{Binding Right.SelectionOverlay}"
                                                                    IsVisible="{Binding Right.IsSelected}" />
                                                     </Panel>
@@ -158,7 +168,8 @@
                                                 </Border>
                                                 <Border Grid.Column="1"
                                                         Background="{Binding ContentBackground}">
-                                                    <TextBlock Margin="6,2,10,2"
+                                                    <TextBlock Classes="diff-hunk-text"
+                                                               Margin="6,2,10,2"
                                                                Foreground="{Binding HunkForeground}"
                                                                Text="{Binding HunkText}"
                                                                VerticalAlignment="Center" />
@@ -180,7 +191,8 @@
                                                         Width="{Binding $parent[v:DiffView].NumberColumnWidth}"
                                                         Background="{Binding NumberBackground}">
                                                     <Panel>
-                                                        <TextBlock Margin="10,2"
+                                                        <TextBlock Classes="diff-line-number"
+                                                                   Margin="10,2"
                                                                    Foreground="{Binding NumberForeground}"
                                                                    Text="{Binding OldNumber}"
                                                                    TextAlignment="Right"
@@ -194,7 +206,8 @@
                                                         Width="{Binding $parent[v:DiffView].NumberColumnWidth}"
                                                         Background="{Binding NumberBackground}">
                                                     <Panel>
-                                                        <TextBlock Margin="10,2"
+                                                        <TextBlock Classes="diff-line-number"
+                                                                   Margin="10,2"
                                                                    Foreground="{Binding NumberForeground}"
                                                                    Text="{Binding NewNumber}"
                                                                    TextAlignment="Right"
@@ -215,16 +228,19 @@
                                                         Background="{Binding ContentBackground}"
                                                         ClipToBounds="True">
                                                     <Panel>
-                                                        <StackPanel Margin="4,2,0,2"
-                                                                    Orientation="Horizontal"
-                                                                    VerticalAlignment="Center">
+                                                        <Grid Classes="diff-content-layout"
+                                                              Margin="4,2,0,2"
+                                                              ColumnDefinitions="Auto,*"
+                                                              VerticalAlignment="Center">
                                                             <TextBlock Margin="0,0,6,0"
                                                                        Text="{Binding Sign}" />
-                                                            <v:DiffSegmentText Text="{Binding Text}"
+                                                            <v:DiffSegmentText Grid.Column="1"
+                                                                               Text="{Binding Text}"
                                                                                HighlightBrush="{Binding HighlightBrush}"
                                                                                Highlights="{Binding Highlights}"
-                                                                               SyntaxRuns="{Binding SyntaxRuns}" />
-                                                        </StackPanel>
+                                                                               SyntaxRuns="{Binding SyntaxRuns}"
+                                                                               Wrap="{Binding $parent[v:DiffView].Wrap}" />
+                                                        </Grid>
                                                         <Rectangle Fill="{Binding SelectionOverlay}"
                                                                    IsVisible="{Binding IsSelected}" />
                                                     </Panel>
@@ -278,7 +294,8 @@
                                                         Background="{Binding NumberBackground}" />
                                                 <Border Grid.Column="2"
                                                         Background="{Binding ContentBackground}">
-                                                    <TextBlock Margin="6,2,10,2"
+                                                    <TextBlock Classes="diff-hunk-text"
+                                                               Margin="6,2,10,2"
                                                                Foreground="{Binding HunkForeground}"
                                                                Text="{Binding HunkText}"
                                                                VerticalAlignment="Center" />
@@ -304,6 +321,19 @@
         <Setter Property="HorizontalContentAlignment" Value="Center" />
         <Setter Property="VerticalContentAlignment" Value="Center" />
         <Setter Property="Cursor" Value="Hand" />
+    </Style>
+
+    <!-- Wrap mode (upstream diffViewWrap): wrapped rows top-align their content and numbers
+         (upstream align-top), and long hunk headers wrap like the content lines (upstream
+         applies pre-wrap to them as well). NoWrap keeps everything vertically centered. -->
+    <Style Selector="v|DiffView[Wrap=True] Grid.diff-content-layout">
+        <Setter Property="VerticalAlignment" Value="Top" />
+    </Style>
+    <Style Selector="v|DiffView[Wrap=True] TextBlock.diff-line-number">
+        <Setter Property="VerticalAlignment" Value="Top" />
+    </Style>
+    <Style Selector="v|DiffView[Wrap=True] TextBlock.diff-hunk-text">
+        <Setter Property="TextWrapping" Value="Wrap" />
     </Style>
 
 </Styles>

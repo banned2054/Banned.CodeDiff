@@ -2,6 +2,35 @@
 
 ## Unreleased
 
+### M6 — 长行换行模式(上游 diffViewWrap 移植,批次 4)
+
+- **`Banned.CodeDiff.Avalonia`**:`DiffView` 新增可绑定属性 `Wrap`(bool,默认 false,不改变现有宿主
+  渲染——与 `IsSelectionEnabled` 同样的 opt-in 策略;上游包装层默认开启,端口不沿用)。行号列不参与
+  换行(宽度仍由 `NumberColumnWidth` 决定)。
+- **`DiffSegmentText` 多行化**:`Wrap=true` 时以测量可用宽度构建 `TextLayout`
+  (`TextWrapping.Wrap` + `maxWidth`),控件高度 = 全部 TextLine 高度之和,宽度变化时布局缓存按宽度
+  重建;`Wrap=false` 路径行为不变(现有测试为回归守卫)。词级高亮矩形 `ComputeHighlightRects`
+  按行分段:跨行 range 碎片化为每行一块(首行从起点到行尾、中间行整行、末行从行首到终点),对齐浏览器
+  inline box 背景的跨行行为;`HitTestTextPosition` 的 Rect 自带行内 y 偏移,按 `TextLine` 归属取 y。
+  语法段(`GetSyntaxLayouts`)同样按行边界切分,每片布局放在该行自己的 (x, y)。
+- **模板(Generic.axaml)**:内容单元格由横向 StackPanel 改为 `Auto,*` Grid(star 列给文本传递有限
+  换行宽度;nowrap 下测量结果不变),`Wrap` 经 `{Binding $parent[v:DiffView].Wrap}` 下传;wrap 开启
+  时内容与行号改为顶对齐(上游 wrap 组件的 `align-top`,nowrap 保持居中),hunk 头文本同步换行
+  (上游 unified hunk 行 pre-wrap;split hunk 行依赖 div 默认 white-space:normal 同样换行)。
+  split 同一行左右 cell 由 Grid 共享行高天然等高(= 较高者),对应上游 useSyncHeight;上游 wrap 模式
+  的 DOM 形态差异(左右挤同一 tr、JS 同步高度)不移植,以模型行为为准(既定决策)。
+- **换行策略对照**:上游为 CSS `white-space: pre-wrap` + `word-break: break-all`(逐字符贪心填行);
+  端口用 `TextWrapping.Wrap`(词级断行 + 超宽单词内断行,即 GitHub diff 风格)——Avalonia TextLayout
+  无 break-all 等价物且不引入新依赖,该差异仅影响"单词整体能否挤入行尾"的断点选择,不影响可见文本。
+- **虚拟化**:VirtualizingStackPanel 对可变高度项工作正常(测试实证:extent 随实现行高度精化,
+  滚到底部/中部目标行可见,不丢行,仍只实现可见切片);展开锚定在 wrap 下用邻近行高估算,不崩、
+  视口不越界(不承诺逐像素几何)。
+- **Demo**:工具栏新增「自动换行」开关(`IsWrap` → `DiffView.Wrap`)。
+- 测试:UI 13 个 headless 测试——DiffSegmentText nowrap 回归/多行布局与按宽度重建/跨行高亮分段
+  (含第二行 y 断言)/语法段按行切分;DiffView 行高开关切换、split 左右等高(左右长度悬殊)、
+  unified 行增长且行号列定宽、词级高亮落在换行后行、选区遮罩覆盖换行行高、复制不受 wrap 影响、
+  虚拟化滚底/滚中回顶、wrap 下展开视口合法。
+
 ### M6 — 复制功能(原生新功能,上游无对应实现,批次 3)
 
 - **`Banned.CodeDiff`**:`Utils/MultiSelectData.cs` 新增 `GetSelectedTextFromResult(MultiSelectResult?)`

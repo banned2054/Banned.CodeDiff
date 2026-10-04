@@ -28,6 +28,7 @@
             <ToggleButton Content="词级高亮" IsChecked="{Binding IsFastDiff}" />
             <ToggleButton Content="语法高亮" IsChecked="{Binding IsSyntax}" />
             <ToggleButton Content="Unified 视图" IsChecked="{Binding IsUnified}" />
+            <ToggleButton Content="自动换行" IsChecked="{Binding IsWrap}" />
             <ToggleButton Content="启用行选择" IsChecked="{Binding IsSelectionEnabled}" />
             <Button Command="{Binding CopySelectionCommand}" Content="复制选中行" />
             <Button Command="{Binding CopyOldFileCommand}" Content="复制旧文件" />
@@ -51,7 +52,8 @@
                             DiffFile="{Binding DiffFile}"
                             IsSelectionEnabled="{Binding IsSelectionEnabled}"
                             SyntaxHighlight="{Binding IsSyntax}"
-                            ViewMode="{Binding ViewMode}" />
+                            ViewMode="{Binding ViewMode}"
+                            Wrap="{Binding IsWrap}" />
         </Border>
 
         <TextBlock Grid.Row="3" Margin="0,8,0,0" Text="{Binding Stats}" />

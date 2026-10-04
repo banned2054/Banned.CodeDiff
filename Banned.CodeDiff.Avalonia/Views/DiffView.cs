@@ -50,6 +50,10 @@ public sealed class DiffView : TemplatedControl
     public static readonly StyledProperty<bool> IsSelectionEnabledProperty =
         AvaloniaProperty.Register<DiffView, bool>(nameof(IsSelectionEnabled), false);
 
+    /// <summary>Identifies the <see cref="Wrap"/> dependency property.</summary>
+    public static readonly StyledProperty<bool> WrapProperty =
+        AvaloniaProperty.Register<DiffView, bool>(nameof(Wrap), false);
+
     /// <summary>Identifies the <see cref="Highlighter"/> dependency property.</summary>
     public static readonly StyledProperty<IDiffHighlighter?> HighlighterProperty =
         AvaloniaProperty.Register<DiffView, IDiffHighlighter?>(nameof(Highlighter));
@@ -140,6 +144,20 @@ public sealed class DiffView : TemplatedControl
     {
         get => GetValue(HighlighterProperty);
         set => SetValue(HighlighterProperty, value);
+    }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether long lines wrap at the view width (the upstream
+    /// diffViewWrap prop: white-space pre-wrap, word breaks at the line edge) instead of
+    /// rendering one horizontally clipped line. Defaults to <c>false</c> — the upstream wrappers
+    /// default it to on, but an opt-in keeps existing hosts' row layout (one line tall)
+    /// unchanged. Split rows keep both sides the height of the taller one; line-number columns
+    /// never wrap.
+    /// </summary>
+    public bool Wrap
+    {
+        get => GetValue(WrapProperty);
+        set => SetValue(WrapProperty, value);
     }
 
     /// <summary>

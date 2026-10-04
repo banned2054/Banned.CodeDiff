@@ -12,10 +12,14 @@ namespace Banned.CodeDiff.Avalonia.Views;
 /// rectangles behind the changed ranges. Avalonia text runs expose no per-run
 /// background, so the highlight is custom-drawn: the whole line is laid out once
 /// with <see cref="TextLayout"/> and <see cref="TextLayout.HitTestTextPosition"/>
-/// resolves each range boundary to an x coordinate. Syntax coloring draws each
-/// <see cref="DiffSyntaxRun"/> as its own small layout, positioned at the x
-/// coordinate the whole-line layout reports for the run start (monospaced diff
-/// text keeps segments aligned). Single line, no wrap (wrap mode is M6 scope).
+/// resolves each range boundary to x/y coordinates. Syntax coloring draws each
+/// <see cref="DiffSyntaxRun"/> as its own small layout, positioned at the
+/// coordinates the whole-line layout reports for the run start (monospaced diff
+/// text keeps segments aligned). With <see cref="Wrap"/> off the layout is one
+/// line measuring the full text width (upstream white-space: pre); with it on the
+/// layout wraps at the measured width (upstream diffViewWrap: pre-wrap), and a
+/// range or run crossing a line break is drawn per text line, like browser inline
+/// boxes fragmenting across lines.
 /// </summary>
 public sealed class DiffSegmentText : Control
 {
@@ -25,6 +29,10 @@ public sealed class DiffSegmentText : Control
     /// <summary>Identifies the <see cref="Text"/> dependency property.</summary>
     public static readonly StyledProperty<string?> TextProperty =
         AvaloniaProperty.Register<DiffSegmentText, string?>(nameof(Text));
+
+    /// <summary>Identifies the <see cref="Wrap"/> dependency property.</summary>
+    public static readonly StyledProperty<bool> WrapProperty =
+        AvaloniaProperty.Register<DiffSegmentText, bool>(nameof(Wrap));
 
     /// <summary>Identifies the <see cref="Highlights"/> dependency property.</summary>
     public static readonly StyledProperty<IReadOnlyList<DiffHighlight>> HighlightsProperty =
@@ -52,11 +60,14 @@ public sealed class DiffSegmentText : Control
 
     private TextLayout? _layout;
 
-    private IReadOnlyList<(TextLayout Layout, double X)>? _syntaxLayouts;
+    /// <summary>The width the cached layout was built for — wrap layouts are width-sensitive.</summary>
+    private double _layoutWidth = double.NaN;
+
+    private IReadOnlyList<(TextLayout Layout, double X, double Y)>? _syntaxLayouts;
 
     static DiffSegmentText()
     {
-        AffectsMeasure<DiffSegmentText>(TextProperty, FontFamilyProperty, FontSizeProperty);
+        AffectsMeasure<DiffSegmentText>(TextProperty, FontFamilyProperty, FontSizeProperty, WrapProperty);
         AffectsRender<DiffSegmentText>(HighlightsProperty, SyntaxRunsProperty, HighlightBrushProperty, ForegroundProperty);
     }
 
@@ -65,6 +76,15 @@ public sealed class DiffSegmentText : Control
     {
         get => GetValue(TextProperty);
         set => SetValue(TextProperty, value);
+    }
+
+    /// <summary>Gets or sets a value indicating whether the text wraps at the measured width,
+    /// growing the control height over several text lines (upstream diffViewWrap), instead of
+    /// rendering one full-width line. Words break at line edges when they do not fit.</summary>
+    public bool Wrap
+    {
+        get => GetValue(WrapProperty);
+        set => SetValue(WrapProperty, value);
     }
 
     /// <summary>Gets or sets the word-level highlight ranges within <see cref="Text"/>.</summary>
@@ -110,11 +130,20 @@ public sealed class DiffSegmentText : Control
         set => SetValue(ForegroundProperty, value);
     }
 
-    /// <summary>Computes the highlight rectangles for the given ranges within a text layout.</summary>
+    /// <summary>Computes the highlight rectangles for the given ranges within a text layout.
+    /// A range crossing a line break (wrapped layout) fragments into one rectangle per text
+    /// line — the first runs to its line's end, middle lines cover their full width, and the
+    /// last starts at the line's left edge, like a browser inline box background.</summary>
     internal static IEnumerable<Rect> ComputeHighlightRects(
         TextLayout layout, int textLength, IReadOnlyList<DiffHighlight> highlights)
     {
-        var height = GetLayoutHeight(layout);
+        var lines    = layout.TextLines;
+        var lineTops = new double[lines.Count];
+
+        for (var i = 1; i < lines.Count; i++)
+        {
+            lineTops[i] = lineTops[i - 1] + lines[i - 1].Height;
+        }
 
         foreach (var highlight in highlights)
         {
@@ -126,22 +155,73 @@ public sealed class DiffSegmentText : Control
                 continue;
             }
 
-            var x0 = layout.HitTestTextPosition(start).X;
-            var x1 = layout.HitTestTextPosition(end).X;
+            var firstLine = LineOfPosition(lines, start);
+            var lastLine  = LineOfPosition(lines, end);
+            var x0        = layout.HitTestTextPosition(start).X;
 
-            if (x1 <= x0)
+            if (firstLine == lastLine)
             {
+                var x1 = layout.HitTestTextPosition(end).X;
+
+                if (x1 <= x0)
+                {
+                    continue;
+                }
+
+                yield return new Rect(x0, lineTops[firstLine], x1 - x0, lines[firstLine].Height);
+
                 continue;
             }
 
-            yield return new Rect(x0, 0, x1 - x0, height);
+            yield return new Rect(x0, lineTops[firstLine],
+                                  lines[firstLine].WidthIncludingTrailingWhitespace - x0, lines[firstLine].Height);
+
+            for (var line = firstLine + 1; line < lastLine; line++)
+            {
+                yield return new Rect(0, lineTops[line],
+                                      lines[line].WidthIncludingTrailingWhitespace, lines[line].Height);
+            }
+
+            var lastX = layout.HitTestTextPosition(end).X;
+
+            if (lastX > 0)
+            {
+                yield return new Rect(0, lineTops[lastLine], lastX, lines[lastLine].Height);
+            }
         }
     }
+
+    /// <summary>Index of the text line containing the text position — the last line whose first
+    /// character index precedes it (the end-of-text position belongs to the last line).</summary>
+    private static int LineOfPosition(IReadOnlyList<TextLine> lines, int position)
+    {
+        var result = 0;
+
+        for (var i = 1; i < lines.Count; i++)
+        {
+            if (lines[i].FirstTextSourceIndex > position)
+            {
+                break;
+            }
+
+            result = i;
+        }
+
+        return result;
+    }
+
+    /// <summary>Number of text lines of the layout built for the latest measure pass — a
+    /// wrap-mode probe for the headless tests (1 unless the text wrapped).</summary>
+    internal int TextLineCount => _layout?.TextLines.Count ?? 0;
+
+    /// <summary>The layout built for the latest measure pass — a wrap-mode probe for the
+    /// headless tests.</summary>
+    internal TextLayout? CurrentLayout => _layout;
 
     /// <inheritdoc />
     protected override Size MeasureOverride(Size availableSize)
     {
-        var layout = GetLayout();
+        var layout = GetLayout(availableSize.Width);
         var width  = layout.TextLines.Select(line => line.WidthIncludingTrailingWhitespace).Prepend(0.0).Max();
 
         return new Size(width, GetLayoutHeight(layout));
@@ -150,7 +230,7 @@ public sealed class DiffSegmentText : Control
     /// <inheritdoc />
     public override void Render(DrawingContext context)
     {
-        var layout = GetLayout();
+        var layout = _layout ?? GetLayout(double.PositiveInfinity);
 
         if (string.IsNullOrEmpty(Text))
         {
@@ -176,9 +256,9 @@ public sealed class DiffSegmentText : Control
             return;
         }
 
-        foreach (var (runLayout, x) in syntaxLayouts)
+        foreach (var (runLayout, x, y) in syntaxLayouts)
         {
-            runLayout.Draw(context, new Point(x, 0));
+            runLayout.Draw(context, new Point(x, y));
         }
     }
 
@@ -187,26 +267,41 @@ public sealed class DiffSegmentText : Control
         return layout.TextLines.Sum(line => line.Height);
     }
 
-    private TextLayout GetLayout()
+    /// <summary>
+    /// The whole-line layout, cached per width: nowrap builds a single unconstrained line
+    /// (upstream white-space: pre); wrap builds a layout constrained to the measure width
+    /// (upstream pre-wrap), rebuilt whenever the width changes.
+    /// </summary>
+    private TextLayout GetLayout(double constraintWidth)
     {
-        if (_layout != null)
+        var wrapWidth = Wrap && double.IsFinite(constraintWidth) && constraintWidth > 0
+            ? constraintWidth
+            : double.PositiveInfinity;
+
+        if (_layout != null && wrapWidth == _layoutWidth)
         {
             return _layout;
         }
 
-        _layout = new TextLayout(Text ?? string.Empty, new Typeface(FontFamily), FontSize, Foreground ?? Brushes.Black);
+        _layout        = wrapWidth == double.PositiveInfinity
+            ? new TextLayout(Text ?? string.Empty, new Typeface(FontFamily), FontSize, Foreground ?? Brushes.Black)
+            : new TextLayout(Text ?? string.Empty, new Typeface(FontFamily), FontSize, Foreground ?? Brushes.Black,
+                             textWrapping: TextWrapping.Wrap, maxWidth: wrapWidth);
+        _layoutWidth   = wrapWidth;
+        _syntaxLayouts = null;
 
         return _layout;
     }
 
     /// <summary>
-    /// Builds one small layout per syntax run, offset to the x coordinate the whole-line
-    /// layout reports for the run start. Gaps between runs (plain segments) fall back to the
+    /// Builds one small layout per syntax segment, offset to the coordinates the whole-line
+    /// layout reports for the segment start. Gaps between runs (plain segments) fall back to the
     /// whole-line layout's default foreground, so they are drawn as part of the nearest
     /// default-colored run — plain text is prepended to the first run's start and appended
-    /// after the last run's end via the fallback layout pass.
+    /// after the last run's end via the fallback layout pass. A segment crossing a line break
+    /// (wrapped layout) is split per text line and each piece placed at its own coordinates.
     /// </summary>
-    private IReadOnlyList<(TextLayout Layout, double X)>? GetSyntaxLayouts(TextLayout layout)
+    internal IReadOnlyList<(TextLayout Layout, double X, double Y)>? GetSyntaxLayouts(TextLayout layout)
     {
         if (_syntaxLayouts != null)
         {
@@ -220,16 +315,16 @@ public sealed class DiffSegmentText : Control
             return null;
         }
 
-        var text = Text ?? string.Empty;
-
+        var text     = Text ?? string.Empty;
         var typeface = new Typeface(FontFamily);
+        var plain    = Foreground ?? Brushes.Black;
 
-        var layouts = new List<(TextLayout, double)>(runs.Count + 2);
+        var layouts = new List<(TextLayout, double, double)>(runs.Count + 2);
 
         // Plain text before the first colored run.
         if (runs[0].Start > 0)
         {
-            layouts.Add((new TextLayout(text[..runs[0].Start], typeface, FontSize, Foreground ?? Brushes.Black), 0));
+            AddSegmentLayouts(layouts, layout, typeface, text, 0, runs[0].Start, FontSize, plain);
         }
 
         var previousEnd = 0;
@@ -242,14 +337,12 @@ public sealed class DiffSegmentText : Control
             // A gap between runs renders with the default foreground.
             if (start > previousEnd)
             {
-                layouts.Add((new TextLayout(text[previousEnd..start], typeface, FontSize, Foreground ?? Brushes.Black),
-                             layout.HitTestTextPosition(previousEnd).X));
+                AddSegmentLayouts(layouts, layout, typeface, text, previousEnd, start, FontSize, plain);
             }
 
             if (end > start)
             {
-                layouts.Add((new TextLayout(text[start..end], typeface, FontSize, run.Foreground),
-                             layout.HitTestTextPosition(start).X));
+                AddSegmentLayouts(layouts, layout, typeface, text, start, end, FontSize, run.Foreground);
             }
 
             previousEnd = Math.Max(previousEnd, end);
@@ -258,8 +351,7 @@ public sealed class DiffSegmentText : Control
         // Plain text after the last colored run.
         if (previousEnd < text.Length)
         {
-            layouts.Add((new TextLayout(text[previousEnd..], typeface, FontSize, Foreground ?? Brushes.Black),
-                         layout.HitTestTextPosition(previousEnd).X));
+            AddSegmentLayouts(layouts, layout, typeface, text, previousEnd, text.Length, FontSize, plain);
         }
 
         _syntaxLayouts = layouts;
@@ -267,20 +359,62 @@ public sealed class DiffSegmentText : Control
         return _syntaxLayouts;
     }
 
+    /// <summary>
+    /// Adds the layouts for one foreground segment between <paramref name="start"/> and
+    /// <paramref name="end"/>: the whole-line layout reports where each piece begins, so a
+    /// nowrap layout yields a single piece while a wrapped one yields one per text line.
+    /// </summary>
+    private static void AddSegmentLayouts(List<(TextLayout Layout, double X, double Y)> layouts,
+                                          TextLayout layout, Typeface typeface, string text, int start, int end,
+                                          double fontSize, IBrush foreground)
+    {
+        end = Math.Clamp(end, start, text.Length);
+
+        var lines = layout.TextLines;
+        var index = LineOfPosition(lines, start);
+
+        for (var position = start; position < end; index++)
+        {
+            if (index >= lines.Count)
+            {
+                break;
+            }
+
+            var line     = lines[index];
+            var pieceEnd = Math.Min(end, line.FirstTextSourceIndex + line.Length);
+
+            if (pieceEnd > position)
+            {
+                var location = layout.HitTestTextPosition(position);
+
+                layouts.Add((new TextLayout(text[position..pieceEnd], typeface, fontSize, foreground),
+                             location.X, location.Y));
+                position = pieceEnd;
+            }
+            else
+            {
+                // A zero-length line cannot advance the position by itself.
+                position++;
+            }
+        }
+    }
+
     /// <inheritdoc />
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
         base.OnPropertyChanged(change);
 
-        // The cached layouts depend on text, font, foreground, and the run structure;
+        // The cached layouts depend on text, font, foreground, wrap mode, and the run structure;
         // highlight ranges and brushes only affect rendering.
         if (change.Property == TextProperty        ||
             change.Property == FontFamilyProperty  ||
             change.Property == FontSizeProperty    ||
             change.Property == ForegroundProperty  ||
+            change.Property == WrapProperty        ||
             change.Property == SyntaxRunsProperty)
         {
             _layout        = null;
+            _layoutWidth   = double.NaN;
             _syntaxLayouts = null;
         }
     }

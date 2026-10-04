@@ -18,6 +18,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     private bool         _isFastDiff    = true;
     private bool         _isSyntax      = true;
     private bool         _isSelectionEnabled;
+    private bool         _isWrap;
     private string       _selectionStatus = "未选择";
     private string       _syntaxFile    = "store.cs";
 
@@ -172,6 +173,13 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
                 OnSelectionCompleted(null);
             }
         }
+    }
+
+    /// <summary>Enables the DiffView long-line wrap mode (off by default, like the control).</summary>
+    public bool IsWrap
+    {
+        get => _isWrap;
+        set => Set(ref _isWrap, value);
     }
 
     /// <summary>Visible (non-hidden) lines of the latest completed selection — the copyable count.</summary>
