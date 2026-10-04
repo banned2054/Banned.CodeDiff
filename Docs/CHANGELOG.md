@@ -2,6 +2,31 @@
 
 ## Unreleased
 
+### M6 — 复制功能(原生新功能,上游无对应实现,批次 3)
+
+- **`Banned.CodeDiff`**:`Utils/MultiSelectData.cs` 新增 `GetSelectedTextFromResult(MultiSelectResult?)`
+  ——选区纯文本生成(纯逻辑,NUnit 可测):逐行取 `SelectedLine.Value`,跳过 `IsHide` 的行
+  (用户看到什么复制什么),每行去尾部换行(与渲染层 `TrimEnd('\r','\n')` 一致——模型 Value
+  自带尾换行,不去除会产生空行),行间用 `\n` 连接(与 diff 文本一致,不用
+  `Environment.NewLine`);`Value` 为 null 的行复制为空行(保留行位);null 结果或全隐藏
+  返回空串。整文件复制直接用现有 `DiffFile.GetOldFileContent()/GetNewFileContent()`,
+  原样传出(含结尾换行)不二次处理。
+- **`Banned.CodeDiff.Avalonia`**:`DiffView` 新增复制 API(与 ExpandHunk 命令同风格):
+  `CopySelectionCommand`(无选区或全为隐藏行时 CanExecute=false;CanExecuteChanged 在
+  选区变化/完成/清除与 DiffFile 重建时触发)、`CopyOldFileCommand`/`CopyNewFileCommand`
+  (不依赖选区,无 DiffFile 内容时 CanExecute=false),及公开方法 `CopySelectionAsync()`/
+  `CopyOldFileAsync()`/`CopyNewFileAsync()`(返回 `Task<bool>`,false = 未写剪贴板的
+  静默 no-op)。剪贴板走 `TopLevel.Clipboard.SetTextAsync`(Avalonia 12 为
+  `Avalonia.Input.Platform.ClipboardExtensions` 扩展);命令 Execute 为 async void
+  fire-and-forget。**不内置键盘快捷键**(避免与宿主绑定冲突),由宿主/Demo 绑定。
+- **Demo**:工具栏新增「复制选中行」「复制旧文件」「复制新文件」按钮;复制选中行按钮
+  随选区状态可用(VM 跟踪 SelectionCompleted 的可见行数),复制后状态栏反馈
+  「已复制 N 行」;`Window.KeyBindings` 绑定 Ctrl+C(宿主接入示例,控件本身不绑)。
+- 测试:核心 10 个文本生成单测(普通/含隐藏/跨 hunk/null Value/全隐藏/CRLF/边界);
+  UI 10 个 headless 测试——Avalonia Headless 12.1.3 实测提供可用剪贴板
+  (`TopLevel.Clipboard` 非空、SetText/TryGetText 往返成功且同步完成),直接断言最终
+  剪贴板内容,无需注入隔离。
+
 ### M6 — 行选择(上游 multiSelect 移植,批次 2)
 
 - **`Banned.CodeDiff`**:数据层移植自 `multiSelect/types.ts` + `multiSelect/data.ts`(+ `dom.ts`

@@ -3,6 +3,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
+using Avalonia.Input.Platform;
 using Avalonia.Media;
 using Avalonia.VisualTree;
 using Banned.CodeDiff.Avalonia.Models;
@@ -68,6 +69,9 @@ public sealed class DiffView : TemplatedControl
     private ItemsControl?          _items;
     private Vector?                _pendingExpandOffset;
 
+    /// <summary>The three copy commands, kept for CanExecuteChanged invalidation.</summary>
+    private readonly List<DiffCopyCommand> _copyCommands;
+
     /// <summary>The multi-select state machine (upstream multiSelect/manager.ts).</summary>
     private readonly DiffSelection _selection = new();
 
@@ -86,6 +90,19 @@ public sealed class DiffView : TemplatedControl
         ExpandHunkUpCommand   = new HunkExpandCommand(this, HunkExpandDirection.Up);
         ExpandHunkDownCommand = new HunkExpandCommand(this, HunkExpandDirection.Down);
         ExpandHunkAllCommand  = new HunkExpandCommand(this, HunkExpandDirection.All);
+
+        var copySelection = new DiffCopyCommand(this, static v => v.CanCopySelection(),
+                                                static v => v.CopySelectionAsync());
+        var copyOldFile   = new DiffCopyCommand(this, static v => v.DiffFile?.GetOldFileContent() != null,
+                                                static v => v.CopyOldFileAsync());
+        var copyNewFile   = new DiffCopyCommand(this, static v => v.DiffFile?.GetNewFileContent() != null,
+                                                static v => v.CopyNewFileAsync());
+
+        CopySelectionCommand = copySelection;
+        CopyOldFileCommand   = copyOldFile;
+        CopyNewFileCommand   = copyNewFile;
+
+        _copyCommands = [copySelection, copyOldFile, copyNewFile];
 
         // Brushes are baked into the rows; switch palette by rebuilding on theme changes.
         ActualThemeVariantChanged += (_, _) => RebuildRows();
@@ -168,6 +185,27 @@ public sealed class DiffView : TemplatedControl
     public ICommand ExpandHunkAllCommand { get; }
 
     /// <summary>
+    /// Gets the command that copies the current selection's plain text
+    /// (<see cref="CopySelectionAsync"/>). Native port addition — the upstream library has no
+    /// copy feature. CanExecute is false without a selection or when every selected line is
+    /// hidden behind a collapsed hunk; no keyboard shortcut is built in (hosts bind their own to
+    /// avoid clashing with the host's bindings).
+    /// </summary>
+    public ICommand CopySelectionCommand { get; }
+
+    /// <summary>
+    /// Gets the command that copies the whole old-side file content
+    /// (<see cref="CopyOldFileAsync"/>); independent of any selection. Native port addition.
+    /// </summary>
+    public ICommand CopyOldFileCommand { get; }
+
+    /// <summary>
+    /// Gets the command that copies the whole new-side file content
+    /// (<see cref="CopyNewFileAsync"/>); independent of any selection. Native port addition.
+    /// </summary>
+    public ICommand CopyNewFileCommand { get; }
+
+    /// <summary>
     /// Gets the current selection result (normalized range plus line data) — during a drag it
     /// reflects the live range; after a release it keeps returning the completed range until the
     /// next interaction clears it (upstream manager semantics). Returns <c>null</c> without a range.
@@ -200,6 +238,78 @@ public sealed class DiffView : TemplatedControl
     {
         _selection.SetPreselectedLines(new MultiSelectPreselectedLines(oldLines, newLines));
         ApplySelectionVisual();
+    }
+
+    // ---- copy (native port feature — the upstream library has no copy counterpart) ----
+
+    /// <summary>
+    /// Copies the current selection as plain text to the clipboard: one output line per selected
+    /// line, hidden lines skipped and trailing newlines trimmed
+    /// (<see cref="MultiSelectData.GetSelectedTextFromResult"/> — the copy matches what the view
+    /// shows). A silent no-op returning <c>false</c> without a visible selection (or without a
+    /// clipboard, i.e. detached from a TopLevel).
+    /// </summary>
+    public async Task<bool> CopySelectionAsync()
+    {
+        var text = MultiSelectData.GetSelectedTextFromResult(GetSelectionResult());
+
+        if (text.Length == 0)
+        {
+            return false;
+        }
+
+        return await SetClipboardTextAsync(text);
+    }
+
+    /// <summary>
+    /// Copies the whole old-side file content (<c>DiffFile.GetOldFileContent</c>) to the
+    /// clipboard, its trailing newline kept as-is. Returns <c>false</c> — without touching the
+    /// clipboard — when the model has no old-side content.
+    /// </summary>
+    public Task<bool> CopyOldFileAsync() => CopyFileContentAsync(DiffFile?.GetOldFileContent());
+
+    /// <summary>
+    /// Copies the whole new-side file content (<c>DiffFile.GetNewFileContent</c>) to the
+    /// clipboard, its trailing newline kept as-is. Returns <c>false</c> — without touching the
+    /// clipboard — when the model has no new-side content.
+    /// </summary>
+    public Task<bool> CopyNewFileAsync() => CopyFileContentAsync(DiffFile?.GetNewFileContent());
+
+    private async Task<bool> CopyFileContentAsync(string? content)
+    {
+        if (content == null)
+        {
+            return false;
+        }
+
+        return await SetClipboardTextAsync(content);
+    }
+
+    private async Task<bool> SetClipboardTextAsync(string text)
+    {
+        var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
+
+        if (clipboard == null)
+        {
+            return false;
+        }
+
+        await clipboard.SetTextAsync(text);
+
+        return true;
+    }
+
+    private bool CanCopySelection() =>
+        GetSelectionResult()?.Lines.Any(line => !line.IsHide) == true;
+
+    /// <summary>Invalidates the copy commands after a selection or model change (the file
+    /// commands track the model, the selection command tracks the current selection result).</summary>
+    private void RaiseCopyCommandsCanExecuteChanged()
+    {
+        foreach (var command in _copyCommands)
+        {
+            command.RaiseCanExecuteChanged();
+        }
     }
 
     /// <inheritdoc />
@@ -297,6 +407,10 @@ public sealed class DiffView : TemplatedControl
             // are fresh objects, so hidden lines stay unhighlighted while remaining in the range
             // and revealed lines pick the highlight up after an expand.
             ApplySelectionVisual();
+
+            // Expands/collapses flip IsHide on selection members; the model change also covers
+            // the file commands' availability.
+            RaiseCopyCommandsCanExecuteChanged();
         }
         finally
         {
@@ -495,6 +609,8 @@ public sealed class DiffView : TemplatedControl
 
         ApplySelectionVisual();
 
+        RaiseCopyCommandsCanExecuteChanged();
+
         SelectionChanged?.Invoke(this, new DiffSelectionChangedEventArgs(range, state));
     }
 
@@ -520,6 +636,8 @@ public sealed class DiffView : TemplatedControl
         }
 
         ApplySelectionVisual();
+
+        RaiseCopyCommandsCanExecuteChanged();
 
         SelectionCompleted?.Invoke(this, new DiffSelectionCompletedEventArgs(result));
     }
@@ -861,6 +979,31 @@ public sealed class DiffView : TemplatedControl
                 owner.ApplyExpandAnchor(captured, direction, hunkIndex);
             }
         }
+    }
+
+    /// <summary>
+    /// Relays one of the view's copy operations. Unlike <see cref="HunkExpandCommand"/>, whose
+    /// availability is static per row, copy availability follows the selection and the model, so
+    /// the owner raises <see cref="RaiseCanExecuteChanged"/> when those change.
+    /// </summary>
+    private sealed class DiffCopyCommand(DiffView owner, Func<DiffView, bool> canExecute,
+                                         Func<DiffView, Task> executeAsync) : ICommand
+    {
+        private EventHandler? _canExecuteChanged;
+
+        public event EventHandler? CanExecuteChanged
+        {
+            add => _canExecuteChanged += value;
+            remove => _canExecuteChanged -= value;
+        }
+
+        public bool CanExecute(object? parameter) => canExecute(owner);
+
+        /// <summary>ICommand.Execute is synchronous by contract; the clipboard write runs
+        /// fire-and-forget, the standard async-command pattern.</summary>
+        public async void Execute(object? parameter) => await executeAsync(owner);
+
+        public void RaiseCanExecuteChanged() => _canExecuteChanged?.Invoke(owner, EventArgs.Empty);
     }
 
     /// <summary>Pre-expansion scroll state used to anchor the viewport across a row rebuild.</summary>

@@ -120,4 +120,36 @@ public static class MultiSelectData
 
         return ranges;
     }
+
+    /// <summary>
+    /// Native port addition (no upstream counterpart — git-diff-view has no copy feature):
+    /// flattens a selection result into clipboard-ready plain text. Lines currently hidden behind
+    /// a collapsed hunk (<see cref="SelectedLine.IsHide"/>) are skipped — the copy matches what
+    /// the view shows — and each value is stripped of its trailing newline exactly like the render
+    /// layer does before display (a <c>null</c> value copies as an empty line). The remaining
+    /// lines join with a plain <c>\n</c> (like the diff text itself, not
+    /// <c>Environment.NewLine</c>). A <c>null</c> result or one without any visible line yields
+    /// the empty string.
+    /// </summary>
+    public static string GetSelectedTextFromResult(MultiSelectResult? result)
+    {
+        if (result == null)
+        {
+            return "";
+        }
+
+        var visible = new List<string>();
+
+        foreach (var line in result.Lines)
+        {
+            if (line.IsHide)
+            {
+                continue;
+            }
+
+            visible.Add((line.Value ?? "").TrimEnd('\r', '\n'));
+        }
+
+        return string.Join("\n", visible);
+    }
 }

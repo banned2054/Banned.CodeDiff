@@ -32,6 +32,10 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         LoadSyntaxSampleCommand = new RelayCommand(LoadNextSyntaxSample);
         ExpandAllCommand        = new RelayCommand(ExpandAll);
         CollapseAllCommand      = new RelayCommand(CollapseAll);
+        _copySelectionCommand   = new RelayCommand(() => CopySelectionRequested?.Invoke(),
+                                                   () => _selectionVisibleLines > 0);
+        CopyOldFileCommand      = new RelayCommand(() => CopyOldFileRequested?.Invoke());
+        CopyNewFileCommand      = new RelayCommand(() => CopyNewFileRequested?.Invoke());
         Render();
     }
 
@@ -49,6 +53,30 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     public ICommand ExpandAllCommand { get; }
 
     public ICommand CollapseAllCommand { get; }
+
+    private readonly RelayCommand _copySelectionCommand;
+
+    /// <summary>
+    /// Copies the selected lines (hidden lines skipped) — the code-behind bridges
+    /// <see cref="CopySelectionRequested"/> to <c>DiffView.CopySelectionAsync</c>. Enabled when
+    /// the latest completed selection has at least one visible line.
+    /// </summary>
+    public ICommand CopySelectionCommand => _copySelectionCommand;
+
+    /// <summary>Copies the whole old-side file — bridged to <c>DiffView.CopyOldFileAsync</c>.</summary>
+    public ICommand CopyOldFileCommand { get; }
+
+    /// <summary>Copies the whole new-side file — bridged to <c>DiffView.CopyNewFileAsync</c>.</summary>
+    public ICommand CopyNewFileCommand { get; }
+
+    /// <summary>Code-behind bridges these to the DiffView copy methods (the VM stays view-pure).</summary>
+    public event Action? CopySelectionRequested;
+
+    /// <summary>See <see cref="CopySelectionRequested"/>.</summary>
+    public event Action? CopyOldFileRequested;
+
+    /// <summary>See <see cref="CopySelectionRequested"/>.</summary>
+    public event Action? CopyNewFileRequested;
 
     public bool IsSyntax
     {
@@ -136,10 +164,20 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     public bool IsSelectionEnabled
     {
         get => _isSelectionEnabled;
-        set => Set(ref _isSelectionEnabled, value);
+        set
+        {
+            if (Set(ref _isSelectionEnabled, value) && !value)
+            {
+                // The control clears its selection when the feature turns off — mirror that here.
+                OnSelectionCompleted(null);
+            }
+        }
     }
 
-    /// <summary>Status line for the latest completed selection — groundwork for the M6 copy feature.</summary>
+    /// <summary>Visible (non-hidden) lines of the latest completed selection — the copyable count.</summary>
+    private int _selectionVisibleLines;
+
+    /// <summary>Status line for the latest completed selection and copy feedback (M6 copy feature).</summary>
     public string SelectionStatus
     {
         get => _selectionStatus;
@@ -151,14 +189,28 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     {
         if (result is not { } completed)
         {
-            SelectionStatus = "未选择";
-            return;
+            _selectionVisibleLines = 0;
+            SelectionStatus        = "未选择";
+        }
+        else
+        {
+            var side = completed.Range.Side == SplitSide.Old ? "old" : "new";
+
+            _selectionVisibleLines = completed.Lines.Count(line => !line.IsHide);
+            SelectionStatus        = $"已选 {_selectionVisibleLines} 行({side} {completed.Range.StartLineNumber}-{completed.Range.EndLineNumber})";
         }
 
-        var side = completed.Range.Side == SplitSide.Old ? "old" : "new";
-
-        SelectionStatus = $"已选 {completed.Lines.Count} 行({side} {completed.Range.StartLineNumber}-{completed.Range.EndLineNumber})";
+        _copySelectionCommand.RaiseCanExecuteChanged();
     }
+
+    /// <summary>Copy feedback from the code-behind (called after a successful selection copy).</summary>
+    public void OnSelectionCopied() => SelectionStatus = $"已复制 {_selectionVisibleLines} 行";
+
+    /// <summary>Copy feedback from the code-behind (called after a successful old-file copy).</summary>
+    public void OnOldFileCopied() => SelectionStatus = "已复制旧文件内容";
+
+    /// <summary>Copy feedback from the code-behind (called after a successful new-file copy).</summary>
+    public void OnNewFileCopied() => SelectionStatus = "已复制新文件内容";
 
     public ThemeVariant Theme => IsDark ? ThemeVariant.Dark : ThemeVariant.Light;
 

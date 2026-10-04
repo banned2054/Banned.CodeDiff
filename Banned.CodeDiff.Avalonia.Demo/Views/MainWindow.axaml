@@ -9,6 +9,10 @@
         Width="1100"
         Height="720"
         WindowStartupLocation="CenterScreen">
+    <Window.KeyBindings>
+        <!--Host-side shortcut wiring: the control ships no built-in key bindings by design.-->
+        <KeyBinding Gesture="Ctrl+C" Command="{Binding CopySelectionCommand}" />
+    </Window.KeyBindings>
     <Design.DataContext>
         <vm:MainWindowViewModel />
     </Design.DataContext>
@@ -25,6 +29,9 @@
             <ToggleButton Content="语法高亮" IsChecked="{Binding IsSyntax}" />
             <ToggleButton Content="Unified 视图" IsChecked="{Binding IsUnified}" />
             <ToggleButton Content="启用行选择" IsChecked="{Binding IsSelectionEnabled}" />
+            <Button Command="{Binding CopySelectionCommand}" Content="复制选中行" />
+            <Button Command="{Binding CopyOldFileCommand}" Content="复制旧文件" />
+            <Button Command="{Binding CopyNewFileCommand}" Content="复制新文件" />
             <ToggleButton Content="深色主题" IsChecked="{Binding IsDark}" />
         </StackPanel>
 
