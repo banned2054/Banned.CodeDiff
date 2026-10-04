@@ -1,3 +1,4 @@
+using System.Text;
 using Banned.CodeDiff.Models;
 
 namespace Banned.CodeDiff.Services;
@@ -351,8 +352,8 @@ public sealed class DiffFile
         {
             var newLineNumber    = 1;
             var oldLineNumber    = 1;
-            var oldFileContent   = "";
-            var newFileContent   = "";
+            var oldContent       = new StringBuilder();
+            var newContent       = new StringBuilder();
             var hasSymbolChanged = false;
             while (oldLineNumber <= DiffLineLength || newLineNumber <= DiffLineLength)
             {
@@ -362,23 +363,23 @@ public sealed class DiffFile
                 var newDiffLine = GetNewDiffLine(newIndex);
                 if (oldDiffLine != null)
                 {
-                    oldFileContent += oldDiffLine.Text;
+                    oldContent.Append(oldDiffLine.Text);
                 }
                 else
                 {
                     // empty line for placeholder
-                    oldFileContent                    += "\n";
+                    oldContent.Append('\n');
                     oldFilePlaceholderLines[oldIndex] =  true;
                 }
 
                 if (newDiffLine != null)
                 {
-                    newFileContent += newDiffLine.Text;
+                    newContent.Append(newDiffLine.Text);
                 }
                 else
                 {
                     // empty line for placeholder
-                    newFileContent                    += "\n";
+                    newContent.Append('\n');
                     newFilePlaceholderLines[newIndex] =  true;
                 }
 
@@ -388,6 +389,9 @@ public sealed class DiffFile
                         hasSymbolChanged || oldDiffLine.NoTrailingNewLine != newDiffLine.NoTrailingNewLine;
                 }
             }
+
+            var oldFileContent = oldContent.ToString();
+            var newFileContent = newContent.ToString();
 
             if (!hasSymbolChanged && oldFileContent == newFileContent)
             {
@@ -408,7 +412,7 @@ public sealed class DiffFile
         {
             var newLineNumber    = 1;
             var oldLineNumber    = 1;
-            var newFileContent   = "";
+            var newContent       = new StringBuilder();
             var hasSymbolChanged = false;
             while (oldLineNumber <= _oldFileResult.MaxLineNumber)
             {
@@ -416,14 +420,14 @@ public sealed class DiffFile
                 var oldDiffLine = GetOldDiffLine(oldLineNumber);
                 if (newDiffLine != null)
                 {
-                    newFileContent += newDiffLine.Text;
+                    newContent.Append(newDiffLine.Text);
                     oldLineNumber  =  newDiffLine.OldLineNumber is { } ol ? ol + 1 : oldLineNumber;
                 }
                 else
                 {
                     if (oldDiffLine == null)
                     {
-                        newFileContent += GetOldRawLine(oldLineNumber) ?? "";
+                        newContent.Append(GetOldRawLine(oldLineNumber) ?? "");
                     }
 
                     oldLineNumber++;
@@ -435,6 +439,8 @@ public sealed class DiffFile
                         hasSymbolChanged || newDiffLine.NoTrailingNewLine != oldDiffLine.NoTrailingNewLine;
                 }
             }
+
+            var newFileContent = newContent.ToString();
 
             if (!hasSymbolChanged && newFileContent == OldFileContent)
             {
@@ -448,7 +454,7 @@ public sealed class DiffFile
         {
             var oldLineNumber    = 1;
             var newLineNumber    = 1;
-            var oldFileContent   = "";
+            var oldContent       = new StringBuilder();
             var hasSymbolChanged = false;
             while (newLineNumber <= _newFileResult.MaxLineNumber)
             {
@@ -456,14 +462,14 @@ public sealed class DiffFile
                 var newDiffLine = GetNewDiffLine(newLineNumber);
                 if (oldDiffLine != null)
                 {
-                    oldFileContent += oldDiffLine.Text;
+                    oldContent.Append(oldDiffLine.Text);
                     newLineNumber  =  oldDiffLine.NewLineNumber is { } nl ? nl + 1 : newLineNumber;
                 }
                 else
                 {
                     if (newDiffLine == null)
                     {
-                        oldFileContent += GetNewRawLine(newLineNumber) ?? "";
+                        oldContent.Append(GetNewRawLine(newLineNumber) ?? "");
                     }
 
                     newLineNumber++;
@@ -475,6 +481,8 @@ public sealed class DiffFile
                         hasSymbolChanged || newDiffLine.NoTrailingNewLine != oldDiffLine.NoTrailingNewLine;
                 }
             }
+
+            var oldFileContent = oldContent.ToString();
 
             if (!hasSymbolChanged && oldFileContent == NewFileContent)
             {
