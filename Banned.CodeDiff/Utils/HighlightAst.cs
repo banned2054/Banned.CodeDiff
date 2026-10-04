@@ -73,7 +73,10 @@ public static class HighlightAst
                         {
                             Type       = "text",
                             Value      = value,
-                            StartIndex = int.MaxValue, // JS: Infinity placeholder, overwritten below
+
+                            // JS: Infinity placeholder — immediately overwritten by
+                            // AppendToLine below, never used in computation.
+                            StartIndex = int.MaxValue,
                             EndIndex   = int.MaxValue,
                             LineNumber = line,
                         };

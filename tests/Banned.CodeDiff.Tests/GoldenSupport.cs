@@ -181,7 +181,8 @@ public static class GoldenSupport
         {
             arr.Add(new JsonObject
             {
-                ["type"]       = i.Type,
+                // JS dumps the fast-diff op code as its numeric value
+                ["type"]       = (int)i.Type,
                 ["str"]        = i.Str,
                 ["startIndex"] = i.StartIndex,
                 ["endIndex"]   = i.EndIndex,
@@ -432,7 +433,8 @@ public static class GoldenSupport
         var arr = new JsonArray();
         foreach (var t in result)
         {
-            arr.Add(new JsonObject { ["op"] = t.Op, ["text"] = t.Text, });
+            // JS dumps the fast-diff op code as its numeric value
+            arr.Add(new JsonObject { ["op"] = (int)t.Op, ["text"] = t.Text, });
         }
 
         return arr;

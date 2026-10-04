@@ -4,22 +4,22 @@ namespace Banned.CodeDiff.Models;
 /// Port of the <c>DiffHighlighter</c> interface shape
 /// (packages/lowlight/src/index.ts — the interface the core package programs
 /// against; lowlight/shiki/lezer implement it upstream).
-/// <see cref="Type"/> is a JS string enum (<c>"class"</c> or <c>"style"</c>);
-/// kept as a string to mirror the JS semantics.
+/// <see cref="Type"/> ports the JS string enum (<c>"class"</c> / <c>"style"</c>)
+/// as <see cref="HighlighterType"/>.
 /// </summary>
 public interface IDiffHighlighter
 {
     /// <summary>Engine id, e.g. "lowlight" / "shiki" upstream.</summary>
     string Name { get; }
 
-    /// <summary>"class" (theme-independent AST) or "style"; JS string enum.</summary>
-    string Type { get; }
+    /// <summary>"class" (theme-independent AST) or "style"; see <see cref="HighlighterType"/>.</summary>
+    HighlighterType Type { get; }
 
     /// <summary>Files longer than this many raw lines skip syntax highlighting.</summary>
     int MaxLineToIgnoreSyntax { get; }
 
-    /// <summary>JS: (string | RegExp)[] matched against the file name.</summary>
-    IReadOnlyList<object> IgnoreSyntaxHighlightList { get; }
+    /// <summary>JS: (string | RegExp)[] matched against the file name; see <see cref="IgnorePattern"/>.</summary>
+    IReadOnlyList<IgnorePattern> IgnoreSyntaxHighlightList { get; }
 
     /// <summary>JS: getAST(raw, fileName, lang, theme) — tokenizes the full file into a
     /// hast-like tree (root SyntaxNode whose children are per-token wrapper elements).

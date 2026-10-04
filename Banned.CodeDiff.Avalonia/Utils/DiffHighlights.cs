@@ -21,7 +21,7 @@ internal static class DiffHighlights
 
         if (diff.DiffChanges is { HasLineChange: true } fastDiff)
         {
-            var operation = kind == DiffCellKind.Add ? FastDiff.Insert : FastDiff.Delete;
+            var operation = kind == DiffCellKind.Add ? DiffOp.Insert : DiffOp.Delete;
 
             return fastDiff.Range
                            .Where(item => item.Type == operation && item.Length > 0)

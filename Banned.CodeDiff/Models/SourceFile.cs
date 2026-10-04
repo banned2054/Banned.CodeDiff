@@ -35,7 +35,8 @@ public sealed class SourceFile(string row, string lang, string? fileName = null)
     public int? SyntaxLength { get; private set; }
 
     public string? HighlighterName { get; private set; }
-    public string? HighlighterType { get; private set; }
+
+    public HighlighterType? HighlighterType { get; private set; }
 
     public void DoRaw()
     {
@@ -97,10 +98,12 @@ public sealed class SourceFile(string row, string lang, string? fileName = null)
             supportEngine = DiffHighlighters.Default;
         }
 
+        // NOTE: the enum must be qualified here — the simple name resolves to the
+        // HighlighterType property of this instance (C# "Color Color" rule).
         if (HasDoSyntax &&
             supportEngine.Name == HighlighterName &&
             supportEngine.Type == HighlighterType &&
-            (Theme == theme || supportEngine.Type == "class"))
+            (Theme == theme || supportEngine.Type == Banned.CodeDiff.Models.HighlighterType.Class))
         {
             return;
         }

@@ -26,18 +26,29 @@
 namespace Banned.CodeDiff.Services;
 
 /// <summary>
+/// fast-diff's op codes. JS uses the raw numbers -1/1/0; the explicit assignments
+/// keep the wire values (golden JSON dumps them as ints).
+/// </summary>
+public enum DiffOp
+{
+    Delete = -1,
+    Insert = 1,
+    Equal  = 0,
+}
+
+/// <summary>
 /// The data structure representing a diff is a list of tuples:
 /// [[DELETE, 'Hello'], [INSERT, 'Goodbye'], [EQUAL, ' world.']]
 /// which means: delete 'Hello', add 'Goodbye' and keep ' world.'.
 /// Mutable by design — the cleanup passes rewrite tuples in place, matching the JS arrays.
 /// </summary>
-public sealed class DiffTuple(int op, string text)
+public sealed class DiffTuple(DiffOp op, string text)
 {
-    public int Op { get; set; } = op;
+    public DiffOp Op { get; set; } = op;
 
     public string Text { get; set; } = text;
 
-    public void Deconstruct(out int op, out string text)
+    public void Deconstruct(out DiffOp op, out string text)
     {
         op   = Op;
         text = Text;
@@ -45,7 +56,7 @@ public sealed class DiffTuple(int op, string text)
 
     public override string ToString()
     {
-        return $"[{Op}, \"{Text}\"]";
+        return $"[{(int)Op}, \"{Text}\"]";
     }
 }
 
@@ -61,9 +72,6 @@ public sealed class CursorInfo
 
 public static class FastDiff
 {
-    public const int Delete = -1;
-    public const int Insert = 1;
-    public const int Equal  = 0;
 
     /// <summary>
     /// Find the differences between two texts. Simplifies the problem by stripping any
@@ -110,7 +118,7 @@ public static class FastDiff
         {
             if (text1.Length > 0)
             {
-                return [new DiffTuple(Equal, text1)];
+                return [new DiffTuple(DiffOp.Equal, text1)];
             }
 
             return [];
@@ -143,12 +151,12 @@ public static class FastDiff
         // Restore the prefix and suffix.
         if (commonPrefix.Length > 0)
         {
-            diffs.Insert(0, new DiffTuple(Equal, commonPrefix));
+            diffs.Insert(0, new DiffTuple(DiffOp.Equal, commonPrefix));
         }
 
         if (commonSuffix.Length > 0)
         {
-            diffs.Add(new DiffTuple(Equal, commonSuffix));
+            diffs.Add(new DiffTuple(DiffOp.Equal, commonSuffix));
         }
 
         DiffCleanupMerge(diffs, fixUnicode);
@@ -169,13 +177,13 @@ public static class FastDiff
         if (text1.Length == 0)
         {
             // Just add some text (speedup).
-            return [new DiffTuple(Insert, text2)];
+            return [new DiffTuple(DiffOp.Insert, text2)];
         }
 
         if (text2.Length == 0)
         {
             // Just delete some text (speedup).
-            return [new DiffTuple(Delete, text1)];
+            return [new DiffTuple(DiffOp.Delete, text1)];
         }
 
         var longText = text1.Length > text2.Length ? text1 : text2;
@@ -186,14 +194,14 @@ public static class FastDiff
             // Shorter text is inside the longer text (speedup).
             var diffs = new List<DiffTuple>
             {
-                new(Insert, longText[..i]),
-                new(Equal, shorText),
-                new(Insert, longText[(i + shorText.Length)..]),
+                new(DiffOp.Insert, longText[..i]),
+                new(DiffOp.Equal, shorText),
+                new(DiffOp.Insert, longText[(i + shorText.Length)..]),
             };
             // Swap insertions for deletions if diff is reversed.
             if (text1.Length <= text2.Length) return diffs;
-            diffs[0].Op = Delete;
-            diffs[2].Op = Delete;
+            diffs[0].Op = DiffOp.Delete;
+            diffs[2].Op = DiffOp.Delete;
 
             return diffs;
         }
@@ -202,7 +210,7 @@ public static class FastDiff
         {
             // Single character string.
             // After the previous speedup, the character can't be an equality.
-            return [new DiffTuple(Delete, text1), new DiffTuple(Insert, text2)];
+            return [new DiffTuple(DiffOp.Delete, text1), new DiffTuple(DiffOp.Insert, text2)];
         }
 
         // Check to see if the problem can be split in two.
@@ -215,7 +223,7 @@ public static class FastDiff
         var diffsa = DiffMain(text1a, text2a, null, false, false, depth + 1);
         var diffsb = DiffMain(text1b, text2b, null, false, false, depth + 1);
         // Merge the results.
-        var result = new List<DiffTuple>(diffsa) { new(Equal, midCommon) };
+        var result = new List<DiffTuple>(diffsa) { new(DiffOp.Equal, midCommon) };
         result.AddRange(diffsb);
         return result;
     }
@@ -354,7 +362,7 @@ public static class FastDiff
 
         // Diff took too long and hit the deadline or
         // number of diffs equals number of characters, no commonality at all.
-        return [new DiffTuple(Delete, text1), new DiffTuple(Insert, text2)];
+        return [new DiffTuple(DiffOp.Delete, text1), new DiffTuple(DiffOp.Insert, text2)];
     }
 
     /// <summary>
@@ -618,7 +626,7 @@ public static class FastDiff
         var lengthDeletions2  = 0;
         while (pointer < diffs.Count)
         {
-            if (diffs[pointer].Op == Equal)
+            if (diffs[pointer].Op == DiffOp.Equal)
             {
                 // Equality found.
                 equalities[equalitiesLength] = pointer;
@@ -632,7 +640,7 @@ public static class FastDiff
             else
             {
                 // An insertion or deletion.
-                if (diffs[pointer].Op == Insert)
+                if (diffs[pointer].Op == DiffOp.Insert)
                 {
                     lengthInsertions2 += diffs[pointer].Text.Length;
                 }
@@ -650,9 +658,9 @@ public static class FastDiff
                 )
                 {
                     // Duplicate record.
-                    diffs.Insert(equalities[equalitiesLength - 1], new DiffTuple(Delete, lastEquality));
+                    diffs.Insert(equalities[equalitiesLength - 1], new DiffTuple(DiffOp.Delete, lastEquality));
                     // Change second copy to insert.
-                    diffs[equalities[equalitiesLength - 1] + 1].Op = Insert;
+                    diffs[equalities[equalitiesLength - 1] + 1].Op = DiffOp.Insert;
                     // Throw away the equality we just deleted.
                     equalitiesLength--;
                     // Throw away the previous equality (it needs to be reevaluated).
@@ -687,7 +695,7 @@ public static class FastDiff
         pointer = 1;
         while (pointer < diffs.Count)
         {
-            if (diffs[pointer - 1].Op == Delete && diffs[pointer].Op == Insert)
+            if (diffs[pointer - 1].Op == DiffOp.Delete && diffs[pointer].Op == DiffOp.Insert)
             {
                 var deletion       = diffs[pointer - 1].Text;
                 var insertion      = diffs[pointer].Text;
@@ -695,10 +703,11 @@ public static class FastDiff
                 var overlapLength2 = DiffCommonOverlap(insertion, deletion);
                 if (overlapLength1 >= overlapLength2)
                 {
+                    // JS floating-point division: keep the 2.0 literal to mirror length / 2.
                     if (overlapLength1 >= deletion.Length / 2.0 || overlapLength1 >= insertion.Length / 2.0)
                     {
                         // Overlap found. Insert an equality and trim the surrounding edits.
-                        diffs.Insert(pointer, new DiffTuple(Equal, insertion[..overlapLength1]));
+                        diffs.Insert(pointer, new DiffTuple(DiffOp.Equal, insertion[..overlapLength1]));
                         diffs[pointer - 1].Text = deletion[..^overlapLength1];
                         diffs[pointer + 1].Text = insertion[overlapLength1..];
                         pointer++;
@@ -706,14 +715,15 @@ public static class FastDiff
                 }
                 else
                 {
+                    // JS floating-point division: keep the 2.0 literal to mirror length / 2.
                     if (overlapLength2 >= deletion.Length / 2.0 || overlapLength2 >= insertion.Length / 2.0)
                     {
                         // Reverse overlap found.
                         // Insert an equality and swap and trim the surrounding edits.
-                        diffs.Insert(pointer, new DiffTuple(Equal, deletion[..overlapLength2]));
-                        diffs[pointer - 1].Op   = Insert;
+                        diffs.Insert(pointer, new DiffTuple(DiffOp.Equal, deletion[..overlapLength2]));
+                        diffs[pointer - 1].Op   = DiffOp.Insert;
                         diffs[pointer - 1].Text = insertion[..^overlapLength2];
-                        diffs[pointer + 1].Op   = Delete;
+                        diffs[pointer + 1].Op   = DiffOp.Delete;
                         diffs[pointer + 1].Text = deletion[overlapLength2..];
                         pointer++;
                     }
@@ -865,7 +875,7 @@ public static class FastDiff
         // Intentionally ignore the first and last element (don't need checking).
         while (pointer < diffs.Count - 1)
         {
-            if (diffs[pointer - 1].Op == Equal && diffs[pointer + 1].Op == Equal)
+            if (diffs[pointer - 1].Op == DiffOp.Equal && diffs[pointer + 1].Op == DiffOp.Equal)
             {
                 // This is a single edit surrounded by equalities.
                 var equality1 = diffs[pointer - 1].Text;
@@ -939,7 +949,7 @@ public static class FastDiff
     {
         while (true)
         {
-            diffs.Add(new DiffTuple(Equal, "")); // Add a dummy entry at the end.
+            diffs.Add(new DiffTuple(DiffOp.Equal, "")); // Add a dummy entry at the end.
             var pointer     = 0;
             var countDelete = 0;
             var countInsert = 0;
@@ -956,12 +966,12 @@ public static class FastDiff
                 var op = diffs[pointer].Op;
                 switch (op)
                 {
-                    case Insert :
+                    case DiffOp.Insert :
                         countInsert++;
                         textInsert += diffs[pointer].Text;
                         pointer++;
                         break;
-                    case Delete :
+                    case DiffOp.Delete :
                         countDelete++;
                         textDelete += diffs[pointer].Text;
                         pointer++;
@@ -996,14 +1006,14 @@ public static class FastDiff
                                     diffs.RemoveAt(previousEquality);
                                     pointer--;
                                     var k = previousEquality - 1;
-                                    if (k >= 0 && k < diffs.Count && diffs[k].Op == Insert)
+                                    if (k >= 0 && k < diffs.Count && diffs[k].Op == DiffOp.Insert)
                                     {
                                         countInsert++;
                                         textInsert = diffs[k].Text + textInsert;
                                         k--;
                                     }
 
-                                    if (k >= 0 && k < diffs.Count && diffs[k].Op == Delete)
+                                    if (k >= 0 && k < diffs.Count && diffs[k].Op == DiffOp.Delete)
                                     {
                                         countDelete++;
                                         textDelete = diffs[k].Text + textDelete;
@@ -1045,7 +1055,7 @@ public static class FastDiff
                                     }
                                     else
                                     {
-                                        diffs.Insert(0, new DiffTuple(Equal, textInsert[..commonLength]));
+                                        diffs.Insert(0, new DiffTuple(DiffOp.Equal, textInsert[..commonLength]));
                                         pointer++;
                                     }
 
@@ -1073,7 +1083,7 @@ public static class FastDiff
                                     break;
                                 case 0 :
                                     diffs.RemoveRange(pointer - n, n);
-                                    diffs.Insert(pointer      - n, new DiffTuple(Insert, textInsert));
+                                    diffs.Insert(pointer      - n, new DiffTuple(DiffOp.Insert, textInsert));
                                     pointer = pointer - n + 1;
                                     break;
                                 default :
@@ -1081,14 +1091,14 @@ public static class FastDiff
                                     if (textInsert.Length == 0)
                                     {
                                         diffs.RemoveRange(pointer - n, n);
-                                        diffs.Insert(pointer      - n, new DiffTuple(Delete, textDelete));
+                                        diffs.Insert(pointer      - n, new DiffTuple(DiffOp.Delete, textDelete));
                                         pointer = pointer - n + 1;
                                     }
                                     else
                                     {
                                         diffs.RemoveRange(pointer - n, n);
-                                        diffs.Insert(pointer      - n, new DiffTuple(Delete, textDelete));
-                                        diffs.Insert(pointer - n  + 1, new DiffTuple(Insert, textInsert));
+                                        diffs.Insert(pointer      - n, new DiffTuple(DiffOp.Delete, textDelete));
+                                        diffs.Insert(pointer - n  + 1, new DiffTuple(DiffOp.Insert, textInsert));
                                         pointer = pointer - n + 2;
                                     }
 
@@ -1097,7 +1107,7 @@ public static class FastDiff
                             }
                         }
 
-                        if (pointer != 0 && diffs[pointer - 1].Op == Equal)
+                        if (pointer != 0 && diffs[pointer - 1].Op == DiffOp.Equal)
                         {
                             // Merge this equality with the previous one.
                             diffs[pointer - 1].Text += diffs[pointer].Text;
@@ -1130,7 +1140,7 @@ public static class FastDiff
             // Intentionally ignore the first and last element (don't need checking).
             while (pointer < diffs.Count - 1)
             {
-                if (diffs[pointer - 1].Op == Equal && diffs[pointer + 1].Op == Equal)
+                if (diffs[pointer - 1].Op == DiffOp.Equal && diffs[pointer + 1].Op == DiffOp.Equal)
                 {
                     // This is a single edit surrounded by equalities.
                     if (diffs[pointer].Text.EndsWith(diffs[pointer - 1].Text, StringComparison.Ordinal))
@@ -1200,10 +1210,10 @@ public static class FastDiff
 
         return RemoveEmptyTuples(
         [
-            new DiffTuple(Equal, before),
-            new DiffTuple(Delete, oldMiddle),
-            new DiffTuple(Insert, newMiddle),
-            new DiffTuple(Equal, after),
+            new DiffTuple(DiffOp.Equal, before),
+            new DiffTuple(DiffOp.Delete, oldMiddle),
+            new DiffTuple(DiffOp.Insert, newMiddle),
+            new DiffTuple(DiffOp.Equal, after),
         ]);
     }
 

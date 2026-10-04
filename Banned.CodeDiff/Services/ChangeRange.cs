@@ -229,20 +229,20 @@ public static class ChangeRange
         var bStart = 0;
 
         var aRange = new List<DiffItem>();
-        foreach (var item in diffRange.Where(item => item.Op != FastDiff.Delete))
+        foreach (var item in diffRange.Where(item => item.Op != DiffOp.Delete))
         {
             aRange.Add(new DiffItem(item.Op, item.Text, aStart, aStart + item.Text.Length - 1, item.Text.Length));
             aStart += item.Text.Length;
         }
 
         var bRange = new List<DiffItem>();
-        foreach (var item in diffRange.Where(item => item.Op != FastDiff.Insert))
+        foreach (var item in diffRange.Where(item => item.Op != DiffOp.Insert))
         {
             bRange.Add(new DiffItem(item.Op, item.Text, bStart, bStart + item.Text.Length - 1, item.Text.Length));
             bStart += item.Text.Length;
         }
 
-        var hasLineChange = aRange.Any(i => i.Type == FastDiff.Equal && i.Str.Trim().Length > 0);
+        var hasLineChange = aRange.Any(i => i.Type == DiffOp.Equal && i.Str.Trim().Length > 0);
 
         return (new DiffRange { Range = aRange, HasLineChange = hasLineChange, NewLineSymbol = addSymbol },
                 new DiffRange { Range = bRange, HasLineChange = hasLineChange, NewLineSymbol = delSymbol });

@@ -180,20 +180,6 @@ public class DiffLine(
     /// </summary>
     public DiffRange? InternalDiffChanges { get; set; }
 
-    // ---- M2 (templates, built by template.ts) ----
-
-    public string? PlainTemplate { get; set; }
-
-    /// <summary>"fast-diff" | "relative"</summary>
-    public string? PlainTemplateMode { get; set; }
-
-    public string? SyntaxTemplate { get; set; }
-
-    public string? SyntaxTemplateName { get; set; }
-
-    /// <summary>"fast-diff" | "relative"</summary>
-    public string? SyntaxTemplateMode { get; set; }
-
     // ---- DiffFile line model state (diff-file.ts DiffLineItem / DiffHunkItem) ----
 
     /// <summary>JS field: DiffLineItem.index. Null until the line is composed into diffLines.</summary>

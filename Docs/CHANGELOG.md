@@ -4,6 +4,31 @@
 
 ### 重构 — JS 语法怪癖 .NET 化(行为不变,golden 测试护栏)
 
+- **删除零消费死代码**(公开 API 删除):`DiffLine` 的
+  `PlainTemplate/PlainTemplateMode/SyntaxTemplate/SyntaxTemplateName/SyntaxTemplateMode`
+  (M2 为不移植的 HTML 模板功能预留);`Utils/Symbol.cs` 的 `DiffModeEnum`
+  (JS 侧仅框架包装组件使用,明确不移植)。
+- **`IDiffHighlighter.Type` enum 化**:`string`("class"/"style")→
+  `Banned.CodeDiff.Models.HighlighterType { Class, Style }`(新文件
+  `Models/HighlighterType.cs`);`SourceFile.HighlighterType` 与
+  `DiffFile` 的 `_highlighterType`/`GetHighlighterType()` 同步改为
+  `HighlighterType?`(null 取代原空串"未设置"语义)。契约收窄:引擎只能返回
+  Class/Style,不再接受任意字符串。
+- **`IDiffHighlighter.IgnoreSyntaxHighlightList` 强类型化**:`IReadOnlyList<object>`
+  (string | RegExp 混装)→ 判别联合 `IgnorePattern`(新文件 `Models/IgnorePattern.cs`:
+  `abstract record IgnorePattern` + `FileNameIgnorePattern(string FileName)` +
+  `RegexIgnorePattern(Regex Regex)`);文件名相等比较与 `Regex.IsMatch` 两种匹配
+  语义保持不变。`TextMateHighlighter.SetIgnoreSyntaxHighlightList` 参数同步换型。
+- **FastDiff 操作码 enum 化**:`FastDiff` 的 `Delete=-1/Insert=1/Equal=0` int 常量与
+  `DiffTuple.Op`、`DiffItem.Type` 统一为 `enum DiffOp { Delete = -1, Insert = 1, Equal = 0 }`
+  (显式赋值保值,golden JSON 数值不变);消费点 `ChangeRange`、Avalonia
+  `DiffHighlights`、golden dump(`(int)` 转换)同步。
+- **命名规范**:`DiffFile` 私有 camelCase 属性 `_composeByRange` 改为字段
+  (与兄弟状态位 `_composeByDiff` 一致,仍未被赋值——bundle 序列化不移植)。
+- **注释微改善**(不改代码):FastDiff `/ 2.0` 处注明 JS 浮点除法语义;
+  `DiffFile` hunk 头解析 `?? 0` 兜底处注明被 `DiffHeaderRegex` 纯数字捕获保证不可达;
+  `HighlightAst` `int.MaxValue` 占位处注明立即被覆盖、不参与运算。
+
 - **`_Xxx` 快照字段改为快照语义命名**(`Banned.CodeDiff.Models`,公开 API 重命名,行为不变):
   `HunkInfo`/`HunkLineInfo` 的 `_OldStartIndex/_OldLength/_NewStartIndex/_NewLength` →
   `OldStartIndexSnapshot/OldLengthSnapshot/NewStartIndexSnapshot/NewLengthSnapshot`;

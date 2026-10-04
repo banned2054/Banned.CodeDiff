@@ -187,7 +187,7 @@ public class SyntaxHighlightTests
     {
         var engine = TextMateHighlighter.Instance;
 
-        engine.SetIgnoreSyntaxHighlightList(["generated.cs"]);
+        engine.SetIgnoreSyntaxHighlightList([new FileNameIgnorePattern("generated.cs")]);
 
         try
         {

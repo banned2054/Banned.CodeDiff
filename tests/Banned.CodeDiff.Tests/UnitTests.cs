@@ -14,11 +14,11 @@ public class UnitTests
         // the exact fast-diff@1.3.0 output (its README example is outdated)
         var result = FastDiff.Diff("Hello world.", "Goodbye world.");
         Assert.That(result.Select(t => (t.Op, t.Text)).ToArray(), Is.EqualTo([
-            (FastDiff.Delete, "Hell"),
-            (FastDiff.Insert, "G"),
-            (FastDiff.Equal, "o"),
-            (FastDiff.Insert, "odbye"),
-            (FastDiff.Equal, " world.")
+            (DiffOp.Delete, "Hell"),
+            (DiffOp.Insert, "G"),
+            (DiffOp.Equal, "o"),
+            (DiffOp.Insert, "odbye"),
+            (DiffOp.Equal, " world.")
         ]));
     }
 
@@ -27,18 +27,18 @@ public class UnitTests
     {
         var result = FastDiff.Diff("The cat came.", "The came.", (int?)null, cleanup : true);
         Assert.That(result.Select(t => (t.Op, t.Text)).ToArray(), Is.EqualTo([
-            (FastDiff.Equal, "The "),
-            (FastDiff.Delete, "cat "),
-            (FastDiff.Equal, "came.")
+            (DiffOp.Equal, "The "),
+            (DiffOp.Delete, "cat "),
+            (DiffOp.Equal, "came.")
         ]));
     }
 
     [Test]
     public void FastDiff_InsertConstant()
     {
-        Assert.That(FastDiff.Insert, Is.EqualTo(1));
-        Assert.That(FastDiff.Delete, Is.EqualTo(-1));
-        Assert.That(FastDiff.Equal, Is.EqualTo(0));
+        Assert.That((int)DiffOp.Insert, Is.EqualTo(1));
+        Assert.That((int)DiffOp.Delete, Is.EqualTo(-1));
+        Assert.That((int)DiffOp.Equal, Is.EqualTo(0));
     }
 
     [Test]

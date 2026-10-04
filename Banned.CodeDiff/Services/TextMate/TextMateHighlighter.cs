@@ -20,26 +20,24 @@ public sealed class TextMateHighlighter : IDiffHighlighter
 
     private int _maxLineToIgnoreSyntax = 2000;
 
-    private readonly List<object> _ignoreSyntaxHighlightList = [];
+    private readonly List<IgnorePattern> _ignoreSyntaxHighlightList = [];
 
     private TextMateHighlighter() { }
 
     public string Name => "textmate";
 
-    /// <summary>JS string enum; kept as the literal "class".</summary>
-    public string Type => "class";
+    public HighlighterType Type => HighlighterType.Class;
 
     public int MaxLineToIgnoreSyntax => _maxLineToIgnoreSyntax;
 
-    /// <summary>Entries are <see cref="string"/> (exact file name) or <see cref="Regex"/>.</summary>
-    public IReadOnlyList<object> IgnoreSyntaxHighlightList => _ignoreSyntaxHighlightList;
+    public IReadOnlyList<IgnorePattern> IgnoreSyntaxHighlightList => _ignoreSyntaxHighlightList;
 
     public void SetMaxLineToIgnoreSyntax(int value)
     {
         _maxLineToIgnoreSyntax = value;
     }
 
-    public void SetIgnoreSyntaxHighlightList(IReadOnlyList<object> items)
+    public void SetIgnoreSyntaxHighlightList(IReadOnlyList<IgnorePattern> items)
     {
         _ignoreSyntaxHighlightList.Clear();
 
@@ -58,8 +56,12 @@ public sealed class TextMateHighlighter : IDiffHighlighter
 
     public SyntaxNode? GetAst(string raw, string? fileName, string? lang, string? theme)
     {
-        if (fileName != null && _ignoreSyntaxHighlightList.Any(item =>
-                item is Regex regex ? regex.IsMatch(fileName) : fileName.Equals(item)))
+        if (fileName != null && _ignoreSyntaxHighlightList.Any(item => item switch
+            {
+                RegexIgnorePattern regex  => regex.Regex.IsMatch(fileName),
+                FileNameIgnorePattern name => fileName.Equals(name.FileName),
+                _                          => false
+            }))
         {
             return null;
         }

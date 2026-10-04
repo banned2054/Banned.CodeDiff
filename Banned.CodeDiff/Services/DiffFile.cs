@@ -44,7 +44,7 @@ public sealed class DiffFile
     private Dictionary<int, SyntaxLine>? _newFileSyntaxLines;
 
     private string? _highlighterName;
-    private string? _highlighterType;
+    private HighlighterType? _highlighterType;
     private string? _theme;
 
     private bool _hasInitSyntax;
@@ -65,9 +65,9 @@ public sealed class DiffFile
     private bool _composeByDiff;
 
     // JS: set by _mergeFullBundle (bundle serialization is M2 scope)
-    private bool   _composeByRange { get; set; }
-    private bool   _hasExpandSplitAll;
-    private bool   _hasExpandUnifiedAll;
+    private bool _composeByRange = false;
+    private bool _hasExpandSplitAll;
+    private bool _hasExpandUnifiedAll;
     public  string OldFileName    { get; private set; }
     public  string OldFileContent { get; private set; }
     public  string OldFileLang    { get; private set; }
@@ -264,6 +264,8 @@ public sealed class DiffFile
                     var newNumInfo    = numParts.Length > 1 ? numParts[1] : "";
                     var oldNumParts   = oldNumInfo.Split(',');
                     var newNumParts   = newNumInfo.Split(',');
+                    // The "?? 0" fallbacks are unreachable: the parser's DiffHeaderRegex
+                    // guarantees the first (start index) capture groups are pure digits.
                     var oldStartIndex = -JsNumber(oldNumParts[0]) ?? 0;
                     var oldLength     = oldNumParts.Length > 1 ? JsNumber(oldNumParts[1]) : null;
                     var newStartIndex = JsNumber(newNumParts[0]) ?? 0;
@@ -532,11 +534,11 @@ public sealed class DiffFile
     /// <summary>JS: _getTheme.</summary>
     public string? GetTheme() => _theme;
 
-    /// <summary>JS: _getHighlighterName / _getHighlighterType.</summary>
+    /// <summary>JS: _getHighlighterName.</summary>
     public string? GetHighlighterName() => _highlighterName;
 
     /// <summary>JS: _getHighlighterType.</summary>
-    public string? GetHighlighterType() => _highlighterType;
+    public HighlighterType? GetHighlighterType() => _highlighterType;
 
     /// <summary>Port of initSyntax({ registerHighlighter }).</summary>
     public void InitSyntax(IDiffHighlighter? registerHighlighter = null)
@@ -586,9 +588,9 @@ public sealed class DiffFile
                            : !string.IsNullOrEmpty(_newFileResult?.HighlighterName) ? _newFileResult!.HighlighterName
                            : _highlighterName;
 
-        _highlighterType = !string.IsNullOrEmpty(_oldFileResult?.HighlighterType) ? _oldFileResult!.HighlighterType
-                           : !string.IsNullOrEmpty(_newFileResult?.HighlighterType) ? _newFileResult!.HighlighterType
-                           : _highlighterType;
+        _highlighterType = _oldFileResult?.HighlighterType
+                       ?? _newFileResult?.HighlighterType
+                       ?? _highlighterType;
 
         if (!string.IsNullOrEmpty(_oldFileResult?.HighlighterName))
         {
