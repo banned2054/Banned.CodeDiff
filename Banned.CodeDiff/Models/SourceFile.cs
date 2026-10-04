@@ -3,6 +3,11 @@ using Banned.CodeDiff.Services;
 namespace Banned.CodeDiff.Models;
 
 /// <summary>
+///     packages/core/src/file.ts 的移植——单个源文件的原文 + 语法状态。上游的模块级跨实例缓存
+///     (cache.ts + getFile)未按原样移植;其中昂贵的部分——语法分词结果——改为通过 <see cref="DoSyntax" />
+///     内部的有界 LRU 记忆化,并作为性能增强记录(见 Docs/CHANGELOG.md)。在 doSyntax 层级缓存
+///     (而非像 getFile 那样共享整个 File 实例)保持了"语法只有在本文件执行过 doSyntax 后才存在"
+///     这一可观察规则。<br />
 ///     Port of packages/core/src/file.ts — raw + syntax state of one source file.
 ///     The upstream module-level cross-instance cache (cache.ts + getFile) is not ported
 ///     as-is; the expensive part — the syntax tokenization result — is memoized instead
@@ -28,35 +33,71 @@ public sealed class SourceFile(string row, string lang, string? fileName = null)
     private static readonly Dictionary<(string Raw, string Lang, string? FileName, string EngineName,
         HighlighterType EngineType, string? Theme), LinkedListNode<SyntaxResultEntry>> SyntaxResultMap = new();
 
-    public string  Raw      { get; } = Transform.ProcessTransformForFile(row);
-    public string  Lang     { get; } = lang;
+    /// <summary>处理后的文件原文(已应用 transform 函数)。<br />The processed raw file content (transform function applied).</summary>
+    public string Raw { get; } = Transform.ProcessTransformForFile(row);
+
+    /// <summary>语言 id(如 "ts" / "cs")。<br />The language id (e.g. "ts" / "cs").</summary>
+    public string Lang { get; } = lang;
+
+    /// <summary>文件名,用于忽略规则匹配;可为 <c>null</c>。<br />The file name used for ignore-pattern matching; may be <c>null</c>.</summary>
     public string? FileName { get; } = fileName;
 
-    /// <summary>JS: rawFile — 1-based line number → line content (trailing "\n" kept except on the last line).</summary>
+    /// <summary>
+    ///     JS: rawFile —— 1 基行号 → 行内容(除最后一行外保留行尾 "\n")。<br />JS: rawFile — 1-based line number → line content (trailing
+    ///     "\n" kept except on the last line).
+    /// </summary>
     public Dictionary<int, string> RawFile { get; private set; } = new();
 
-    public bool HasDoRaw      { get; private set; }
-    public int? RawLength     { get; private set; }
-    public int  MaxLineNumber { get; private set; }
+    /// <summary>是否已执行 <see cref="DoRaw" />。<br />Whether <see cref="DoRaw" /> has run.</summary>
+    public bool HasDoRaw { get; private set; }
+
+    /// <summary>
+    ///     原文行数;执行 <see cref="DoRaw" /> 之前为 <c>null</c>。<br />The raw line count; <c>null</c> before <see cref="DoRaw" />
+    ///     runs.
+    /// </summary>
+    public int? RawLength { get; private set; }
+
+    /// <summary>最大行号(1 基)。<br />The largest line number (1-based).</summary>
+    public int MaxLineNumber { get; private set; }
 
     // ---- syntax state (doSyntax) ----
 
-    /// <summary>JS: ast — the highlighter-produced tree (hast Root equivalent).</summary>
+    /// <summary>JS: ast —— 高亮器产出的语法树(hast Root 等价物)。<br />JS: ast — the highlighter-produced tree (hast Root equivalent).</summary>
     public SyntaxNode? Ast { get; private set; }
 
-    /// <summary>JS: theme ("light" | "dark"); recorded for the hasDoSyntax idempotence check.</summary>
+    /// <summary>
+    ///     JS: theme("light" | "dark");记录用于 hasDoSyntax 的幂等检查。<br />JS: theme ("light" | "dark"); recorded for the
+    ///     hasDoSyntax idempotence check.
+    /// </summary>
     public string? Theme { get; private set; }
 
-    /// <summary>JS: syntaxFile — 1-based line number → syntax spans of that line.</summary>
+    /// <summary>JS: syntaxFile —— 1 基行号 → 该行的语法文本段。<br />JS: syntaxFile — 1-based line number → syntax spans of that line.</summary>
     public Dictionary<int, SyntaxLine>? SyntaxFile { get; private set; }
 
-    public bool    HasDoSyntax     { get; private set; }
-    public int?    SyntaxLength    { get; private set; }
+    /// <summary>
+    ///     是否已执行 <see cref="DoSyntax" /> 并得到语法结果(跳过高亮时不置位)。<br />Whether <see cref="DoSyntax" /> ran and produced a
+    ///     syntax result (not set when highlighting is skipped).
+    /// </summary>
+    public bool HasDoSyntax { get; private set; }
+
+    /// <summary>
+    ///     语法处理后的总行数(processAST 的 lineNumber);尚未执行时为 <c>null</c>。<br />Total line count after syntax processing
+    ///     (processAST's lineNumber); <c>null</c> before it runs.
+    /// </summary>
+    public int? SyntaxLength { get; private set; }
+
+    /// <summary>实际使用的高亮器引擎名。<br />Name of the highlighter engine actually used.</summary>
     public string? HighlighterName { get; private set; }
 
+    /// <summary>
+    ///     实际使用的引擎类型(<see cref="Models.HighlighterType" />);尚未执行时为 <c>null</c>。<br />Type of the engine actually used (
+    ///     <see cref="Models.HighlighterType" />); <c>null</c> before it runs.
+    /// </summary>
     public HighlighterType? HighlighterType { get; private set; }
 
     /// <summary>
+    ///     丢弃所有记忆化的语法结果。在全局引擎配置变化时调用(transform 函数、语法忽略列表 / 阈值),
+    ///     使下一次 doSyntax 反映新设置——无记忆化时每次运行都会重新计算,该可观察行为被保留。<br />
     ///     Drops every memoized syntax result. Called when global engine configuration changes
     ///     (transform function, syntax ignore list / threshold) so the next doSyntax reflects the
     ///     new settings — without memoization every run recomputed, and that observable behavior
@@ -111,6 +152,11 @@ public sealed class SourceFile(string row, string lang, string? fileName = null)
         }
     }
 
+    /// <summary>
+    ///     按 "\n" 拆分原文,填充 <see cref="RawFile" />、<see cref="RawLength" /> 与 <see cref="MaxLineNumber" />;内容为空或已执行时为空操作。
+    ///     <br />Splits the raw content by "\n" to fill <see cref="RawFile" />, <see cref="RawLength" /> and
+    ///     <see cref="MaxLineNumber" />; no-op for empty content or when already run.
+    /// </summary>
     public void DoRaw()
     {
         if (Raw.Length == 0 || HasDoRaw) return;
@@ -132,11 +178,19 @@ public sealed class SourceFile(string row, string lang, string? fileName = null)
     }
 
     /// <summary>
+    ///     File.doSyntax({ registerHighlighter, theme }) 的移植。上游在注入的高亮器不认识该语言时
+    ///     回退到内置 lowlight 引擎;C# 移植的内置默认是 TextMate 引擎,双方都不认识的语言保持
+    ///     无高亮(GetAst → null)。<br />
     ///     Port of File.doSyntax({ registerHighlighter, theme }). The upstream falls
     ///     back to the built-in lowlight engine when the injected highlighter does not
     ///     know the language; the C# port's built-in default is the TextMate engine,
     ///     and a language unknown to both simply stays unhighlighted (GetAst → null).
     /// </summary>
+    /// <param name="registerHighlighter">
+    ///     注入的高亮器;<c>null</c> 时使用内置默认。<br />The highlighter to register; <c>null</c> uses the
+    ///     built-in default.
+    /// </param>
+    /// <param name="theme">主题名("light" / "dark")。<br />The theme name ("light" / "dark").</param>
     public void DoSyntax(IDiffHighlighter? registerHighlighter = null, string? theme = null)
     {
         if (Raw.Length == 0) return;

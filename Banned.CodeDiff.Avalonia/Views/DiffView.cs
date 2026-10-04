@@ -15,6 +15,11 @@ using System.Windows.Input;
 namespace Banned.CodeDiff.Avalonia.Views;
 
 /// <summary>
+///     将 <see cref="T:Banned.CodeDiff.Services.DiffFile" /> 渲染为只读的 GitHub 风格 diff
+///     视图,行级新增/删除带背景色——分栏(两列,默认)或统一(单列、双行号,删除行位于
+///     新增行之上)两种模式。赋给它一个 <see cref="DiffFile" />(无论是否已构建——
+///     <c>Init</c> 与各 <c>Build*DiffLines</c> 调用都是幂等的、按需调用),视图便会通过模型
+///     的 <c>Updated</c> 事件保持自身同步。<br />
 ///     Renders a <see cref="T:Banned.CodeDiff.Services.DiffFile" /> as a read-only, GitHub-style diff
 ///     view with line-level add/delete background colors — either split (two columns, default) or
 ///     unified (single column with dual line numbers, deleted lines above the added ones). Assign a
@@ -33,35 +38,44 @@ public sealed class DiffView : TemplatedControl
     /// <summary>Approximate advance width of one monospace digit relative to the font size.</summary>
     private const double MonospaceCharWidthRatio = 0.62;
 
-    /// <summary>Identifies the <see cref="DiffFile" /> dependency property.</summary>
+    /// <summary>标识 <see cref="DiffFile" /> 依赖属性。<br />Identifies the <see cref="DiffFile" /> dependency property.</summary>
     public static readonly StyledProperty<DiffFile?> DiffFileProperty =
         AvaloniaProperty.Register<DiffView, DiffFile?>(nameof(DiffFile));
 
-    /// <summary>Identifies the <see cref="ViewMode" /> dependency property.</summary>
+    /// <summary>标识 <see cref="ViewMode" /> 依赖属性。<br />Identifies the <see cref="ViewMode" /> dependency property.</summary>
     public static readonly StyledProperty<DiffViewMode> ViewModeProperty =
         AvaloniaProperty.Register<DiffView, DiffViewMode>(nameof(ViewMode));
 
-    /// <summary>Identifies the <see cref="SyntaxHighlight" /> dependency property.</summary>
+    /// <summary>
+    ///     标识 <see cref="SyntaxHighlight" /> 依赖属性。<br />Identifies the <see cref="SyntaxHighlight" /> dependency
+    ///     property.
+    /// </summary>
     public static readonly StyledProperty<bool> SyntaxHighlightProperty =
         AvaloniaProperty.Register<DiffView, bool>(nameof(SyntaxHighlight), true);
 
-    /// <summary>Identifies the <see cref="IsSelectionEnabled" /> dependency property.</summary>
+    /// <summary>
+    ///     标识 <see cref="IsSelectionEnabled" /> 依赖属性。<br />Identifies the <see cref="IsSelectionEnabled" /> dependency
+    ///     property.
+    /// </summary>
     public static readonly StyledProperty<bool> IsSelectionEnabledProperty =
         AvaloniaProperty.Register<DiffView, bool>(nameof(IsSelectionEnabled));
 
-    /// <summary>Identifies the <see cref="Wrap" /> dependency property.</summary>
+    /// <summary>标识 <see cref="Wrap" /> 依赖属性。<br />Identifies the <see cref="Wrap" /> dependency property.</summary>
     public static readonly StyledProperty<bool> WrapProperty =
         AvaloniaProperty.Register<DiffView, bool>(nameof(Wrap));
 
-    /// <summary>Identifies the <see cref="Highlighter" /> dependency property.</summary>
+    /// <summary>标识 <see cref="Highlighter" /> 依赖属性。<br />Identifies the <see cref="Highlighter" /> dependency property.</summary>
     public static readonly StyledProperty<IDiffHighlighter?> HighlighterProperty =
         AvaloniaProperty.Register<DiffView, IDiffHighlighter?>(nameof(Highlighter));
 
-    /// <summary>Identifies the <see cref="Rows" /> direct property.</summary>
+    /// <summary>标识 <see cref="Rows" /> 直接属性。<br />Identifies the <see cref="Rows" /> direct property.</summary>
     public static readonly DirectProperty<DiffView, IReadOnlyList<DiffRow>> RowsProperty =
         AvaloniaProperty.RegisterDirect<DiffView, IReadOnlyList<DiffRow>>(nameof(Rows), o => o.Rows);
 
-    /// <summary>Identifies the <see cref="NumberColumnWidth" /> direct property.</summary>
+    /// <summary>
+    ///     标识 <see cref="NumberColumnWidth" /> 直接属性。<br />Identifies the <see cref="NumberColumnWidth" /> direct
+    ///     property.
+    /// </summary>
     public static readonly DirectProperty<DiffView, double> NumberColumnWidthProperty =
         AvaloniaProperty.RegisterDirect<DiffView, double>(nameof(NumberColumnWidth), o => o.NumberColumnWidth);
 
@@ -94,7 +108,7 @@ public sealed class DiffView : TemplatedControl
     /// </summary>
     private Dictionary<int, DiffSplitContentRow>? _splitRowsByLineIndex;
 
-    /// <summary>Initializes a new instance of the <see cref="DiffView" /> class.</summary>
+    /// <summary>初始化 <see cref="DiffView" /> 类的新实例。<br />Initializes a new instance of the <see cref="DiffView" /> class.</summary>
     public DiffView()
     {
         // SetCurrentValue keeps these overridable by styles and inherited values.
@@ -125,14 +139,14 @@ public sealed class DiffView : TemplatedControl
         _selection.SelectionCompleted += OnSelectionCompleted;
     }
 
-    /// <summary>Gets or sets the diff model to render. <c>null</c> clears the view.</summary>
+    /// <summary>获取或设置要渲染的 diff 模型。<c>null</c> 会清空视图。<br />Gets or sets the diff model to render. <c>null</c> clears the view.</summary>
     public DiffFile? DiffFile
     {
         get => GetValue(DiffFileProperty);
         set => SetValue(DiffFileProperty, value);
     }
 
-    /// <summary>Gets or sets the display mode (split or unified).</summary>
+    /// <summary>获取或设置显示模式(分栏或统一)。<br />Gets or sets the display mode (split or unified).</summary>
     public DiffViewMode ViewMode
     {
         get => GetValue(ViewModeProperty);
@@ -140,6 +154,8 @@ public sealed class DiffView : TemplatedControl
     }
 
     /// <summary>
+    ///     获取或设置渲染前模型是否执行语法高亮(<c>DiffFile.InitSyntax</c>);语言已注册时
+    ///     内置 TextMate 引擎会为各行着色。<br />
     ///     Gets or sets whether the model runs syntax highlighting
     ///     (<c>DiffFile.InitSyntax</c>) before rendering; the built-in TextMate engine
     ///     colors lines when the language is registered.
@@ -151,6 +167,8 @@ public sealed class DiffView : TemplatedControl
     }
 
     /// <summary>
+    ///     获取或设置传给 <c>InitSyntax</c> 的语法高亮器;<c>null</c> 使用核心库内置的
+    ///     TextMate 引擎(上游:registerHighlighter)。<br />
     ///     Gets or sets the syntax engine passed to <c>InitSyntax</c>; <c>null</c> uses
     ///     the core library's built-in TextMate engine (upstream: registerHighlighter).
     /// </summary>
@@ -161,6 +179,10 @@ public sealed class DiffView : TemplatedControl
     }
 
     /// <summary>
+    ///     获取或设置一个值,指示长行是否在视图宽度处自动换行(对应上游 diffViewWrap prop:
+    ///     white-space pre-wrap,行边缘断词),而不是渲染一行被水平裁剪的文本。默认为
+    ///     <c>false</c>——上游包装器默认开启,这里做成显式启用,让既有宿主的行布局(单行高)
+    ///     保持不变。分栏行两侧保持与较高一侧同高;行号列永不换行。<br />
     ///     Gets or sets a value indicating whether long lines wrap at the view width (the upstream
     ///     diffViewWrap prop: white-space pre-wrap, word breaks at the line edge) instead of
     ///     rendering one horizontally clipped line. Defaults to <c>false</c> — the upstream wrappers
@@ -175,6 +197,9 @@ public sealed class DiffView : TemplatedControl
     }
 
     /// <summary>
+    ///     获取或设置在行号单元格上拖拽时是否按行区间创建选区(上游的 multiSelect 功能)。
+    ///     默认为 <c>false</c>——上游包装器默认开启,这里做成显式启用,让既有宿主的指针行为
+    ///     保持不变。<br />
     ///     Gets or sets whether dragging over line-number cells selects line ranges (the upstream
     ///     multiSelect feature). Defaults to <c>false</c> — the upstream wrappers default it to on,
     ///     but an opt-in keeps existing hosts' pointer behavior unchanged.
@@ -185,31 +210,43 @@ public sealed class DiffView : TemplatedControl
         set => SetValue(IsSelectionEnabledProperty, value);
     }
 
-    /// <summary>Gets the flat row list currently rendered (content rows and hunk placeholders).</summary>
+    /// <summary>
+    ///     获取当前渲染的扁平行列表(内容行与 hunk 占位行)。<br />Gets the flat row list currently rendered (content rows and hunk
+    ///     placeholders).
+    /// </summary>
     public IReadOnlyList<DiffRow> Rows => _rows;
 
-    /// <summary>Gets the resolved line-number column width for the current rows and font size.</summary>
+    /// <summary>获取按当前行与字号解析出的行号列宽度。<br />Gets the resolved line-number column width for the current rows and font size.</summary>
     public double NumberColumnWidth => _numberColumnWidth;
 
     /// <summary>
+    ///     获取将 hunk 行向上展开一个 compose 长度(40 行)的命令;命令参数为
+    ///     <see cref="DiffSplitHunkRow" /> 或 <see cref="DiffUnifiedHunkRow" />。<br />
     ///     Gets the command that expands a hunk row up by the compose length (40 lines);
     ///     the command parameter is the <see cref="DiffSplitHunkRow" /> or <see cref="DiffUnifiedHunkRow" />.
     /// </summary>
     public ICommand ExpandHunkUpCommand { get; }
 
     /// <summary>
+    ///     获取将 hunk 行向下展开一个 compose 长度(40 行)的命令;命令参数为
+    ///     <see cref="DiffSplitHunkRow" /> 或 <see cref="DiffUnifiedHunkRow" />。<br />
     ///     Gets the command that expands a hunk row down by the compose length (40 lines);
     ///     the command parameter is the <see cref="DiffSplitHunkRow" /> or <see cref="DiffUnifiedHunkRow" />.
     /// </summary>
     public ICommand ExpandHunkDownCommand { get; }
 
     /// <summary>
+    ///     获取完全展开一个 hunk 行的命令;命令参数为
+    ///     <see cref="DiffSplitHunkRow" /> 或 <see cref="DiffUnifiedHunkRow" />。<br />
     ///     Gets the command that fully expands a hunk row; the command parameter is the
     ///     <see cref="DiffSplitHunkRow" /> or <see cref="DiffUnifiedHunkRow" />.
     /// </summary>
     public ICommand ExpandHunkAllCommand { get; }
 
     /// <summary>
+    ///     获取复制当前选区纯文本的命令(<see cref="CopySelectionAsync" />)。本机移植新增——
+    ///     上游库没有复制功能。没有选区、或所有被选行都隐藏在折叠的 hunk 之内时 CanExecute 为
+    ///     false;不内置键盘快捷键(宿主自行绑定,以免与宿主的快捷键冲突)。<br />
     ///     Gets the command that copies the current selection's plain text
     ///     (<see cref="CopySelectionAsync" />). Native port addition — the upstream library has no
     ///     copy feature. CanExecute is false without a selection or when every selected line is
@@ -219,24 +256,32 @@ public sealed class DiffView : TemplatedControl
     public ICommand CopySelectionCommand { get; }
 
     /// <summary>
+    ///     获取复制整个旧侧文件内容的命令(<see cref="CopyOldFileAsync" />);与任何选区无关。
+    ///     本机移植新增。<br />
     ///     Gets the command that copies the whole old-side file content
     ///     (<see cref="CopyOldFileAsync" />); independent of any selection. Native port addition.
     /// </summary>
     public ICommand CopyOldFileCommand { get; }
 
     /// <summary>
+    ///     获取复制整个新侧文件内容的命令(<see cref="CopyNewFileAsync" />);与任何选区无关。
+    ///     本机移植新增。<br />
     ///     Gets the command that copies the whole new-side file content
     ///     (<see cref="CopyNewFileAsync" />); independent of any selection. Native port addition.
     /// </summary>
     public ICommand CopyNewFileCommand { get; }
 
     /// <summary>
+    ///     在选区拖拽移动过程中以及选区被清空时发生——对应上游管理器的 onSelectionChange。
+    ///     清空时区间为 <c>null</c>。<br />
     ///     Occurs while a selection drag moves and when the selection is cleared — the upstream
     ///     manager's onSelectionChange. The range is <c>null</c> on clear.
     /// </summary>
     public event EventHandler<DiffSelectionChangedEventArgs>? SelectionChanged;
 
     /// <summary>
+    ///     在选区拖拽释放时发生——对应上游管理器的 onSelectionComplete,经 React 包装器的
+    ///     onMultiSelectComplete 呈现。释放时没有区间则结果为 <c>null</c>。<br />
     ///     Occurs when a selection drag is released — the upstream manager's onSelectionComplete
     ///     surfaced through the React wrapper's onMultiSelectComplete. The result is <c>null</c>
     ///     when the release happened without a range.
@@ -244,6 +289,9 @@ public sealed class DiffView : TemplatedControl
     public event EventHandler<DiffSelectionCompletedEventArgs>? SelectionCompleted;
 
     /// <summary>
+    ///     获取当前选区结果(规范化区间加行数据)——拖拽过程中反映实时区间;释放之后持续
+    ///     返回已完成的区间,直到下一次交互将其清除(上游管理器语义)。没有区间时返回
+    ///     <c>null</c>。<br />
     ///     Gets the current selection result (normalized range plus line data) — during a drag it
     ///     reflects the live range; after a release it keeps returning the completed range until the
     ///     next interaction clears it (upstream manager semantics). Returns <c>null</c> without a range.
@@ -253,13 +301,16 @@ public sealed class DiffView : TemplatedControl
         return _selection.GetSelectionResult(DiffFile, ViewMode == DiffViewMode.Unified);
     }
 
-    /// <summary>Gets the current selection state (upstream manager getState).</summary>
+    /// <summary>获取当前选区状态(上游管理器的 getState)。<br />Gets the current selection state (upstream manager getState).</summary>
     public MultiSelectState GetSelectionState()
     {
         return _selection.GetState();
     }
 
     /// <summary>
+    ///     清除选区:交互状态与持久化的完成态高亮一并清除。与上游的差异:JS 管理器的
+    ///     clearSelection 会保留 #preselectedLines(本移植同样用它持久化已完成的选区,即
+    ///     评论锚定通道),若清除时保留它,高亮将永远不会消失——因此这里两个通道都清除。<br />
     ///     Clears the selection: the interactive state and the persisted completion highlight.
     ///     Upstream difference: the JS manager's clearSelection keeps #preselectedLines (the
     ///     comment-anchored channel this port also uses to persist completed selections), so a clear
@@ -273,6 +324,9 @@ public sealed class DiffView : TemplatedControl
     }
 
     /// <summary>
+    ///     设置预选行(例如来自既有批注)。每侧的行列表会合并成一个覆盖 min/max 的大区间——
+    ///     上游已知语义(visual.ts changePreselectedLinesToLineRange):离散的列表会高亮其
+    ///     最小值与最大值之间的所有行。<br />
     ///     Sets preselected lines (e.g. from existing annotations). Each side's list merges into one
     ///     big min/max range — the upstream-known semantics (visual.ts changePreselectedLinesToLineRange):
     ///     a scattered list highlights everything between its min and max.
@@ -286,6 +340,9 @@ public sealed class DiffView : TemplatedControl
     // ---- copy (native port feature — the upstream library has no copy counterpart) ----
 
     /// <summary>
+    ///     将当前选区以纯文本复制到剪贴板:每个被选行对应一行输出,隐藏行跳过、行尾换行符
+    ///     去除(<see cref="MultiSelectData.GetSelectedTextFromResult" />——复制内容与视图所示
+    ///     一致)。没有可见选区(或没有剪贴板,即未附加到 TopLevel)时静默返回 <c>false</c>。<br />
     ///     Copies the current selection as plain text to the clipboard: one output line per selected
     ///     line, hidden lines skipped and trailing newlines trimmed
     ///     (<see cref="MultiSelectData.GetSelectedTextFromResult" /> — the copy matches what the view
@@ -302,6 +359,8 @@ public sealed class DiffView : TemplatedControl
     }
 
     /// <summary>
+    ///     将整个旧侧文件内容(<c>DiffFile.OldFileRaw</c>)复制到剪贴板,末尾换行符原样保留。
+    ///     模型没有旧侧内容时返回 <c>false</c>,且不触碰剪贴板。<br />
     ///     Copies the whole old-side file content (<c>DiffFile.OldFileRaw</c>) to the
     ///     clipboard, its trailing newline kept as-is. Returns <c>false</c> — without touching the
     ///     clipboard — when the model has no old-side content.
@@ -312,6 +371,8 @@ public sealed class DiffView : TemplatedControl
     }
 
     /// <summary>
+    ///     将整个新侧文件内容(<c>DiffFile.NewFileRaw</c>)复制到剪贴板,末尾换行符原样保留。
+    ///     模型没有新侧内容时返回 <c>false</c>,且不触碰剪贴板。<br />
     ///     Copies the whole new-side file content (<c>DiffFile.NewFileRaw</c>) to the
     ///     clipboard, its trailing newline kept as-is. Returns <c>false</c> — without touching the
     ///     clipboard — when the model has no new-side content.

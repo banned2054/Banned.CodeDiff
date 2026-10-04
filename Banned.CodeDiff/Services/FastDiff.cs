@@ -26,17 +26,27 @@
 namespace Banned.CodeDiff.Services;
 
 /// <summary>
+///     fast-diff 的操作码。JS 使用原始数字 -1/1/0；显式赋值以保持这些取值（golden JSON 会把它们导出为整数）。<br />
 ///     fast-diff's op codes. JS uses the raw numbers -1/1/0; the explicit assignments
 ///     keep the wire values (golden JSON dumps them as ints).
 /// </summary>
 public enum DiffOp
 {
+    /// <summary>删除：文本仅在旧文本（text1）中。<br />Delete: text only in the old text (text1).</summary>
     Delete = -1,
+
+    /// <summary>插入：文本仅在新文本（text2）中。<br />Insert: text only in the new text (text2).</summary>
     Insert = 1,
-    Equal  = 0
+
+    /// <summary>相同：两段文本共有。<br />Equal: text common to both texts.</summary>
+    Equal = 0
 }
 
 /// <summary>
+///     表示一个 diff 的数据结构是元组列表：
+///     [[DELETE, 'Hello'], [INSERT, 'Goodbye'], [EQUAL, ' world.']]
+///     含义为：删除 'Hello'、新增 'Goodbye'、保留 ' world.'。
+///     刻意设计为可变——各清理阶段会原地改写元组，与 JS 数组行为一致。<br />
 ///     The data structure representing a diff is a list of tuples:
 ///     [[DELETE, 'Hello'], [INSERT, 'Goodbye'], [EQUAL, ' world.']]
 ///     which means: delete 'Hello', add 'Goodbye' and keep ' world.'.
@@ -44,42 +54,69 @@ public enum DiffOp
 /// </summary>
 public sealed class DiffTuple(DiffOp op, string text)
 {
+    /// <summary>本元组的操作码。<br />The op code of this tuple.</summary>
     public DiffOp Op { get; set; } = op;
 
+    /// <summary>本元组携带的文本。<br />The text carried by this tuple.</summary>
     public string Text { get; set; } = text;
 
+    /// <summary>解构为 (Op, Text)。<br />Deconstructs into (Op, Text).</summary>
+    /// <param name="op">操作码。The op code.</param>
+    /// <param name="text">文本。The text.</param>
     public void Deconstruct(out DiffOp op, out string text)
     {
         op   = Op;
         text = Text;
     }
 
+    /// <summary>返回形如 [op, "text"] 的调试字符串。<br />Returns a debug string of the form [op, "text"].</summary>
     public override string ToString()
     {
         return $"[{(int)Op}, \"{Text}\"]";
     }
 }
 
-/// <summary>JS: the {oldRange, newRange} cursor_pos object form.</summary>
+/// <summary>
+///     JS cursor_pos 的 {oldRange, newRange} 对象中单个范围的形式（起始索引 + 长度）。<br />JS: the {oldRange, newRange} cursor_pos
+///     object form.
+/// </summary>
+/// <param name="Index">范围起始索引。Start index of the range.</param>
+/// <param name="Length">范围长度。Length of the range.</param>
 public sealed record CursorRange(int Index, int Length);
 
+/// <summary>
+///     JS cursor_pos 的 {oldRange, newRange} 对象形式，用于把 diff 定位到一次光标编辑；
+///     oldRange 必填，newRange 可省略。<br />
+///     The {oldRange, newRange} form of the JS cursor_pos object, used to locate the
+///     diff at a cursor edit; oldRange is required, newRange is optional.
+/// </summary>
 public sealed class CursorInfo
 {
+    /// <summary>旧文本（text1）中的选区范围。<br />The selection range within text1 (old text).</summary>
     public CursorRange? OldRange { get; set; }
 
+    /// <summary>新文本（text2）中的选区范围；可省略。<br />The selection range within text2 (new text); optional.</summary>
     public CursorRange? NewRange { get; set; }
 }
 
+/// <summary>
+///     npm 包 fast-diff@1.3.0 的移植（单文件 diff.js）：基于 Neil Fraser 的
+///     diff-match-patch，移除了 patch/match 功能与部分高级选项。<br />
+///     Port of the npm package fast-diff@1.3.0 (diff.js, single file), based on
+///     Neil Fraser's diff-match-patch with the patch and match functionality and
+///     certain advanced options removed.
+/// </summary>
 public static class FastDiff
 {
     /// <summary>
+    ///     找出两段文本之间的差异；先剥离公共前缀与公共后缀，再对中间部分做 diff 以简化问题。<br />
     ///     Find the differences between two texts. Simplifies the problem by stripping any
     ///     common prefix or suffix off the texts before diffing.
     /// </summary>
-    /// <param name="text1">Old string to be diffed.</param>
-    /// <param name="text2">New string to be diffed.</param>
-    /// <param name="cursorPos">Edit position in text1 (JS number form).</param>
-    /// <param name="cleanup">Apply semantic cleanup before returning.</param>
+    /// <param name="text1">旧文本。Old string to be diffed.</param>
+    /// <param name="text2">新文本。New string to be diffed.</param>
+    /// <param name="cursorPos">text1 中的编辑位置（JS number 形式）。Edit position in text1 (JS number form).</param>
+    /// <param name="cleanup">返回前是否执行语义清理。Apply semantic cleanup before returning.</param>
     public static List<DiffTuple> Diff(string text1, string text2, int? cursorPos = null, bool cleanup = false)
     {
         var cursor = cursorPos.HasValue
@@ -88,7 +125,14 @@ public static class FastDiff
         return DiffMain(text1, text2, cursor, cleanup, true, 0);
     }
 
-    /// <summary>JS: diff(text1, text2, {oldRange, newRange}, cleanup).</summary>
+    /// <summary>
+    ///     对应 JS 的 diff(text1, text2, {oldRange, newRange}, cleanup)：以旧/新选区定位光标编辑。<br />JS: diff(text1, text2, {oldRange,
+    ///     newRange}, cleanup).
+    /// </summary>
+    /// <param name="text1">旧文本。Old string to be diffed.</param>
+    /// <param name="text2">新文本。New string to be diffed.</param>
+    /// <param name="cursor">光标选区信息，用于加速定位本次编辑。Cursor selection info used to localize the edit.</param>
+    /// <param name="cleanup">返回前是否执行语义清理。Apply semantic cleanup before returning.</param>
     public static List<DiffTuple> Diff(string text1, string text2, CursorInfo cursor, bool cleanup = false)
     {
         return DiffMain(text1, text2, cursor, cleanup, true, 0);
@@ -670,24 +714,30 @@ public static class FastDiff
     }
 
     // JS: whitespaceRegex_ = /\s/ — the exact ECMAScript \s character set.
-    private static bool IsJsWhitespace(char c) => c is '\t'
-                                                    or '\n'
-                                                    or '\v'
-                                                    or '\f'
-                                                    or '\r'
-                                                    or ' '
-                                                    or '\u00a0'
-                                                    or '\u1680'
-                                                    or >= '\u2000' and <= '\u200a'
-                                                    or '\u2028'
-                                                    or '\u2029'
-                                                    or '\u202f'
-                                                    or '\u205f'
-                                                    or '\u3000'
-                                                    or '\ufeff';
+    private static bool IsJsWhitespace(char c)
+    {
+        return c is '\t'
+                 or '\n'
+                 or '\v'
+                 or '\f'
+                 or '\r'
+                 or ' '
+                 or '\u00a0'
+                 or '\u1680'
+                 or >= '\u2000' and <= '\u200a'
+                 or '\u2028'
+                 or '\u2029'
+                 or '\u202f'
+                 or '\u205f'
+                 or '\u3000'
+                 or '\ufeff';
+    }
 
     // JS: linebreakRegex_ = /[\r\n]/
-    private static bool IsLineBreak(char c) => c is '\r' or '\n';
+    private static bool IsLineBreak(char c)
+    {
+        return c is '\r' or '\n';
+    }
 
     // JS: blanklineEndRegex_ = /\n\r?\n$/ ($ matches at the very end in JS).
     private static bool MatchesBlankLineEnd(SegmentView s)
@@ -1108,13 +1158,30 @@ public static class FastDiff
         }
     }
 
-    private static bool IsSurrogatePairStart(char c)   => c          >= 0xd800 && c <= 0xdbff;
-    private static bool IsSurrogatePairEnd(char   c)   => c          >= 0xdc00 && c <= 0xdfff;
-    private static bool StartsWithPairEnd(string  str) => str.Length > 0       && IsSurrogatePairEnd(str[0]);
-    private static bool EndsWithPairStart(string  str) => str.Length > 0       && IsSurrogatePairStart(str[^1]);
+    private static bool IsSurrogatePairStart(char c)
+    {
+        return c >= 0xd800 && c <= 0xdbff;
+    }
 
-    private static List<DiffTuple> RemoveEmptyTuples(IEnumerable<DiffTuple> tuples) =>
-        tuples.Where(t => t.Text.Length > 0).ToList();
+    private static bool IsSurrogatePairEnd(char c)
+    {
+        return c >= 0xdc00 && c <= 0xdfff;
+    }
+
+    private static bool StartsWithPairEnd(string str)
+    {
+        return str.Length > 0 && IsSurrogatePairEnd(str[0]);
+    }
+
+    private static bool EndsWithPairStart(string str)
+    {
+        return str.Length > 0 && IsSurrogatePairStart(str[^1]);
+    }
+
+    private static List<DiffTuple> RemoveEmptyTuples(IEnumerable<DiffTuple> tuples)
+    {
+        return tuples.Where(t => t.Text.Length > 0).ToList();
+    }
 
     private static List<DiffTuple>? MakeEditSplice(string before, string oldMiddle, string newMiddle, string after)
     {

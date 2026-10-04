@@ -6,6 +6,11 @@ using TextMateSharp.Grammars;
 namespace Banned.CodeDiff.Services.TextMate;
 
 /// <summary>
+///     C# 移植版的内置语法高亮引擎(JS 对应物:核心库默认面向的 lowlight 单例高亮器;
+///     此处基于 TextMateSharp/oniguruma,并内嵌与上游 shiki 引擎相同的语法包与
+///     github-light/dark 主题)。与 shiki 一样是 "class" 型引擎:一次分词产出的包装节点
+///     其样式同时携带明暗两套主题颜色(以 CSS 变量
+///     "--diff-view-light:#...;--diff-view-dark:#..." 形式),因此切换主题永不重新分词。<br />
 ///     The C# port's built-in syntax engine (JS counterpart: the lowlight singleton
 ///     core programs against by default; here TextMateSharp/oniguruma with the same
 ///     bundled grammars and github-light/dark themes as the upstream shiki engine).
@@ -14,8 +19,16 @@ namespace Banned.CodeDiff.Services.TextMate;
 ///     ("--diff-view-light:#...;--diff-view-dark:#..."), so theme switches never
 ///     re-tokenize.
 /// </summary>
+/// <remarks>
+///     基于 TextMateSharp(oniguruma 原生库),目标平台需提供对应的原生运行时;
+///     分词经由进程级共享的 <c>Registry</c>(单一 oniguruma 状态,设计上即为全局)。<br />
+///     Built on TextMateSharp (the oniguruma native library) — the target platform must
+///     provide the matching native runtime; tokenization goes through a process-wide shared
+///     <c>Registry</c> (a single oniguruma state, global by design).
+/// </remarks>
 public sealed class TextMateHighlighter : IDiffHighlighter
 {
+    /// <summary>进程级共享的单例。<br />The process-wide shared singleton.</summary>
     public static readonly TextMateHighlighter Instance = new();
 
     /// <summary>
@@ -32,24 +45,67 @@ public sealed class TextMateHighlighter : IDiffHighlighter
     {
     }
 
+    /// <summary>引擎标识,固定为 "textmate"。<br />Engine id, always "textmate".</summary>
     public string Name => "textmate";
 
+    /// <summary>
+    ///     固定为 <see cref="HighlighterType.Class" />("class" 型引擎)。<br />Always <see cref="HighlighterType.Class" /> (a
+    ///     "class" engine).
+    /// </summary>
     public HighlighterType Type => HighlighterType.Class;
 
+    /// <summary>
+    ///     原始行数超过该值的文件跳过语法高亮,默认 2000。<br />Files longer than this many raw lines skip syntax highlighting; defaults to
+    ///     2000.
+    /// </summary>
     public int MaxLineToIgnoreSyntax { get; private set; } = 2000;
 
+    /// <summary>
+    ///     按文件名匹配的语法高亮忽略规则(JS:<c>(string | RegExp)[]</c>)。<br />Ignore patterns matched against the file name (JS:
+    ///     <c>(string | RegExp)[]</c>).
+    /// </summary>
     public IReadOnlyList<IgnorePattern> IgnoreSyntaxHighlightList => _ignoreSyntaxHighlightList;
 
+    /// <summary>
+    ///     语言 id/别名是否已注册(能解析到 TextMate scope)。<br />Whether the language id/alias is registered (resolves to a TextMate
+    ///     scope).
+    /// </summary>
+    /// <param name="lang">语言 id 或别名,如 "cs"。The language id or alias, e.g. "cs".</param>
     public bool HasRegisteredCurrentLang(string lang)
     {
         return TextMateResources.Instance.ResolveScope(lang) != null;
     }
 
+    /// <summary>
+    ///     把高亮产出的 AST 切分为逐行文本段,委托 <see cref="HighlightAst.ProcessAst" />。<br />Splits the highlighter-produced AST into
+    ///     per-line spans, delegating to <see cref="HighlightAst.ProcessAst" />.
+    /// </summary>
+    /// <param name="ast">高亮器产出的根节点。The root node produced by the highlighter.</param>
+    /// <returns>行号从 1 起始的逐行文本段集合与总行数。The per-line span records keyed from line 1, plus the total line count.</returns>
     public SyntaxAstResult ProcessAst(SyntaxNode ast)
     {
         return HighlightAst.ProcessAst(ast);
     }
 
+    /// <summary>
+    ///     把整个原始文件分词为 hast 风格语法树(root 节点,子节点为逐 token 的 element 包装,
+    ///     相邻且外观相同的 token 已合并);文件名命中忽略规则或语言未注册时返回 <c>null</c>。<br />
+    ///     Tokenizes the whole raw file into a hast-like syntax tree (a root node whose children
+    ///     are per-token element wrappers, adjacent tokens of equal appearance merged); returns
+    ///     <c>null</c> when the file name hits an ignore pattern or the language is not registered.
+    /// </summary>
+    /// <param name="raw">完整原始文件文本。The full raw file text.</param>
+    /// <param name="fileName">文件名,用于匹配忽略规则,可为 <c>null</c>。File name matched against the ignore patterns; may be <c>null</c>.</param>
+    /// <param name="lang">语言 id 或别名,如 "cs"。The language id or alias, e.g. "cs".</param>
+    /// <param name="theme">未使用——每个 token 的样式同时携带明暗两套主题颜色。Unused; each token's style carries both light and dark theme colors.</param>
+    /// <returns>root 语法节点;需跳过高亮时为 <c>null</c>。The root syntax node, or <c>null</c> when highlighting must be skipped.</returns>
+    /// <remarks>
+    ///     自第 1 行起对整个文件分词,规则状态跨行传递,与上游"高亮整个原始文件"契约一致;
+    ///     分词抛出的异常会向外传播(上游 JS 的 getAST 捕获引擎错误并返回 undefined)。<br />
+    ///     Tokenizes from line 1 with rule state carried across lines — the same "highlight the
+    ///     whole raw file" contract as upstream; tokenizer exceptions propagate to the caller
+    ///     (upstream JS getAST catches engine errors and returns undefined).
+    /// </remarks>
     public SyntaxNode? GetAst(string raw, string? fileName, string? lang, string? theme)
     {
         if (fileName != null && _ignoreSyntaxHighlightList.Any(item => item switch
@@ -77,6 +133,11 @@ public sealed class TextMateHighlighter : IDiffHighlighter
         // return null;
     }
 
+    /// <summary>
+    ///     设置跳过语法高亮的行数阈值,并清空源文件缓存使新阈值立即生效。<br />Sets the line-count threshold for skipping syntax highlighting and clears
+    ///     the source file cache so the new value takes effect at once.
+    /// </summary>
+    /// <param name="value">新的行数阈值。The new threshold.</param>
     public void SetMaxLineToIgnoreSyntax(int value)
     {
         MaxLineToIgnoreSyntax = value;
@@ -86,6 +147,11 @@ public sealed class TextMateHighlighter : IDiffHighlighter
         SourceFile.ClearFileCache();
     }
 
+    /// <summary>
+    ///     整体替换文件名忽略规则列表,并清空源文件缓存使其立即生效。<br />Replaces the file-name ignore pattern list and clears the source file cache
+    ///     so it takes effect at once.
+    /// </summary>
+    /// <param name="items">新的忽略规则集合。The new ignore patterns.</param>
     public void SetIgnoreSyntaxHighlightList(IReadOnlyList<IgnorePattern> items)
     {
         _ignoreSyntaxHighlightList.Clear();

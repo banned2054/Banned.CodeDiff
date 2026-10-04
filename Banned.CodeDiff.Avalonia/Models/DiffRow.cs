@@ -2,7 +2,10 @@ using Banned.CodeDiff.Models;
 
 namespace Banned.CodeDiff.Avalonia.Models;
 
-/// <summary>Base row type rendered by <see cref="Views.DiffView" /> in either view mode.</summary>
+/// <summary>
+///     <see cref="Views.DiffView" /> 在任一视图模式下渲染的行基类型。<br />
+///     Base row type rendered by <see cref="Views.DiffView" /> in either view mode.
+/// </summary>
 public abstract class DiffRow;
 
 /// <summary>

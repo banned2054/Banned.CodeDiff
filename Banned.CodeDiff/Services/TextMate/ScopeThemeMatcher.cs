@@ -28,6 +28,17 @@ internal sealed class ScopeThemeMatcher
         _defaultForeground = defaultForeground;
     }
 
+    /// <summary>
+    ///     从主题 JSON 构建 scope→前景色匹配器,走 vscode-textmate 的 parseTheme /
+    ///     resolveParsedThemeRules 流水线(规则排序、空 scope 规则提升为主题默认值、
+    ///     十六进制色统一大写);缺失 tokenColors 或无有效规则时返回不带规则的空匹配器。<br />
+    ///     Builds a scope-to-foreground matcher from theme JSON, running the vscode-textmate
+    ///     parseTheme / resolveParsedThemeRules pipeline (rule sorting, empty-scope rules
+    ///     lifted into the theme defaults, upper-cased hex colors); returns a rule-less empty
+    ///     matcher when tokenColors is missing or no valid rule exists.
+    /// </summary>
+    /// <param name="themeJson">主题 JSON 文本(UTF-8)。The theme JSON document (UTF-8).</param>
+    /// <returns>解析完成的匹配器。The parsed matcher.</returns>
     public static ScopeThemeMatcher FromThemeJson(byte[] themeJson)
     {
         using var doc = JsonDocument.Parse(themeJson);
@@ -53,7 +64,6 @@ internal sealed class ScopeThemeMatcher
             List<string> selectors;
 
             if (entry.TryGetProperty("scope", out var scopeElement))
-            {
                 switch (scopeElement.ValueKind)
                 {
                     case JsonValueKind.String :
@@ -70,11 +80,8 @@ internal sealed class ScopeThemeMatcher
                         selectors = [""];
                         break;
                 }
-            }
             else
-            {
                 selectors = [""];
-            }
 
             string? foreground = null;
 
@@ -153,6 +160,10 @@ internal sealed class ScopeThemeMatcher
     }
 
     /// <summary>
+    ///     按 vscode-textmate 编码元数据的方式解析 token 作用域栈的前景色:作用域从最内层
+    ///     向外逐层匹配,命中主题规则的最深层生效——未命中的层继承外层作用域的颜色
+    ///     (例如 JSON key 的引号标点会因此渲染成 key 的颜色)。全部未命中时回退到主题默认
+    ///     前景色(shiki 的 colorMap[0])。<br />
     ///     Resolves the foreground color for a token scope stack the way
     ///     vscode-textmate's encoded metadata does: scopes are matched
     ///     innermost-first and the deepest layer with a theme hit wins — a layer
@@ -160,6 +171,11 @@ internal sealed class ScopeThemeMatcher
     ///     JSON key's quote punctuation renders in the key color). Falls back to
     ///     the theme default foreground (shiki's colorMap[0]).
     /// </summary>
+    /// <param name="scopeStack">从最内到最外排列的作用域栈。The scope stack, ordered innermost first.</param>
+    /// <returns>
+    ///     大写十六进制前景色;无命中时为主题默认前景色,可能为 <c>null</c>。<br />The upper-cased hex foreground color, or the theme default when
+    ///     nothing matches; may be <c>null</c>.
+    /// </returns>
     public string? MatchForeground(IList<string> scopeStack)
     {
         for (var i = scopeStack.Count - 1; i >= 0; i--)
@@ -243,10 +259,7 @@ internal sealed class ScopeThemeMatcher
 
         if (b == null) return 1;
 
-        if (a.Length == b.Length)
-        {
-            return a.Select((t, i) => StrCmp(t, b[i])).FirstOrDefault(r => r != 0);
-        }
+        if (a.Length == b.Length) return a.Select((t, i) => StrCmp(t, b[i])).FirstOrDefault(r => r != 0);
 
         return a.Length < b.Length ? -1 : 1;
     }

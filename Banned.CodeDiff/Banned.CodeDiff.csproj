@@ -4,6 +4,16 @@
 		<TargetFramework>net10.0</TargetFramework>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
+		<GenerateDocumentationFile>true</GenerateDocumentationFile>
+		<IsAotCompatible>true</IsAotCompatible>
+		<PackageId>Banned.CodeDiff</PackageId>
+		<Version>0.1.0</Version>
+		<Title>Banned.CodeDiff</Title>
+		<Authors>banned</Authors>
+		<Description>Core Git diff parsing, models, transformations, and syntax highlighting.</Description>
+		<PackageTags>diff;git;parser;syntax-highlighting</PackageTags>
+		<RepositoryUrl>https://github.com/banned2054/Banned.CodeDiff</RepositoryUrl>
+		<PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
 	</PropertyGroup>
 	<ItemGroup>
 		<PackageReference Include="TextMateSharp" Version="2.0.4" />
@@ -17,6 +27,10 @@
 	<ItemGroup>
 		<EmbeddedResource Include="Resources/TextMate/grammars/*.json" />
 		<EmbeddedResource Include="Resources/TextMate/themes/*.json" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<None Include="..\NOTICE" Pack="true" PackagePath="\" />
 	</ItemGroup>
 
 </Project>

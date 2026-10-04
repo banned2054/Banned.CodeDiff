@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+### 文档 — 公开 API 中英双语 XML 注释(NuGet 发布准备)
+
+- 两个库(`Banned.CodeDiff`、`Banned.CodeDiff.Avalonia`)的全部公开可见成员
+  (类型、属性、方法、事件、枚举成员、`StyledProperty`/`DirectProperty` 字段)
+  的 XML 注释统一转换为「中文 + `<br/>` + 英文」双语格式,并补齐缺失成员
+  (含 `<summary>`/`<param>`/`<returns>`/`<remarks>`);全局状态、JS 行为锚点、
+  可空语义等注意点同步写入注释。共 42 个源文件 +1075/−203 行,全部为注释行,
+  零代码改动(624 + 68 测试全绿)。
+- 核心库 csproj 启用 `GenerateDocumentationFile`(此前仅 Avalonia 库启用),
+  编译器 CS1591 强制保证公开 API 注释零缺口;并补设 `IsAotCompatible` 与
+  Avalonia 库对齐(两库 AOT 分析器均 0 警告);全解决方案构建 0 警告 0 错误。
+- internal/private 成员注释按约定保持原样,不进入包文档。
+
 ### 修复 — fast-diff 负 cursor 后缀切片对齐 JS slice 钳制
 
 - `FastDiff.FindCursorEditDiff` 的 editAfter 分支:`cursor < 0` 时两个 before 串同为

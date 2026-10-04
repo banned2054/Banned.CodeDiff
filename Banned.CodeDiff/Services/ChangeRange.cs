@@ -3,18 +3,23 @@ using Banned.CodeDiff.Utils;
 
 namespace Banned.CodeDiff.Services;
 
-/// <summary>Port of packages/core/src/parse/change-range.ts.</summary>
+/// <summary>packages/core/src/parse/change-range.ts 的移植。<br />Port of packages/core/src/parse/change-range.ts.</summary>
 public static class ChangeRange
 {
-    /// <summary>JS: getMaxLengthToIgnoreLineDiff.</summary>
+    /// <summary>忽略行内 diff 的最大行长上限，超过该长度的行不做行内比较（对应 JS 的 getMaxLengthToIgnoreLineDiff）。<br />JS: getMaxLengthToIgnoreLineDiff.</summary>
     public static int MaxLengthToIgnoreLineDiff { get; private set; } = 1000;
 
-    /// <summary>Change the maximum length of a line to ignore line diff.</summary>
+    /// <summary>更改忽略行内 diff 的最大行长。<br />Change the maximum length of a line to ignore line diff.</summary>
+    /// <param name="length">新的最大行长。New maximum line length.</param>
     public static void ChangeMaxLengthToIgnoreLineDiff(int length)
     {
         MaxLengthToIgnoreLineDiff = length;
     }
 
+    /// <summary>
+    ///     将忽略行内 diff 的最大行长重置为默认值 1000。<br />Resets the maximum line length for ignoring line diff back to the default
+    ///     value of 1000.
+    /// </summary>
     public static void ResetMaxLengthToIgnoreLineDiff()
     {
         MaxLengthToIgnoreLineDiff = 1000;
@@ -118,7 +123,10 @@ public static class ChangeRange
     }
 
     // TODO maybe could use the original content line.  fixed
-    /// <summary>Get the changed ranges in the strings, relative to each other.</summary>
+    /// <summary>获取两个字符串相互之间的变更范围。<br />Get the changed ranges in the strings, relative to each other.</summary>
+    /// <param name="addition">新增行。The added line.</param>
+    /// <param name="deletion">删除行。The deleted line.</param>
+    /// <returns>新增侧与删除侧的变更范围。The change ranges for the addition side and the deletion side.</returns>
     public static (LineRange AddRange, LineRange DelRange) RelativeChanges(DiffLine addition, DiffLine deletion)
     {
         var stringA = addition.Text;
@@ -199,6 +207,13 @@ public static class ChangeRange
         );
     }
 
+    /// <summary>
+    ///     基于 fast-diff 计算一对（新增行，删除行）的行内 diff 文本段，返回两侧各自的范围。<br />Computes the in-line diff segments for an (addition,
+    ///     deletion) pair with fast-diff and returns the ranges for both sides.
+    /// </summary>
+    /// <param name="addition">新增行。The added line.</param>
+    /// <param name="deletion">删除行。The deleted line.</param>
+    /// <returns>新增侧与删除侧的 diff 文本段范围。The diff segment ranges for the addition side and the deletion side.</returns>
     public static (DiffRange AddRange, DiffRange DelRange) DiffChanges(DiffLine addition, DiffLine deletion)
     {
         var (addSymbol, addString, delSymbol, delString) = CheckNewLineSymbolChange(addition, deletion);

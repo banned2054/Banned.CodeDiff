@@ -3,7 +3,7 @@ using System.Text.RegularExpressions;
 
 namespace Banned.CodeDiff.Services;
 
-/// <summary>Port of packages/core/src/parse/diff-parse.ts.</summary>
+// Port of packages/core/src/parse/diff-parse.ts.
 //
 // !NOTE: ALL of the diff parse logic copy from desktop, SEE https://github.com/desktop/desktop
 // With mirror change
@@ -19,23 +19,42 @@ namespace Banned.CodeDiff.Services;
 //
 // In many versions of GNU diff, each range can omit the comma and trailing value s,
 // in which case s defaults to 1
+/// <summary>
+///     diff 解析所需的行前缀常量与正则表达式（来自 packages/core/src/parse/diff-parse.ts）。<br />Line prefix constants and regexes used
+///     by the diff parser (from packages/core/src/parse/diff-parse.ts).
+/// </summary>
 public static class DiffParserConstants
 {
-    public const string DiffPrefixAdd     = "+";
-    public const string DiffPrefixDelete  = "-";
+    /// <summary>新增行前缀："+"。<br />Prefix for added lines: "+".</summary>
+    public const string DiffPrefixAdd = "+";
+
+    /// <summary>删除行前缀："-"。<br />Prefix for deleted lines: "-".</summary>
+    public const string DiffPrefixDelete = "-";
+
+    /// <summary>上下文行前缀（单个空格）。<br />Prefix for context lines: a single space.</summary>
     public const string DiffPrefixContext = " ";
 
+    /// <summary>"no newline at end of file" 标记行的前缀 "\"。<br />Prefix for "no newline at end of file" marker lines: "\".</summary>
     public const string DiffPrefixNoNewline = "\\";
 
+    /// <summary>
+    ///     仅由换行符组成的行的前缀 "\n"，部分行只有换行符而没有其他字符（见 git-diff-view#41）。<br />Prefix for lines that only contain a newline
+    ///     character without any other content (see git-diff-view#41).
+    /// </summary>
     // https://github.com/MrWangJustToDo/git-diff-view/issues/41
     // some line only have a new line symbol without any other character
     public const string DiffPrefixNewLine = "\n";
 
+    /// <summary>
+    ///     匹配 hunk 头部 "@@ -l,s +l,s @@" 的正则表达式，行数 s 可省略（省略时默认为 1）。<br />Regex matching hunk headers "@@ -l,s +l,s @@",
+    ///     where the count s may be omitted (defaulting to 1).
+    /// </summary>
     // in which case s defaults to 1
     public static readonly Regex DiffHeaderRegex =
         new(@"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@", RegexOptions.Compiled);
 
     /// <summary>
+    ///     匹配不可见的双向 Unicode 字符的正则表达式，此类字符可能被错误解读或与外观表现不一致。更多信息：<br />
     ///     Regular expression matching invisible bidirectional Unicode characters that may
     ///     be interpreted or compiled differently than what it appears. More info:
     ///     https://github.co/hiddenchars
@@ -44,9 +63,16 @@ public static class DiffParserConstants
 }
 
 /// <summary>
+///     GNU unified diff 格式的解析器。<br />
 ///     A parser for the GNU unified diff format.
 ///     See https://www.gnu.org/software/diffutils/manual/html_node/Detailed-Unified.html
 /// </summary>
+/// <remarks>
+///     解析器实例内部持有解析状态；<see cref="Shared" /> 共享实例与 <see cref="TemplateOptions" />
+///     一样是全局有状态的，禁止并发使用。<br />
+///     A parser instance holds internal parsing state; the shared <see cref="Shared" /> instance,
+///     like <see cref="TemplateOptions" />, is globally stateful and must not be used concurrently.
+/// </remarks>
 public sealed class DiffParser
 {
     // JS: /\n\\ No newline at end of file/g
@@ -67,12 +93,18 @@ public sealed class DiffParser
     /// <summary>The text buffer containing the raw, unified diff output to be parsed</summary>
     private string _text = "";
 
+    /// <summary>构造解析器并将内部状态重置为初始值。<br />Creates a parser and resets its internal state.</summary>
     public DiffParser()
     {
         Reset();
     }
 
-    /// <summary>JS export: parseInstance (a shared parser instance).</summary>
+    /// <summary>共享解析器实例（对应 JS 导出的 parseInstance）。<br />JS export: parseInstance (a shared parser instance).</summary>
+    /// <remarks>
+    ///     该实例是全局有状态的，禁止并发使用；并发场景应为每个任务创建独立的 <see cref="DiffParser" />。<br />
+    ///     This instance is globally stateful and must not be used concurrently; create a dedicated
+    ///     <see cref="DiffParser" /> per task in concurrent scenarios.
+    /// </remarks>
     public static DiffParser Shared { get; } = new();
 
     /// <summary>Resets the internal parser state so that it can be reused.</summary>
@@ -265,6 +297,11 @@ public sealed class DiffParser
     ///     relative to the overall parsed diff. These numbers have no real meaning in the
     ///     context of a diff and are only used to aid the app in line-selections.
     /// </param>
+    /// <param name="hunkIndex">
+    ///     当前 hunk 的序号(即已解析 hunk 数)。<br />The index of the current hunk (the number of hunks parsed so
+    ///     far).
+    /// </param>
+    /// <param name="previousHunk">上一个已解析的 hunk,可能为 null。<br />The previously parsed hunk, if any.</param>
     private DiffHunk ParseHunk(int linesConsumed, int hunkIndex, DiffHunk? previousHunk)
     {
         var headerLine = ReadLine(true);
@@ -338,12 +375,18 @@ public sealed class DiffParser
     }
 
     /// <summary>
+    ///     将格式良好的 unified diff 解析为 hunk 与行。<br />
     ///     Parse a well-formed unified diff into hunks and lines.
     /// </summary>
     /// <param name="text">
+    ///     由 git diff、git log --patch 或其他任何产出 unified diff 的 git 底层命令生成的 diff 文本。<br />
     ///     A unified diff produced by git diff, git log --patch or any other git plumbing
     ///     command that produces unified diffs.
     /// </param>
+    /// <returns>
+    ///     解析结果，包含头部、hunk 列表与二进制/隐藏字符标记。<br />The parse result, containing the header, the hunk list and the
+    ///     binary/hidden-char flags.
+    /// </returns>
     public RawDiff Parse(string text)
     {
         _text = text;

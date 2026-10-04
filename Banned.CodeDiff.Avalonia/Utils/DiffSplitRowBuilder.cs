@@ -6,6 +6,10 @@ using Banned.CodeDiff.Services;
 namespace Banned.CodeDiff.Avalonia.Utils;
 
 /// <summary>
+///     从已构建的 <see cref="DiffFile" /> 分栏模型生成 <see cref="Views.DiffView" /> 渲染所需的
+///     扁平行列表。对应上游的渲染循环:对每个分栏行索引,折叠的 hunk 占位行(存在且仍在隐藏
+///     行时)先于内容行输出,隐藏行被跳过。合成的末尾 hunk 以 <c>SplitLineLength</c>(最后一行
+///     内容行之后的位置)为键,循环因此多跑一个索引,以渲染底部的展开条。<br />
 ///     Builds the flat row list rendered by <see cref="Views.DiffView" /> from a built
 ///     <see cref="DiffFile" /> split model. Mirrors the upstream render loop: for each split row index,
 ///     the collapsed hunk placeholder (when present and still hiding lines) is emitted above the
@@ -15,6 +19,13 @@ namespace Banned.CodeDiff.Avalonia.Utils;
 /// </summary>
 internal static class DiffSplitRowBuilder
 {
+    /// <summary>
+    ///     从 <paramref name="file" /> 的分栏模型构建扁平行列表。<br />
+    ///     Builds the flat row list from the split model of <paramref name="file" />.
+    /// </summary>
+    /// <param name="file">已构建分栏模型的 diff 文件。The diff file with its split model built.</param>
+    /// <param name="variant">当前主题变体,决定画刷集。The theme variant selecting the brush set.</param>
+    /// <returns>分栏行列表(含 hunk 占位行)。<br />The split rows (including hunk placeholder rows).</returns>
     public static IReadOnlyList<DiffRow> Build(DiffFile file, ThemeVariant variant)
     {
         var brushes = DiffBrushes.Get(variant);

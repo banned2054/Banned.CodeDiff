@@ -6,6 +6,10 @@ using Banned.CodeDiff.Services;
 namespace Banned.CodeDiff.Avalonia.Utils;
 
 /// <summary>
+///     从已构建的 <see cref="DiffFile" /> 统一模型为 <see cref="Views.DiffView" /> 的统一模式生成
+///     扁平行列表。与分栏构建器相同:对每个统一行索引,折叠的 hunk 占位行(存在且仍在隐藏行
+///     时)先于内容行输出,隐藏行被跳过。合成的末尾 hunk 以 <c>UnifiedLineLength</c>(最后一行
+///     内容行之后的位置)为键,循环因此多跑一个索引,以渲染底部的展开条。<br />
 ///     Builds the flat row list for <see cref="Views.DiffView" /> in unified mode from a built
 ///     <see cref="DiffFile" /> unified model. Mirrors the split builder: for each unified row index,
 ///     the collapsed hunk placeholder (when present and still hiding lines) is emitted above the
@@ -15,6 +19,13 @@ namespace Banned.CodeDiff.Avalonia.Utils;
 /// </summary>
 internal static class DiffUnifiedRowBuilder
 {
+    /// <summary>
+    ///     从 <paramref name="file" /> 的统一模型构建扁平行列表。<br />
+    ///     Builds the flat row list from the unified model of <paramref name="file" />.
+    /// </summary>
+    /// <param name="file">已构建统一模型的 diff 文件。The diff file with its unified model built.</param>
+    /// <param name="variant">当前主题变体,决定画刷集。The theme variant selecting the brush set.</param>
+    /// <returns>统一行列表(含 hunk 占位行)。<br />The unified rows (including hunk placeholder rows).</returns>
     public static IReadOnlyList<DiffRow> Build(DiffFile file, ThemeVariant variant)
     {
         var brushes = DiffBrushes.Get(variant);

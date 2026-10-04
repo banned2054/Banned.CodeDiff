@@ -8,6 +8,14 @@ using Banned.CodeDiff.Avalonia.Models;
 namespace Banned.CodeDiff.Avalonia.Views;
 
 /// <summary>
+///     渲染一行 diff:语法着色的文本段,加上绘制在变更区间背后的词级高亮矩形。Avalonia
+///     的文本 run 不提供逐 run 背景,因此高亮采用自绘:整行先用 <see cref="TextLayout" />
+///     排版一次,再用 <see cref="TextLayout.HitTestTextPosition" /> 把每个区间的边界解析为
+///     x/y 坐标。语法着色把每个 <see cref="DiffSyntaxRun" /> 画成一份独立的小布局,定位到
+///     整行布局为该 run 起点报告的坐标处(等宽的 diff 文本保证各文本段保持对齐)。
+///     <see cref="Wrap" /> 关闭时,布局是一行、按完整文本宽度度量(对应上游
+///     white-space: pre);开启时布局在度量宽度处自动换行(对应上游 diffViewWrap:
+///     pre-wrap),跨越换行处的区间或 run 会逐文本行绘制,如同浏览器的行内盒子跨行拆分。<br />
 ///     Renders one diff line: syntax-colored text segments plus word-level highlight
 ///     rectangles behind the changed ranges. Avalonia text runs expose no per-run
 ///     background, so the highlight is custom-drawn: the whole line is laid out once
@@ -26,35 +34,35 @@ public sealed class DiffSegmentText : Control
     /// <summary>Corner radius of the highlight rectangles, approximating the upstream 0.2em.</summary>
     private const float HighlightCornerRadius = 2f;
 
-    /// <summary>Identifies the <see cref="Text" /> dependency property.</summary>
+    /// <summary>标识 <see cref="Text" /> 依赖属性。<br />Identifies the <see cref="Text" /> dependency property.</summary>
     public static readonly StyledProperty<string?> TextProperty =
         AvaloniaProperty.Register<DiffSegmentText, string?>(nameof(Text));
 
-    /// <summary>Identifies the <see cref="Wrap" /> dependency property.</summary>
+    /// <summary>标识 <see cref="Wrap" /> 依赖属性。<br />Identifies the <see cref="Wrap" /> dependency property.</summary>
     public static readonly StyledProperty<bool> WrapProperty =
         AvaloniaProperty.Register<DiffSegmentText, bool>(nameof(Wrap));
 
-    /// <summary>Identifies the <see cref="Highlights" /> dependency property.</summary>
+    /// <summary>标识 <see cref="Highlights" /> 依赖属性。<br />Identifies the <see cref="Highlights" /> dependency property.</summary>
     public static readonly StyledProperty<IReadOnlyList<DiffHighlight>> HighlightsProperty =
         AvaloniaProperty.Register<DiffSegmentText, IReadOnlyList<DiffHighlight>>(nameof(Highlights));
 
-    /// <summary>Identifies the <see cref="SyntaxRuns" /> dependency property.</summary>
+    /// <summary>标识 <see cref="SyntaxRuns" /> 依赖属性。<br />Identifies the <see cref="SyntaxRuns" /> dependency property.</summary>
     public static readonly StyledProperty<IReadOnlyList<DiffSyntaxRun>?> SyntaxRunsProperty =
         AvaloniaProperty.Register<DiffSegmentText, IReadOnlyList<DiffSyntaxRun>?>(nameof(SyntaxRuns));
 
-    /// <summary>Identifies the <see cref="HighlightBrush" /> dependency property.</summary>
+    /// <summary>标识 <see cref="HighlightBrush" /> 依赖属性。<br />Identifies the <see cref="HighlightBrush" /> dependency property.</summary>
     public static readonly StyledProperty<IBrush?> HighlightBrushProperty =
         AvaloniaProperty.Register<DiffSegmentText, IBrush?>(nameof(HighlightBrush));
 
-    /// <summary>Identifies the <see cref="FontFamily" /> dependency property.</summary>
+    /// <summary>标识 <see cref="FontFamily" /> 依赖属性。<br />Identifies the <see cref="FontFamily" /> dependency property.</summary>
     public static readonly StyledProperty<FontFamily> FontFamilyProperty =
         TextElement.FontFamilyProperty.AddOwner<DiffSegmentText>();
 
-    /// <summary>Identifies the <see cref="FontSize" /> dependency property.</summary>
+    /// <summary>标识 <see cref="FontSize" /> 依赖属性。<br />Identifies the <see cref="FontSize" /> dependency property.</summary>
     public static readonly StyledProperty<double> FontSizeProperty =
         TextElement.FontSizeProperty.AddOwner<DiffSegmentText>();
 
-    /// <summary>Identifies the <see cref="Foreground" /> dependency property.</summary>
+    /// <summary>标识 <see cref="Foreground" /> 依赖属性。<br />Identifies the <see cref="Foreground" /> dependency property.</summary>
     public static readonly StyledProperty<IBrush?> ForegroundProperty =
         TextElement.ForegroundProperty.AddOwner<DiffSegmentText>();
 
@@ -70,7 +78,7 @@ public sealed class DiffSegmentText : Control
                                        ForegroundProperty);
     }
 
-    /// <summary>Gets or sets the line text to render.</summary>
+    /// <summary>获取或设置要渲染的行文本。<br />Gets or sets the line text to render.</summary>
     public string? Text
     {
         get => GetValue(TextProperty);
@@ -78,6 +86,9 @@ public sealed class DiffSegmentText : Control
     }
 
     /// <summary>
+    ///     获取或设置一个值,指示文本是否在度量宽度处自动换行、控件高度随多个文本行增长
+    ///     (对应上游 diffViewWrap),而不是渲染一行完整宽度的文本。放不下的单词会在行边缘
+    ///     断开。<br />
     ///     Gets or sets a value indicating whether the text wraps at the measured width,
     ///     growing the control height over several text lines (upstream diffViewWrap), instead of
     ///     rendering one full-width line. Words break at line edges when they do not fit.
@@ -88,7 +99,10 @@ public sealed class DiffSegmentText : Control
         set => SetValue(WrapProperty, value);
     }
 
-    /// <summary>Gets or sets the word-level highlight ranges within <see cref="Text" />.</summary>
+    /// <summary>
+    ///     获取或设置 <see cref="Text" /> 内的词级高亮区间。<br />Gets or sets the word-level highlight ranges within
+    ///     <see cref="Text" />.
+    /// </summary>
     public IReadOnlyList<DiffHighlight> Highlights
     {
         get => GetValue(HighlightsProperty);
@@ -96,6 +110,8 @@ public sealed class DiffSegmentText : Control
     }
 
     /// <summary>
+    ///     获取或设置 <see cref="Text" /> 内的语法着色文本段;<c>null</c> 时整行以
+    ///     <see cref="Foreground" /> 渲染。<br />
     ///     Gets or sets the syntax-colored segments within <see cref="Text" />;
     ///     <c>null</c> renders the whole line with <see cref="Foreground" />.
     /// </summary>
@@ -105,28 +121,28 @@ public sealed class DiffSegmentText : Control
         set => SetValue(SyntaxRunsProperty, value);
     }
 
-    /// <summary>Gets or sets the brush used to paint the highlight rectangles.</summary>
+    /// <summary>获取或设置用于绘制高亮矩形的画刷。<br />Gets or sets the brush used to paint the highlight rectangles.</summary>
     public IBrush? HighlightBrush
     {
         get => GetValue(HighlightBrushProperty);
         set => SetValue(HighlightBrushProperty, value);
     }
 
-    /// <summary>Gets or sets the font family used to render the text.</summary>
+    /// <summary>获取或设置渲染文本所用的字体系列。<br />Gets or sets the font family used to render the text.</summary>
     public FontFamily FontFamily
     {
         get => GetValue(FontFamilyProperty);
         set => SetValue(FontFamilyProperty, value);
     }
 
-    /// <summary>Gets or sets the font size used to render the text.</summary>
+    /// <summary>获取或设置渲染文本所用的字号。<br />Gets or sets the font size used to render the text.</summary>
     public double FontSize
     {
         get => GetValue(FontSizeProperty);
         set => SetValue(FontSizeProperty, value);
     }
 
-    /// <summary>Gets or sets the brush used to render the text.</summary>
+    /// <summary>获取或设置渲染文本所用的画刷。<br />Gets or sets the brush used to render the text.</summary>
     public IBrush? Foreground
     {
         get => GetValue(ForegroundProperty);

@@ -4,6 +4,15 @@ using System.Text;
 namespace Banned.CodeDiff.Services;
 
 /// <summary>
+///     diff 视图的核心中枢类型：持有一对旧/新文件与一组统一 diff 文本，负责解析 diff、
+///     组合原始内容，并产出分栏（split）/ 统一（unified）两种行模型供渲染层消费。<br />
+///     典型生命周期：构造（文件内容与 diff 文本至少提供其一）→ <see cref="InitRaw" /> 或
+///     <see cref="Init" /> → <see cref="BuildSplitDiffLines" /> / <see cref="BuildUnifiedDiffLines" />
+///     → 行查询与展开折叠；模型变化通过 <see cref="Updated" /> 事件通知，各阶段方法均幂等。<br />
+///     packages/core/src/diff-file.ts 的移植——M1（纯逻辑）子集加上语法状态（M5）：
+///     原始文件组合、diff 解析与词级范围、带展开/折叠的分栏/统一行模型，以及 initSyntax。
+///     未移植（web 专用）：bundle 序列化（getBundle / mergeBundle / _getFullBundle）、
+///     克隆实例同步与 DOM id（subscribe 保留为简单事件）。<br />
 ///     Port of packages/core/src/diff-file.ts — the M1 (pure logic) subset plus the
 ///     syntax state (M5): raw file composition, diff parsing + word-level ranges,
 ///     the split/unified line models with expand/collapse, and initSyntax.
@@ -16,13 +25,13 @@ public sealed class DiffFile
     /// <summary>JS module-level composeLen.</summary>
     private static int _composeLen = 40;
 
+    // JS: set by _mergeFullBundle (bundle serialization is M2 scope)
+    private readonly bool _composeByRange = false;
+
     private readonly List<SplitLineItem> _splitLeftLines  = [];
     private readonly List<SplitLineItem> _splitRightLines = [];
 
     private readonly List<UnifiedLineItem> _unifiedLines = [];
-
-    // JS: set by _mergeFullBundle (bundle serialization is M2 scope)
-    private readonly bool _composeByRange = false;
 
     private List<DiffLine>? _diffLines;
     private List<RawDiff>?  _diffListResults;
@@ -58,6 +67,20 @@ public sealed class DiffFile
     private Dictionary<int, int>?      _unifiedNewLineNumberIndex;
     private Dictionary<int, int>?      _unifiedOldLineNumberIndex;
 
+    /// <summary>
+    ///     创建 DiffFile；此时不做任何解析，解析延迟到 <see cref="InitRaw" /> / <see cref="Init" /> 中进行。<br />
+    ///     Create a DiffFile; nothing is parsed here, parsing is deferred to <see cref="InitRaw" /> / <see cref="Init" />.
+    /// </summary>
+    /// <param name="oldFileName">旧侧文件名，同时作为旧侧语言的回退推断来源。Old side file name, also a fallback source for the old side language.</param>
+    /// <param name="oldFileContent">旧侧文件内容；仅提供 diff 时可为空。Old side file content; may be empty when only a diff is provided.</param>
+    /// <param name="newFileName">新侧文件名，同时作为新侧语言的回退推断来源。New side file name, also a fallback source for the new side language.</param>
+    /// <param name="newFileContent">新侧文件内容；仅提供 diff 时可为空。New side file content; may be empty when only a diff is provided.</param>
+    /// <param name="diffList">
+    ///     统一 diff 文本列表，每个元素为一段完整 diff；内部会去重。List of unified diff texts, one complete diff per element;
+    ///     deduplicated internally.
+    /// </param>
+    /// <param name="oldFileLang">旧侧语言提示，优先于基于文件名的推断。Old side language hint, taking priority over file-name based detection.</param>
+    /// <param name="newFileLang">新侧语言提示，优先于基于文件名的推断。New side language hint, taking priority over file-name based detection.</param>
     public DiffFile(
         string                oldFileName,
         string                oldFileContent,
@@ -87,48 +110,112 @@ public sealed class DiffFile
         NewFileContent = newFileContent;
     }
 
-    /// <summary>JS: getCurrentComposeLength.</summary>
+    /// <summary>当前全局展开步长（每次向上/向下展开显示的行数，默认 40）。<br />JS: getCurrentComposeLength.</summary>
     public static int CurrentComposeLength => _composeLen;
 
-    public string OldFileName    { get; }
-    public string OldFileContent { get; private set; }
-    public string OldFileLang    { get; }
-    public string NewFileName    { get; }
-    public string NewFileContent { get; private set; }
-    public string NewFileLang    { get; }
+    /// <summary>旧侧文件名。<br />Old side file name.</summary>
+    public string OldFileName { get; }
 
+    /// <summary>
+    ///     旧侧文件内容；构造时仅提供 diff 时，由 <see cref="InitRaw" /> 依据 diff 反推合成回填。<br />Old side file content; backfilled by
+    ///     <see cref="InitRaw" /> from the diff when only a diff was provided.
+    /// </summary>
+    public string OldFileContent { get; private set; }
+
+    /// <summary>
+    ///     旧侧语言标识：按 oldFileLang → oldFileName → newFileLang → newFileName 顺序取第一个非空者交给 <see cref="DiffTool.GetLang" />
+    ///     解析，无来源时为 "txt"。<br />Old side language: the first non-empty of oldFileLang → oldFileName → newFileLang →
+    ///     newFileName is resolved via <see cref="DiffTool.GetLang" />, falling back to "txt" without a source.
+    /// </summary>
+    public string OldFileLang { get; }
+
+    /// <summary>新侧文件名。<br />New side file name.</summary>
+    public string NewFileName { get; }
+
+    /// <summary>
+    ///     新侧文件内容；构造时仅提供 diff 时，由 <see cref="InitRaw" /> 依据 diff 反推合成回填。<br />New side file content; backfilled by
+    ///     <see cref="InitRaw" /> from the diff when only a diff was provided.
+    /// </summary>
+    public string NewFileContent { get; private set; }
+
+    /// <summary>
+    ///     新侧语言标识：按 newFileLang → newFileName → oldFileLang → oldFileName 顺序取第一个非空者交给 <see cref="DiffTool.GetLang" />
+    ///     解析，无来源时为 "txt"。<br />New side language: the first non-empty of newFileLang → newFileName → oldFileLang →
+    ///     oldFileName is resolved via <see cref="DiffTool.GetLang" />, falling back to "txt" without a source.
+    /// </summary>
+    public string NewFileLang { get; }
+
+    /// <summary>
+    ///     构造时传入的统一 diff 文本列表（已去重，保持首次出现顺序）。<br />The unified diff texts passed at construction (deduplicated,
+    ///     first-occurrence order kept).
+    /// </summary>
     public IReadOnlyList<string> DiffList { get; }
 
-    public int  DiffLineLength       { get; private set; }
-    public int  SplitLineLength      { get; private set; }
-    public int  UnifiedLineLength    { get; private set; }
-    public int  FileLineLength       { get; private set; }
-    public int  AdditionLength       { get; private set; }
-    public int  DeletionLength       { get; private set; }
-    public bool HasSomeLineCollapsed { get; private set; }
-    public int  UpdateCount          { get; private set; }
+    /// <summary>diff 覆盖的最大文件行号（新旧两侧行号取较大者）。<br />The largest file line number covered by the diff (max of both sides).</summary>
+    public int DiffLineLength { get; private set; }
 
-    /// <summary>JS: _getTheme.</summary>
+    /// <summary>
+    ///     分栏视图总行数（<see cref="SplitRightLines" /> 的长度）。<br />Total line count of the split view (length of
+    ///     <see cref="SplitRightLines" />).
+    /// </summary>
+    public int SplitLineLength { get; private set; }
+
+    /// <summary>
+    ///     统一视图总行数（<see cref="UnifiedLines" /> 的长度）。<br />Total line count of the unified view (length of
+    ///     <see cref="UnifiedLines" />).
+    /// </summary>
+    public int UnifiedLineLength { get; private set; }
+
+    /// <summary>文件总行数（两侧原始内容行数的较大者）。<br />Total file line count (larger of both sides).</summary>
+    public int FileLineLength { get; private set; }
+
+    /// <summary>新增行总数。<br />Total number of added lines.</summary>
+    public int AdditionLength { get; private set; }
+
+    /// <summary>删除行总数。<br />Total number of deleted lines.</summary>
+    public int DeletionLength { get; private set; }
+
+    /// <summary>
+    ///     构建行模型时是否存在被折叠的行（置位后不随展开操作复位）。<br />Whether any collapsed lines existed when the line models were built (never
+    ///     reset by expansion).
+    /// </summary>
+    public bool HasSomeLineCollapsed { get; private set; }
+
+    /// <summary>模型更新计数（<see cref="NotifyAll" /> 的调用次数）。<br />Model update counter (number of <see cref="NotifyAll" /> calls).</summary>
+    public int UpdateCount { get; private set; }
+
+    /// <summary>当前主题名；未经 <see cref="InitTheme" /> 设置时为 <c>null</c>（InitTheme 会兜底为 "light"）。<br />JS: _getTheme.</summary>
     public string? Theme { get; private set; }
 
-    /// <summary>JS: _getHighlighterName.</summary>
+    /// <summary>当前生效的语法高亮器名称（由语法初始化流程同步）。<br />JS: _getHighlighterName.</summary>
     public string? HighlighterName { get; private set; }
 
-    /// <summary>JS: _getHighlighterType.</summary>
+    /// <summary>当前生效的语法高亮器类型（由语法初始化流程同步）。<br />JS: _getHighlighterType.</summary>
     public HighlighterType? HighlighterType { get; private set; }
 
 
     // ---- expansion ----
 
-    /// <summary>JS: getExpandEnabled.</summary>
+    /// <summary>展开/折叠操作是否可用；纯 diff 渲染（文件内容完全由 diff 合成）时不可用。<br />JS: getExpandEnabled.</summary>
     public bool IsExpandEnabled => !IsPureDiffRender && !_composeByRange;
 
-    public bool HasExpandSplitAll   { get; private set; }
+    /// <summary>
+    ///     分栏视图是否已全部展开（由 <see cref="OnAllExpand" /> 置位、<see cref="OnAllCollapse" /> 复位）。<br />Whether the split view has
+    ///     been fully expanded (set by <see cref="OnAllExpand" />, cleared by <see cref="OnAllCollapse" />).
+    /// </summary>
+    public bool HasExpandSplitAll { get; private set; }
+
+    /// <summary>
+    ///     统一视图是否已全部展开（由 <see cref="OnAllExpand" /> 置位、<see cref="OnAllCollapse" /> 复位）。<br />Whether the unified view
+    ///     has been fully expanded (set by <see cref="OnAllExpand" />, cleared by <see cref="OnAllCollapse" />).
+    /// </summary>
     public bool HasExpandUnifiedAll { get; private set; }
 
     // ---- misc accessors ----
 
     /// <summary>
+    ///     旧侧文件经 transform 处理后的原始内容（<see cref="InitRaw" /> 之前为 <c>null</c>）；
+    ///     区别于输入属性 <see cref="OldFileContent" />。<br />
     ///     JS: getOldFileContent — the transform-processed raw of the old file
     ///     (<c>null</c> before <see cref="InitRaw" />). Distinct from the
     ///     <see cref="OldFileContent" /> input property.
@@ -136,33 +223,68 @@ public sealed class DiffFile
     public string? OldFileRaw => _oldFileResult?.Raw;
 
     /// <summary>
+    ///     新侧文件经 transform 处理后的原始内容（<see cref="InitRaw" /> 之前为 <c>null</c>）；
+    ///     区别于输入属性 <see cref="NewFileContent" />。<br />
     ///     JS: getNewFileContent — the transform-processed raw of the new file
     ///     (<c>null</c> before <see cref="InitRaw" />). Distinct from the
     ///     <see cref="NewFileContent" /> input property.
     /// </summary>
     public string? NewFileRaw => _newFileResult?.Raw;
 
-    /// <summary>JS: _getIsPureDiffRender.</summary>
+    /// <summary>是否为「纯 diff 渲染」：两侧文件内容均未提供、文件内容完全由 diff 反推合成；此时禁用展开。<br />JS: _getIsPureDiffRender.</summary>
     public bool IsPureDiffRender { get; private set; }
 
-    public IReadOnlyList<SplitLineItem>   SplitLeftLines  => _splitLeftLines;
-    public IReadOnlyList<SplitLineItem>   SplitRightLines => _splitRightLines;
-    public IReadOnlyList<UnifiedLineItem> UnifiedLines    => _unifiedLines;
+    /// <summary>
+    ///     分栏视图左（旧）侧的行模型；需先调用 <see cref="BuildSplitDiffLines" />，缺失的半行以空占位项补位。<br />Line models of the split view's left
+    ///     (old) side; call <see cref="BuildSplitDiffLines" /> first, missing half-rows are padded with empty placeholder
+    ///     items.
+    /// </summary>
+    public IReadOnlyList<SplitLineItem> SplitLeftLines => _splitLeftLines;
 
-    public IReadOnlyCollection<int> SplitHunkLineIndexes   => _splitHunksLines?.Keys.ToArray()   ?? [];
+    /// <summary>
+    ///     分栏视图右（新）侧的行模型；需先调用 <see cref="BuildSplitDiffLines" />，缺失的半行以空占位项补位。<br />Line models of the split view's right
+    ///     (new) side; call <see cref="BuildSplitDiffLines" /> first, missing half-rows are padded with empty placeholder
+    ///     items.
+    /// </summary>
+    public IReadOnlyList<SplitLineItem> SplitRightLines => _splitRightLines;
+
+    /// <summary>
+    ///     统一视图的行模型；需先调用 <see cref="BuildUnifiedDiffLines" />。<br />Line models of the unified view; call
+    ///     <see cref="BuildUnifiedDiffLines" /> first.
+    /// </summary>
+    public IReadOnlyList<UnifiedLineItem> UnifiedLines => _unifiedLines;
+
+    /// <summary>
+    ///     分栏视图中作为折叠区锚点的 hunk 行索引集合（即 <see cref="GetSplitHunkLine" /> 的索引参数）；行模型未构建时为空。<br />Indexes of the hunk anchor
+    ///     rows in the split view (the index arguments of <see cref="GetSplitHunkLine" />); empty before the line models are
+    ///     built.
+    /// </summary>
+    public IReadOnlyCollection<int> SplitHunkLineIndexes => _splitHunksLines?.Keys.ToArray() ?? [];
+
+    /// <summary>
+    ///     统一视图中作为折叠区锚点的 hunk 行索引集合（即 <see cref="GetUnifiedHunkLine" /> 的索引参数）；行模型未构建时为空。<br />Indexes of the hunk anchor
+    ///     rows in the unified view (the index arguments of <see cref="GetUnifiedHunkLine" />); empty before the line models
+    ///     are built.
+    /// </summary>
     public IReadOnlyCollection<int> UnifiedHunkLineIndexes => _unifiedHunksLines?.Keys.ToArray() ?? [];
 
+    /// <summary>
+    ///     修改全局默认展开步长（模块级状态，影响所有实例的向上/向下展开；默认 40）。<br />Changes the global default expand step (module-level state
+    ///     affecting every instance's up/down expansion; default 40).
+    /// </summary>
+    /// <param name="compose">新的步长（行数）。New step length in lines.</param>
     public static void ChangeDefaultComposeLength(int compose)
     {
         _composeLen = compose;
     }
 
+    /// <summary>将全局默认展开步长重置为 40。<br />Resets the global default expand step to 40.</summary>
     public static void ResetDefaultComposeLength()
     {
         _composeLen = 40;
     }
 
-    /// <summary>JS: subscribe/notifyAll — the render layer listens for model changes.</summary>
+    /// <summary>模型更新通知事件；渲染层监听它以刷新视图。<br />JS: subscribe/notifyAll — the render layer listens for model changes.</summary>
     public event Action? Updated;
 
     private static string FirstNonEmpty(params string?[] values)
@@ -514,7 +636,10 @@ public sealed class DiffFile
         return _newFileLines != null && _newFileLines.TryGetValue(lineNumber, out var l) ? l : null;
     }
 
-    /// <summary>Port of initRaw (plus the initRaw-time #syncSyntax call).</summary>
+    /// <summary>
+    ///     initRaw 的移植（包含 initRaw 时机的 #syncSyntax 调用）；幂等，仅首次调用生效。<br />Port of initRaw (plus the initRaw-time #syncSyntax
+    ///     call).
+    /// </summary>
     public void InitRaw()
     {
         if (_hasInitRaw) return;
@@ -530,13 +655,21 @@ public sealed class DiffFile
 
     // ---- syntax (initSyntax) ----
 
-    /// <summary>Port of initTheme: theme ?? existing ?? "light".</summary>
+    /// <summary>initTheme 的移植：theme ?? 现有值 ?? "light"，传入 null 时保留当前主题。<br />Port of initTheme: theme ?? existing ?? "light".</summary>
+    /// <param name="theme">主题名；传 null 表示保留现有值。Theme name; null keeps the current value.</param>
     public void InitTheme(string? theme)
     {
         Theme = theme ?? Theme ?? "light";
     }
 
-    /// <summary>Port of initSyntax({ registerHighlighter }).</summary>
+    /// <summary>
+    ///     initSyntax({ registerHighlighter }) 的移植；幂等——已初始化且高亮器（名称与类型）未变化时直接复用既有结果。<br />Port of initSyntax({
+    ///     registerHighlighter }).
+    /// </summary>
+    /// <param name="registerHighlighter">
+    ///     要注册的语法高亮器；缺省时使用 <see cref="DiffHighlighters.Default" />。The syntax highlighter to
+    ///     register; defaults to <see cref="DiffHighlighters.Default" />.
+    /// </param>
     public void InitSyntax(IDiffHighlighter? registerHighlighter = null)
     {
         if (_hasInitSyntax && (registerHighlighter == null ||
@@ -590,18 +723,30 @@ public sealed class DiffFile
         if (!string.IsNullOrEmpty(_newFileResult?.HighlighterName)) _newFileSyntaxLines = _newFileResult!.SyntaxFile;
     }
 
-    /// <summary>Port of getOldSyntaxLine — syntax spans of the old file line, or <c>null</c>.</summary>
+    /// <summary>
+    ///     getOldSyntaxLine 的移植：取旧侧指定文件行号的语法高亮文本段，无则 <c>null</c>。<br />Port of getOldSyntaxLine — syntax spans of the old
+    ///     file line, or <c>null</c>.
+    /// </summary>
+    /// <param name="lineNumber">旧侧文件行号。Old side file line number.</param>
     public SyntaxLine? GetOldSyntaxLine(int lineNumber)
     {
         return _oldFileSyntaxLines != null && _oldFileSyntaxLines.TryGetValue(lineNumber, out var line) ? line : null;
     }
 
-    /// <summary>Port of getNewSyntaxLine — syntax spans of the new file line, or <c>null</c>.</summary>
+    /// <summary>
+    ///     getNewSyntaxLine 的移植：取新侧指定文件行号的语法高亮文本段，无则 <c>null</c>。<br />Port of getNewSyntaxLine — syntax spans of the new
+    ///     file line, or <c>null</c>.
+    /// </summary>
+    /// <param name="lineNumber">新侧文件行号。New side file line number.</param>
     public SyntaxLine? GetNewSyntaxLine(int lineNumber)
     {
         return _newFileSyntaxLines != null && _newFileSyntaxLines.TryGetValue(lineNumber, out var line) ? line : null;
     }
 
+    /// <summary>
+    ///     一步式初始化：依次调用 <see cref="InitRaw" /> 与 <see cref="InitSyntax" />。<br />One-shot initialization: calls
+    ///     <see cref="InitRaw" /> then <see cref="InitSyntax" />.
+    /// </summary>
     public void Init()
     {
         InitRaw();
@@ -610,6 +755,10 @@ public sealed class DiffFile
 
     // ---- split / unified line models ----
 
+    /// <summary>
+    ///     构建分栏（split）视图的行模型；幂等，完成后通过 <see cref="Updated" /> 通知。<br />Builds the line models of the split view;
+    ///     idempotent, notifies via <see cref="Updated" /> when done.
+    /// </summary>
     public void BuildSplitDiffLines()
     {
         if (_hasBuildSplit) return;
@@ -786,6 +935,10 @@ public sealed class DiffFile
         NotifyAll();
     }
 
+    /// <summary>
+    ///     构建统一（unified）视图的行模型；幂等，完成后通过 <see cref="Updated" /> 通知。<br />Builds the line models of the unified view;
+    ///     idempotent, notifies via <see cref="Updated" /> when done.
+    /// </summary>
     public void BuildUnifiedDiffLines()
     {
         if (_hasBuildUnified) return;
@@ -966,18 +1119,34 @@ public sealed class DiffFile
 
     // ---- split accessors ----
 
+    /// <summary>
+    ///     按索引取分栏左（旧）侧行模型；越界返回 <c>null</c>。<br />Returns the split left (old) side line model at the index, or
+    ///     <c>null</c> when out of range.
+    /// </summary>
+    /// <param name="index"><see cref="SplitLeftLines" /> 中的下标。Index into <see cref="SplitLeftLines" />.</param>
     public SplitLineItem? GetSplitLeftLine(int index)
     {
         return index >= 0 && index < _splitLeftLines.Count ? _splitLeftLines[index] : null;
     }
 
 
+    /// <summary>
+    ///     按索引取分栏右（新）侧行模型；越界返回 <c>null</c>。<br />Returns the split right (new) side line model at the index, or
+    ///     <c>null</c> when out of range.
+    /// </summary>
+    /// <param name="index"><see cref="SplitRightLines" /> 中的下标。Index into <see cref="SplitRightLines" />.</param>
     public SplitLineItem? GetSplitRightLine(int index)
     {
         return index >= 0 && index < _splitRightLines.Count ? _splitRightLines[index] : null;
     }
 
 
+    /// <summary>
+    ///     按文件行号取分栏行模型（旧侧查左列、新侧查右列）；未命中返回 <c>null</c>。<br />Returns the split line model by file line number (old side →
+    ///     left column, new side → right column), or <c>null</c> on a miss.
+    /// </summary>
+    /// <param name="lineNumber">文件行号。File line number.</param>
+    /// <param name="side">旧侧或新侧。Old or new side.</param>
     public SplitLineItem? GetSplitLineByLineNumber(int lineNumber, SplitSide side)
     {
         return side == SplitSide.Old
@@ -986,6 +1155,12 @@ public sealed class DiffFile
     }
 
 
+    /// <summary>
+    ///     按文件行号取分栏行模型在列表中的下标；未命中返回 -1。<br />Returns the list index of the split line model by file line number, or -1 on
+    ///     a miss.
+    /// </summary>
+    /// <param name="lineNumber">文件行号。File line number.</param>
+    /// <param name="side">旧侧或新侧。Old or new side.</param>
     public int GetSplitLineIndexByLineNumber(int lineNumber, SplitSide side)
     {
         return side == SplitSide.Old
@@ -1027,33 +1202,76 @@ public sealed class DiffFile
     ///     O(1) equivalent of <c>lines.FirstOrDefault(i => i.LineNumber == lineNumber)</c>
     ///     — a miss (or a not-yet-built model) returns <c>null</c> like the scan did.
     /// </summary>
-    private static T? GetByLineNumber<T>(List<T> lines, Dictionary<int, int>? index, int lineNumber) where T : class =>
-        index != null && index.TryGetValue(lineNumber, out var i) ? lines[i] : null;
+    private static T? GetByLineNumber<T>(List<T> lines, Dictionary<int, int>? index, int lineNumber) where T : class
+    {
+        return index != null && index.TryGetValue(lineNumber, out var i) ? lines[i] : null;
+    }
 
     /// <summary>
     ///     O(1) equivalent of <c>lines.FindIndex(i => i.LineNumber == lineNumber)</c>
     ///     — a miss (or a not-yet-built model) returns <c>-1</c> like the scan did.
     /// </summary>
-    private static int GetIndexByLineNumber(Dictionary<int, int>? index, int lineNumber) =>
-        index != null && index.TryGetValue(lineNumber, out var i) ? i : -1;
+    private static int GetIndexByLineNumber(Dictionary<int, int>? index, int lineNumber)
+    {
+        return index != null && index.TryGetValue(lineNumber, out var i) ? i : -1;
+    }
 
-    public DiffLine? GetSplitHunkLine(int index) =>
-        _splitHunksLines != null && _splitHunksLines.TryGetValue(index, out var h) ? h : null;
+    /// <summary>
+    ///     取分栏折叠区的 hunk 锚点行（索引来自 <see cref="SplitHunkLineIndexes" />）；无则 <c>null</c>。<br />Returns the hunk anchor line
+    ///     of a split collapsed region (an index from <see cref="SplitHunkLineIndexes" />), or <c>null</c>.
+    /// </summary>
+    /// <param name="index">折叠区锚点索引。Collapsed-region anchor index.</param>
+    public DiffLine? GetSplitHunkLine(int index)
+    {
+        return _splitHunksLines != null && _splitHunksLines.TryGetValue(index, out var h) ? h : null;
+    }
 
     // ---- unified accessors ----
-    public UnifiedLineItem? GetUnifiedLine(int index) =>
-        index >= 0 && index < _unifiedLines.Count ? _unifiedLines[index] : null;
+    /// <summary>
+    ///     按索引取统一视图行模型；越界返回 <c>null</c>。<br />Returns the unified line model at the index, or <c>null</c> when out of
+    ///     range.
+    /// </summary>
+    /// <param name="index"><see cref="UnifiedLines" /> 中的下标。Index into <see cref="UnifiedLines" />.</param>
+    public UnifiedLineItem? GetUnifiedLine(int index)
+    {
+        return index >= 0 && index < _unifiedLines.Count ? _unifiedLines[index] : null;
+    }
 
-    public UnifiedLineItem? GetUnifiedLineByLineNumber(int lineNumber, SplitSide side) => side == SplitSide.Old
-        ? GetByLineNumber(_unifiedLines, _unifiedOldLineNumberIndex, lineNumber)
-        : GetByLineNumber(_unifiedLines, _unifiedNewLineNumberIndex, lineNumber);
+    /// <summary>
+    ///     按文件行号取统一视图行模型；未命中返回 <c>null</c>。<br />Returns the unified line model by file line number, or <c>null</c> on a
+    ///     miss.
+    /// </summary>
+    /// <param name="lineNumber">文件行号。File line number.</param>
+    /// <param name="side">旧侧或新侧。Old or new side.</param>
+    public UnifiedLineItem? GetUnifiedLineByLineNumber(int lineNumber, SplitSide side)
+    {
+        return side == SplitSide.Old
+            ? GetByLineNumber(_unifiedLines, _unifiedOldLineNumberIndex, lineNumber)
+            : GetByLineNumber(_unifiedLines, _unifiedNewLineNumberIndex, lineNumber);
+    }
 
-    public int GetUnifiedLineIndexByLineNumber(int lineNumber, SplitSide side) => side == SplitSide.Old
-        ? GetIndexByLineNumber(_unifiedOldLineNumberIndex, lineNumber)
-        : GetIndexByLineNumber(_unifiedNewLineNumberIndex, lineNumber);
+    /// <summary>
+    ///     按文件行号取统一视图行模型在列表中的下标；未命中返回 -1。<br />Returns the list index of the unified line model by file line number, or
+    ///     -1 on a miss.
+    /// </summary>
+    /// <param name="lineNumber">文件行号。File line number.</param>
+    /// <param name="side">旧侧或新侧。Old or new side.</param>
+    public int GetUnifiedLineIndexByLineNumber(int lineNumber, SplitSide side)
+    {
+        return side == SplitSide.Old
+            ? GetIndexByLineNumber(_unifiedOldLineNumberIndex, lineNumber)
+            : GetIndexByLineNumber(_unifiedNewLineNumberIndex, lineNumber);
+    }
 
-    public DiffLine? GetUnifiedHunkLine(int index) =>
-        _unifiedHunksLines != null && _unifiedHunksLines.TryGetValue(index, out var h) ? h : null;
+    /// <summary>
+    ///     取统一视图折叠区的 hunk 锚点行（索引来自 <see cref="UnifiedHunkLineIndexes" />）；无则 <c>null</c>。<br />Returns the hunk anchor
+    ///     line of a unified collapsed region (an index from <see cref="UnifiedHunkLineIndexes" />), or <c>null</c>.
+    /// </summary>
+    /// <param name="index">折叠区锚点索引。Collapsed-region anchor index.</param>
+    public DiffLine? GetUnifiedHunkLine(int index)
+    {
+        return _unifiedHunksLines != null && _unifiedHunksLines.TryGetValue(index, out var h) ? h : null;
+    }
 
     private void UnhideSplitRange(int start, int end)
     {
@@ -1073,6 +1291,20 @@ public sealed class DiffFile
                 _unifiedLines[i].IsHidden = false;
     }
 
+    /// <summary>
+    ///     展开分栏视图的一个折叠区；最后一个 hunk 不支持向上展开（静默忽略），向上展开后锚点会迁移到新的 EndHiddenIndex 键。<br />Expands a collapsed region of the
+    ///     split view; the last hunk cannot expand up (silently ignored), and upward moves re-key the anchor to its new
+    ///     EndHiddenIndex.
+    /// </summary>
+    /// <param name="dir">展开方向。Expand direction.</param>
+    /// <param name="index">
+    ///     折叠区锚点索引（<see cref="SplitHunkLineIndexes" /> 之一）。Collapsed-region anchor index (one of
+    ///     <see cref="SplitHunkLineIndexes" />).
+    /// </param>
+    /// <param name="needTrigger">
+    ///     是否触发 <see cref="Updated" />；批量操作时可传 false。Whether to raise <see cref="Updated" />; pass false
+    ///     for batch operations.
+    /// </param>
     public void OnSplitHunkExpand(HunkExpandDirection dir, int index, bool needTrigger = true)
     {
         if (!IsExpandEnabled) return;
@@ -1157,6 +1389,20 @@ public sealed class DiffFile
         if (needTrigger) NotifyAll();
     }
 
+    /// <summary>
+    ///     展开统一视图的一个折叠区；最后一个 hunk 不支持向上展开（静默忽略），向上展开后锚点会迁移到新的 EndHiddenIndex 键。<br />Expands a collapsed region of the
+    ///     unified view; the last hunk cannot expand up (silently ignored), and upward moves re-key the anchor to its new
+    ///     EndHiddenIndex.
+    /// </summary>
+    /// <param name="dir">展开方向。Expand direction.</param>
+    /// <param name="index">
+    ///     折叠区锚点索引（<see cref="UnifiedHunkLineIndexes" /> 之一）。Collapsed-region anchor index (one of
+    ///     <see cref="UnifiedHunkLineIndexes" />).
+    /// </param>
+    /// <param name="needTrigger">
+    ///     是否触发 <see cref="Updated" />；批量操作时可传 false。Whether to raise <see cref="Updated" />; pass false
+    ///     for batch operations.
+    /// </param>
     public void OnUnifiedHunkExpand(HunkExpandDirection dir, int index, bool needTrigger = true)
     {
         if (!IsExpandEnabled) return;
@@ -1239,7 +1485,8 @@ public sealed class DiffFile
         if (needTrigger) NotifyAll();
     }
 
-    /// <summary>Port of onAllExpand(mode: "split" | "unified").</summary>
+    /// <summary>onAllExpand(mode: "split" | "unified") 的移植：展开指定视图的全部折叠区。<br />Port of onAllExpand(mode: "split" | "unified").</summary>
+    /// <param name="mode">目标视图：分栏或统一。Target view: split or unified.</param>
     public void OnAllExpand(ExpandViewMode mode)
     {
         if (!IsExpandEnabled) return;
@@ -1262,7 +1509,11 @@ public sealed class DiffFile
         NotifyAll();
     }
 
-    /// <summary>Port of onAllCollapse(mode: "split" | "unified").</summary>
+    /// <summary>
+    ///     onAllCollapse(mode: "split" | "unified") 的移植：收起指定视图的全部折叠区（按构建时快照恢复初始折叠状态）。<br />Port of onAllCollapse(mode:
+    ///     "split" | "unified").
+    /// </summary>
+    /// <param name="mode">目标视图：分栏或统一。Target view: split or unified.</param>
     public void OnAllCollapse(ExpandViewMode mode)
     {
         if (!IsExpandEnabled) return;
@@ -1326,6 +1577,14 @@ public sealed class DiffFile
         NotifyAll();
     }
 
+    /// <summary>
+    ///     触发 <see cref="Updated" /> 事件并递增 <see cref="UpdateCount" />。<br />Raises the <see cref="Updated" /> event and
+    ///     increments <see cref="UpdateCount" />.
+    /// </summary>
+    /// <param name="skipSyncExternal">
+    ///     为对齐 JS 签名保留的参数，当前实现未使用。Parameter kept for JS signature parity; unused in the current
+    ///     implementation.
+    /// </param>
     public void NotifyAll(bool skipSyncExternal = false)
     {
         UpdateCount++;
@@ -1334,19 +1593,40 @@ public sealed class DiffFile
     }
 }
 
-/// <summary>JS string dir: "up" | "down" | "all" | "up-all" | "down-all".</summary>
+/// <summary>
+///     折叠区的展开方向，对应 JS 字符串 dir："up" | "down" | "all" | "up-all" | "down-all"。<br />JS string dir: "up" | "down" |
+///     "all" | "up-all" | "down-all".
+/// </summary>
 public enum HunkExpandDirection
 {
+    /// <summary>
+    ///     向上展开一段（<see cref="DiffFile.CurrentComposeLength" /> 行）。<br />Expand up one step (
+    ///     <see cref="DiffFile.CurrentComposeLength" /> lines).
+    /// </summary>
     Up,
+
+    /// <summary>
+    ///     向下展开一段（<see cref="DiffFile.CurrentComposeLength" /> 行）。<br />Expand down one step (
+    ///     <see cref="DiffFile.CurrentComposeLength" /> lines).
+    /// </summary>
     Down,
+
+    /// <summary>展开整个折叠区。<br />Expand the entire collapsed region.</summary>
     All,
+
+    /// <summary>向上全部展开。<br />Expand all the way up.</summary>
     UpAll,
+
+    /// <summary>向下全部展开。<br />Expand all the way down.</summary>
     DownAll
 }
 
-/// <summary>JS string mode: "split" | "unified".</summary>
+/// <summary>目标视图模式，对应 JS 字符串 mode："split" | "unified"。<br />JS string mode: "split" | "unified".</summary>
 public enum ExpandViewMode
 {
+    /// <summary>分栏视图。<br />Split view.</summary>
     Split,
+
+    /// <summary>统一视图。<br />Unified view.</summary>
     Unified
 }
