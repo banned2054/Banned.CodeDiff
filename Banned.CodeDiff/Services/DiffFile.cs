@@ -59,6 +59,17 @@ public sealed class DiffFile
 
     private Dictionary<int, DiffLine>? _unifiedHunksLines;
 
+    // Line-number → list-index maps for the O(1) *ByLineNumber lookups. The lists are only
+    // appended inside their (idempotent, guarded) Build methods and expansions merely flip
+    // IsHidden / rewrite SplitInfo / UnifiedInfo, so the non-null line numbers — strictly
+    // increasing as each append increments its counter — never change once built. The maps are
+    // therefore built once at the end of the Build methods and stay valid for the instance
+    // lifetime. Placeholder half-rows carry a null line number and never match a query.
+    private Dictionary<int, int>? _splitLeftLineNumberIndex;
+    private Dictionary<int, int>? _splitRightLineNumberIndex;
+    private Dictionary<int, int>? _unifiedOldLineNumberIndex;
+    private Dictionary<int, int>? _unifiedNewLineNumberIndex;
+
     private bool _hasInitRaw;
     private bool _hasBuildSplit;
     private bool _hasBuildUnified;
@@ -808,6 +819,9 @@ public sealed class DiffFile
 
         SplitLineLength = _splitRightLines.Count;
 
+        _splitLeftLineNumberIndex  = BuildSplitLineNumberIndex(_splitLeftLines);
+        _splitRightLineNumberIndex = BuildSplitLineNumberIndex(_splitRightLines);
+
         _hasBuildSplit = true;
 
         NotifyAll();
@@ -1001,6 +1015,9 @@ public sealed class DiffFile
 
         UnifiedLineLength = _unifiedLines.Count;
 
+        _unifiedOldLineNumberIndex = BuildUnifiedLineNumberIndex(_unifiedLines, SplitSide.Old);
+        _unifiedNewLineNumberIndex = BuildUnifiedLineNumberIndex(_unifiedLines, SplitSide.New);
+
         _hasBuildUnified = true;
 
         NotifyAll();
@@ -1017,13 +1034,59 @@ public sealed class DiffFile
 
 
     public SplitLineItem? GetSplitLineByLineNumber(int lineNumber, SplitSide side) => side == SplitSide.Old
-        ? _splitLeftLines.FirstOrDefault(item => item.LineNumber  == lineNumber)
-        : _splitRightLines.FirstOrDefault(item => item.LineNumber == lineNumber);
+        ? GetByLineNumber(_splitLeftLines, _splitLeftLineNumberIndex, lineNumber)
+        : GetByLineNumber(_splitRightLines, _splitRightLineNumberIndex, lineNumber);
 
 
     public int GetSplitLineIndexByLineNumber(int lineNumber, SplitSide side) => side == SplitSide.Old
-        ? _splitLeftLines.FindIndex(item => item.LineNumber  == lineNumber)
-        : _splitRightLines.FindIndex(item => item.LineNumber == lineNumber);
+        ? GetIndexByLineNumber(_splitLeftLineNumberIndex, lineNumber)
+        : GetIndexByLineNumber(_splitRightLineNumberIndex, lineNumber);
+
+    /// <summary>Builds the line-number → index map backing the split lookups (see the field
+    /// remarks for why it never needs rebuilding).</summary>
+    private static Dictionary<int, int> BuildSplitLineNumberIndex(List<SplitLineItem> lines)
+    {
+        var index = new Dictionary<int, int>(lines.Count);
+
+        for (var i = 0; i < lines.Count; i++)
+        {
+            if (lines[i].LineNumber is { } n)
+            {
+                index[n] = i;
+            }
+        }
+
+        return index;
+    }
+
+    /// <summary>Builds the old/new line-number → index map backing the unified lookups.</summary>
+    private static Dictionary<int, int> BuildUnifiedLineNumberIndex(List<UnifiedLineItem> lines, SplitSide side)
+    {
+        var index = new Dictionary<int, int>(lines.Count);
+
+        for (var i = 0; i < lines.Count; i++)
+        {
+            var n = side == SplitSide.Old ? lines[i].OldLineNumber : lines[i].NewLineNumber;
+
+            if (n != null)
+            {
+                index[n.Value] = i;
+            }
+        }
+
+        return index;
+    }
+
+    /// <summary>O(1) equivalent of <c>lines.FirstOrDefault(i => i.LineNumber == lineNumber)</c>
+    /// — a miss (or a not-yet-built model) returns <c>null</c> like the scan did.</summary>
+    private static T? GetByLineNumber<T>(List<T> lines, Dictionary<int, int>? index, int lineNumber)
+        where T : class
+        => index != null && index.TryGetValue(lineNumber, out var i) ? lines[i] : null;
+
+    /// <summary>O(1) equivalent of <c>lines.FindIndex(i => i.LineNumber == lineNumber)</c>
+    /// — a miss (or a not-yet-built model) returns <c>-1</c> like the scan did.</summary>
+    private static int GetIndexByLineNumber(Dictionary<int, int>? index, int lineNumber)
+        => index != null && index.TryGetValue(lineNumber, out var i) ? i : -1;
 
 
     public DiffLine? GetSplitHunkLine(int index) =>
@@ -1037,13 +1100,13 @@ public sealed class DiffFile
 
 
     public UnifiedLineItem? GetUnifiedLineByLineNumber(int lineNumber, SplitSide side) => side == SplitSide.Old
-        ? _unifiedLines.FirstOrDefault(item => item.OldLineNumber == lineNumber)
-        : _unifiedLines.FirstOrDefault(item => item.NewLineNumber == lineNumber);
+        ? GetByLineNumber(_unifiedLines, _unifiedOldLineNumberIndex, lineNumber)
+        : GetByLineNumber(_unifiedLines, _unifiedNewLineNumberIndex, lineNumber);
 
 
     public int GetUnifiedLineIndexByLineNumber(int lineNumber, SplitSide side) => side == SplitSide.Old
-        ? _unifiedLines.FindIndex(item => item.OldLineNumber == lineNumber)
-        : _unifiedLines.FindIndex(item => item.NewLineNumber == lineNumber);
+        ? GetIndexByLineNumber(_unifiedOldLineNumberIndex, lineNumber)
+        : GetIndexByLineNumber(_unifiedNewLineNumberIndex, lineNumber);
 
 
     public DiffLine? GetUnifiedHunkLine(int index) =>

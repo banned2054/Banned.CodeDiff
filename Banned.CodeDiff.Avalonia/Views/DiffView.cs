@@ -84,6 +84,11 @@ public sealed class DiffView : TemplatedControl
     private readonly List<DiffSplitCellModel>   _selectedSplitCells   = [];
     private readonly List<DiffUnifiedContentRow> _selectedUnifiedRows = [];
 
+    /// <summary>LineIndex → content row map for the current <see cref="Rows"/> (built lazily,
+    /// dropped on every rebuild): the split visual pass used to scan all rows per selected line
+    /// (O(lines × rows) per pointer move); the map keeps it O(1) per line.</summary>
+    private Dictionary<int, DiffSplitContentRow>? _splitRowsByLineIndex;
+
     /// <summary>Initializes a new instance of the <see cref="DiffView"/> class.</summary>
     public DiffView()
     {
@@ -317,8 +322,49 @@ public sealed class DiffView : TemplatedControl
         return true;
     }
 
-    private bool CanCopySelection() =>
-        GetSelectionResult()?.Lines.Any(line => !line.IsHide) == true;
+    /// <summary>
+    /// Lightweight equivalent of <c>GetSelectionResult()?.Lines.Any(l => !l.IsHide) == true</c>:
+    /// the result is non-null exactly when a current range and the model exist, a member line is
+    /// collected exactly when the by-line-number lookup finds it (a found line's number is never
+    /// null — it matched the query), and its <c>IsHide</c> is the found item's <c>IsHidden</c>
+    /// (<see cref="DiffFileUtils.CheckCurrentLineIsHidden"/> re-looks-up the same item). Early
+    /// exits on the first visible line instead of materializing the whole result.
+    /// </summary>
+    private bool CanCopySelection()
+    {
+        var file  = DiffFile;
+        var range = _selection.GetState().CurrentRange;
+
+        if (file == null || range == null)
+        {
+            return false;
+        }
+
+        var normalized = MultiSelectData.NormalizeRange(range);
+
+        if (ViewMode == DiffViewMode.Unified)
+        {
+            for (var lineNum = normalized.StartLineNumber; lineNum <= normalized.EndLineNumber; lineNum++)
+            {
+                if (file.GetUnifiedLineByLineNumber(lineNum, normalized.Side) is { IsHidden: false })
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        for (var lineNum = normalized.StartLineNumber; lineNum <= normalized.EndLineNumber; lineNum++)
+        {
+            if (file.GetSplitLineByLineNumber(lineNum, normalized.Side) is { IsHidden: false })
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     /// <summary>Invalidates the copy commands after a selection or model change (the file
     /// commands track the model, the selection command tracks the current selection result).</summary>
@@ -418,6 +464,7 @@ public sealed class DiffView : TemplatedControl
             }
 
             SetAndRaise(RowsProperty, ref _rows, rows);
+            _splitRowsByLineIndex = null;
             UpdateNumberColumnWidth();
 
             // Upstream manager subscribes diffFile changes and re-runs the selection visual (its
@@ -715,6 +762,21 @@ public sealed class DiffView : TemplatedControl
     /// context lines flag both sides, everything else only the range's side.</summary>
     private void ApplySplitSelection(DiffFile file, List<MultiSelectRange> allRanges)
     {
+        // One pass over the rows instead of a scan per selected line; LineIndex is unique (one
+        // content row per split index), so FirstOrDefault == the map hit, misses == the scan's null.
+        if (_splitRowsByLineIndex == null)
+        {
+            _splitRowsByLineIndex = new Dictionary<int, DiffSplitContentRow>(_rows.Count);
+
+            foreach (var row in _rows)
+            {
+                if (row is DiffSplitContentRow content)
+                {
+                    _splitRowsByLineIndex[content.LineIndex] = content;
+                }
+            }
+        }
+
         foreach (var range in allRanges)
         {
             var rangeLines = MultiSelectData.GetSelectedLinesFromDiffFile_Split(file, range);
@@ -726,9 +788,7 @@ public sealed class DiffView : TemplatedControl
                     continue; // JS: if (!item.isHide && item.index)
                 }
 
-                var row = _rows.OfType<DiffSplitContentRow>().FirstOrDefault(r => r.LineIndex == item.Index);
-
-                if (row == null)
+                if (!_splitRowsByLineIndex.TryGetValue(item.Index, out var row))
                 {
                     continue;
                 }

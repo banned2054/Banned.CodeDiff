@@ -183,4 +183,39 @@ public class UnitTests
         Assert.That(count, Is.EqualTo(1));
         Assert.That(df.UpdateCount, Is.EqualTo(1));
     }
+
+    [Test]
+    public void DiffFile_LineNumberLookups_MissReturnsNullAndMinusOne()
+    {
+        var oldLines = string.Join("\n", Enumerable.Range(1, 12).Select(i => $"old{i}")) + "\n";
+        var newLines = string.Join("\n", Enumerable.Range(1, 12).Select(i => i == 5 ? "new5" : $"old{i}")) + "\n";
+        var df = new DiffFile("f.txt", oldLines, "f.txt", newLines,
+                              ["--- a/f.txt\n+++ b/f.txt\n@@ -5,1 +5,1 @@\n-old5\n+new5\n"]);
+        df.InitRaw();
+        df.BuildSplitDiffLines();
+        df.BuildUnifiedDiffLines();
+
+        // Misses: numbers beyond the file length return null / -1 on every accessor and side.
+        Assert.That(df.GetSplitLineByLineNumber(99, SplitSide.Old), Is.Null);
+        Assert.That(df.GetSplitLineByLineNumber(99, SplitSide.New), Is.Null);
+        Assert.That(df.GetSplitLineIndexByLineNumber(99, SplitSide.Old), Is.EqualTo(-1));
+        Assert.That(df.GetSplitLineIndexByLineNumber(99, SplitSide.New), Is.EqualTo(-1));
+        Assert.That(df.GetUnifiedLineByLineNumber(99, SplitSide.Old), Is.Null);
+        Assert.That(df.GetUnifiedLineByLineNumber(99, SplitSide.New), Is.Null);
+        Assert.That(df.GetUnifiedLineIndexByLineNumber(99, SplitSide.Old), Is.EqualTo(-1));
+        Assert.That(df.GetUnifiedLineIndexByLineNumber(99, SplitSide.New), Is.EqualTo(-1));
+
+        // Hits keep resolving to the same items across expand/collapse — expansions only flip
+        // IsHidden, so the line-number lookups must stay stable.
+        var before = df.GetSplitLineByLineNumber(5, SplitSide.Old);
+        Assert.That(before, Is.Not.Null);
+
+        df.OnAllExpand(ExpandViewMode.Split);
+        df.OnAllCollapse(ExpandViewMode.Split);
+
+        Assert.That(df.GetSplitLineByLineNumber(5, SplitSide.Old), Is.SameAs(before));
+        Assert.That(df.GetSplitLineIndexByLineNumber(5, SplitSide.Old), Is.GreaterThanOrEqualTo(0));
+        Assert.That(df.GetUnifiedLineByLineNumber(5, SplitSide.New), Is.Not.Null);
+        Assert.That(df.GetUnifiedLineIndexByLineNumber(5, SplitSide.New), Is.GreaterThanOrEqualTo(0));
+    }
 }

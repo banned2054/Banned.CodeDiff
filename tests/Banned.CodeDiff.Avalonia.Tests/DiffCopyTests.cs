@@ -219,6 +219,33 @@ public class DiffCopyTests
                                            Enumerable.Range(44, 45).Select(n => $"ctx {n:D3}"))));
     }
 
+    [AvaloniaTest]
+    public void SelectionCopy_AllMembersHidden_CannotExecute()
+    {
+        var view = new DiffView { DiffFile = CreateExpandableFile(), IsSelectionEnabled = true };
+        var (window, items) = ShownInView(view);
+
+        // Reveal the collapsed middle (through the model, so no scroll anchoring moves the
+        // viewport) and select a range living entirely inside it: the strip is replaced by its
+        // rows, so 45 and 46 are now Rows[8]/Rows[9] right below line 44.
+        var hunkRow = (DiffSplitHunkRow)view.Rows[8];
+        view.DiffFile!.OnSplitHunkExpand(HunkExpandDirection.All, hunkRow.HunkIndex);
+        RunLayoutPass(window);
+
+        window.MouseDown(CellCenter(window, items, view.Rows[8], 0), MouseButton.Left);
+        window.MouseMove(CellCenter(window, items, view.Rows[9], 0));
+        window.MouseUp(CellCenter(window, items, view.Rows[9], 0), MouseButton.Left);
+
+        Assert.That(view.CopySelectionCommand.CanExecute(null), Is.True);
+
+        // Collapse again: every member of the completed range is hidden behind the hunk —
+        // the command must go dark and the copy must silently do nothing.
+        view.DiffFile!.OnAllCollapse(ExpandViewMode.Split);
+
+        Assert.That(view.CopySelectionCommand.CanExecute(null), Is.False);
+        Assert.That(view.CopySelectionAsync().Result, Is.False);
+    }
+
     // ---- CopyOldFileCommand / CopyNewFileCommand ----
 
     [AvaloniaTest]
