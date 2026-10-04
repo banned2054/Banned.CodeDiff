@@ -15,6 +15,7 @@ internal sealed record DiffBrushSet(
     IBrush DeleteContent,
     IBrush ContextNumber,
     IBrush ContextContent,
+    IBrush ExpandContent,
     IBrush EmptyNumber,
     IBrush EmptyContent,
     IBrush HunkNumber,
@@ -35,6 +36,7 @@ internal static class DiffBrushes
     private static readonly IBrush DeleteContentLight    = Parse("#ffebe9");
     private static readonly IBrush ContextNumberLight    = Parse("#fafafa");
     private static readonly IBrush ContextContentLight   = Parse("#ffffff");
+    private static readonly IBrush ExpandContentLight    = Parse("#fafafa");
     private static readonly IBrush EmptyNumberLight      = Parse("#fafafa");
     private static readonly IBrush EmptyContentLight     = Parse("#fafafa");
     private static readonly IBrush HunkNumberLight       = Parse("#b6e3ff");
@@ -50,6 +52,7 @@ internal static class DiffBrushes
     private static readonly IBrush DeleteContentDark     = Parse("#23191c");
     private static readonly IBrush ContextNumberDark     = Parse("#161b22");
     private static readonly IBrush ContextContentDark    = Parse("#0d1117");
+    private static readonly IBrush ExpandContentDark     = Parse("#161b22");
     private static readonly IBrush EmptyNumberDark       = Parse("#161b22");
     private static readonly IBrush EmptyContentDark      = Parse("#161b22");
     private static readonly IBrush HunkNumberDark        = Parse("#0c2d6b");
@@ -61,7 +64,8 @@ internal static class DiffBrushes
 
     private static readonly DiffBrushSet LightSet = new(NumberForegroundLight, AddNumberLight, AddContentLight,
                                                         DeleteNumberLight, DeleteContentLight,
-                                                        ContextNumberLight, ContextContentLight, EmptyNumberLight,
+                                                        ContextNumberLight, ContextContentLight,
+                                                        ExpandContentLight, EmptyNumberLight,
                                                         EmptyContentLight, HunkNumberLight,
                                                         HunkContentLight, HunkContentLight, HunkForegroundLight,
                                                         AddHighlightLight, DeleteHighlightLight,
@@ -69,7 +73,8 @@ internal static class DiffBrushes
 
     private static readonly DiffBrushSet DarkSet = new(NumberForegroundDark, AddNumberDark, AddContentDark,
                                                        DeleteNumberDark, DeleteContentDark,
-                                                       ContextNumberDark, ContextContentDark, EmptyNumberDark,
+                                                       ContextNumberDark, ContextContentDark,
+                                                       ExpandContentDark, EmptyNumberDark,
                                                        EmptyContentDark, HunkNumberDark,
                                                        HunkContentDark, HunkContentDark, HunkForegroundDark,
                                                        AddHighlightDark, DeleteHighlightDark,

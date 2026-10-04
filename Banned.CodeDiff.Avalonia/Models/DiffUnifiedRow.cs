@@ -36,6 +36,9 @@ public sealed class DiffUnifiedContentRow : DiffUnifiedRow
         {
             DiffCellKind.Add    => brushes.AddContent,
             DiffCellKind.Delete => brushes.DeleteContent,
+            // Raw revealed rows use --diff-expand-content--; the number cell keeps the plain
+            // number value (--diff-expand-lineNumber-- is numerically identical upstream).
+            DiffCellKind.Expand => brushes.ExpandContent,
             _                   => brushes.ContextContent,
         };
         HighlightBrush = kind switch

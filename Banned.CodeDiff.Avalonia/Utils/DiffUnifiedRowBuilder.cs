@@ -46,12 +46,12 @@ internal static class DiffUnifiedRowBuilder
 
             var syntaxRuns = DiffSyntaxRuns.Extract(syntaxLine, lineText.Length, variant);
 
-            // Raw gap lines revealed by expansion have no DiffLine — they render as plain
-            // context rows from the file content.
+            // Raw gap lines revealed by expansion have no DiffLine — they render as plain rows
+            // from the file content, colored with the expand palette (upstream hasDiff=false).
             if (line.Diff is not { } diff)
             {
                 rows.Add(new DiffUnifiedContentRow(line.OldLineNumber?.ToString(), line.NewLineNumber?.ToString(),
-                                                   lineText, DiffCellKind.Context, [], syntaxRuns, brushes));
+                                                   lineText, DiffCellKind.Expand, [], syntaxRuns, brushes));
                 continue;
             }
 

@@ -17,6 +17,10 @@ public enum DiffCellKind
 
     /// <summary>Deleted line (left side only in split view).</summary>
     Delete = 3,
+
+    /// <summary>Raw file line revealed by hunk expansion (no DiffLine); upstream colors it with
+    /// <c>--diff-expand-content--</c> instead of the plain-context background.</summary>
+    Expand = 4,
 }
 
 /// <summary>Base type of split rows rendered by <see cref="Views.DiffView"/>.</summary>
@@ -46,6 +50,8 @@ public sealed class DiffSplitCellModel
             DiffCellKind.Add     => (brushes.AddNumber, brushes.AddContent),
             DiffCellKind.Delete  => (brushes.DeleteNumber, brushes.DeleteContent),
             DiffCellKind.Context => (brushes.ContextNumber, brushes.ContextContent),
+            // --diff-expand-lineNumber-- shares the plain number value; only the content differs.
+            DiffCellKind.Expand  => (brushes.ContextNumber, brushes.ExpandContent),
             _                    => (brushes.EmptyNumber, brushes.EmptyContent),
         };
         HighlightBrush = highlights.Count > 0

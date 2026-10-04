@@ -73,11 +73,11 @@ internal static class DiffSplitRowBuilder
 
         var syntaxRuns = DiffSyntaxRuns.Extract(syntaxLine, text.Length, variant);
 
-        // Raw gap lines revealed by expansion have no DiffLine — they render as plain context
-        // cells from the file content.
+        // Raw gap lines revealed by expansion have no DiffLine — they render as plain rows from
+        // the file content, colored with the expand palette (upstream getContentBG hasDiff=false).
         if (item.Diff is not { } diff)
         {
-            return new DiffSplitCellModel(item.LineNumber?.ToString(), text, DiffCellKind.Context,
+            return new DiffSplitCellModel(item.LineNumber?.ToString(), text, DiffCellKind.Expand,
                                           [], syntaxRuns, brushes);
         }
 

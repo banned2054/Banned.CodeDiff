@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### M6 — 主题颜色对齐上游(批次 1)
+
+- **`Banned.CodeDiff.Avalonia`**: light/dark 两套画笔逐项核对上游 `_com.css` 的
+  `--diff-*--` token(react/vue/solid 一致,svelte 仅引号差异,lynx 为独立变体不计),
+  既有值全部一致。唯一修正:展开 hunk 揭示的原始行(无 `DiffLine`)此前沿用 plain
+  context 背景,现改用上游 `--diff-expand-content--`(light `#fafafa` / dark `#161b22`),
+  通过新增 `DiffCellKind.Expand` 区分;行号格保持原值(上游
+  `--diff-expand-lineNumber--` 与 plain 数值相同)。当前功能未消费的 token 仅记录不实现:
+  展开按钮 hover(`--diff-hunk-lineNumber-hover--`)、"+" 添加小组件
+  (`--diff-add-widget--`/`--diff-add-widget-color--`)、tooltip 配色、multiSelect 选区
+  配色(批次 2)。
+
 ### M5 — Syntax Highlighting
 
 - **`Banned.CodeDiff`**: syntax highlighting state ported from `file.ts` / `diff-file.ts` —
