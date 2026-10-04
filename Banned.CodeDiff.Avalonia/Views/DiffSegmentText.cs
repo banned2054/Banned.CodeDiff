@@ -219,7 +219,14 @@ public sealed class DiffSegmentText : Control
 
         // Hand-rolled Select/Prepend/Max: same result (0 for an empty line list), no enumerator
         // and closure allocations on this per-row hot path.
-        var width = layout.TextLines.Select(line => line.WidthIncludingTrailingWhitespace).Prepend(0.0).Max();
+        var width = 0.0;
+
+        foreach (var line in layout.TextLines)
+        {
+            var lineWidth = line.WidthIncludingTrailingWhitespace;
+
+            if (lineWidth > width) width = lineWidth;
+        }
 
         return new Size(width, GetLayoutHeight(layout));
     }
@@ -264,10 +271,10 @@ public sealed class DiffSegmentText : Control
         var wrapWidth = Wrap && double.IsFinite(constraintWidth) && constraintWidth > 0
             ? constraintWidth
             : double.PositiveInfinity;
+        const float tolerance = 0.0000001f;
+        if (CurrentLayout != null && Math.Abs(wrapWidth - _layoutWidth) < tolerance) return CurrentLayout;
 
-        if (CurrentLayout != null && wrapWidth == _layoutWidth) return CurrentLayout;
-
-        CurrentLayout = wrapWidth == double.PositiveInfinity
+        CurrentLayout = double.IsPositiveInfinity(wrapWidth)
             ? new TextLayout(Text ?? string.Empty, new Typeface(FontFamily), FontSize, Foreground ?? Brushes.Black)
             : new TextLayout(Text ?? string.Empty, new Typeface(FontFamily), FontSize, Foreground ?? Brushes.Black,
                              textWrapping : TextWrapping.Wrap, maxWidth : wrapWidth);

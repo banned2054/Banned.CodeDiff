@@ -215,20 +215,26 @@ public static class ChangeRange
         var bStart = 0;
 
         var aRange = new List<DiffItem>();
-        foreach (var item in diffRange.Where(item => item.Op != DiffOp.Delete))
-        {
-            aRange.Add(new DiffItem(item.Op, item.Text, aStart, aStart + item.Text.Length - 1, item.Text.Length));
-            aStart += item.Text.Length;
-        }
-
         var bRange = new List<DiffItem>();
-        foreach (var item in diffRange.Where(item => item.Op != DiffOp.Insert))
+
+        var hasLineChange = false;
+
+        // One pass over the opcodes instead of two Where passes; the a/b offsets and the
+        // hasLineChange short-circuit (aRange.Any(equal && non-blank)) evolve independently.
+        foreach (var item in diffRange)
         {
+            if (item.Op != DiffOp.Delete)
+            {
+                aRange.Add(new DiffItem(item.Op, item.Text, aStart, aStart + item.Text.Length - 1, item.Text.Length));
+                aStart += item.Text.Length;
+
+                if (!hasLineChange && item.Op == DiffOp.Equal && item.Text.Trim().Length > 0) hasLineChange = true;
+            }
+
+            if (item.Op == DiffOp.Insert) continue;
             bRange.Add(new DiffItem(item.Op, item.Text, bStart, bStart + item.Text.Length - 1, item.Text.Length));
             bStart += item.Text.Length;
         }
-
-        var hasLineChange = aRange.Any(i => i.Type == DiffOp.Equal && i.Str.Trim().Length > 0);
 
         return (new DiffRange { Range = aRange, HasLineChange = hasLineChange, NewLineSymbol = addSymbol },
                 new DiffRange { Range = bRange, HasLineChange = hasLineChange, NewLineSymbol = delSymbol });

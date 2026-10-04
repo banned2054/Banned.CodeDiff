@@ -168,8 +168,8 @@ public sealed class TextMateHighlighter : IDiffHighlighter
                 lineBuilder.Append(line, start, length);
             }
 
-            children.AddRange(spans.Select(span => BuildWrapper(lineBuilder.ToString(span.Start, span.Length),
-                                                                span.Light, span.Dark)));
+            foreach (var span in spans)
+                children.Add(BuildWrapper(lineBuilder.ToString(span.Start, span.Length), span.Light, span.Dark));
 
             if (i < lines.Length - 1) children.Add(new SyntaxNode { Type = "text", Value = "\n" });
         }
@@ -186,19 +186,32 @@ public sealed class TextMateHighlighter : IDiffHighlighter
     {
         foreach (var scopeName in scopes)
         {
-            var segments = scopeName.Split('.');
+            // Split('.') equivalent scanned right-to-left without materializing the
+            // segment array/strings — each segment is only used for equality checks.
+            var segmentEnd = scopeName.Length;
 
-            for (var i = segments.Length - 1; i >= 0; i--)
+            for (var i = scopeName.Length - 1; i >= -1; i--)
             {
-                switch (segments[i])
+                if (i >= 0 && scopeName[i] != '.') continue;
+
+                var segmentLength = segmentEnd - i - 1;
+
+                if (segmentLength > 0)
                 {
-                    case "comment" :
-                        return 1;
-                    case "string" :
-                        return 2;
-                    case "regexp" :
-                        return 3;
+                    var segment = scopeName.AsSpan(i + 1, segmentLength);
+
+                    switch (segment)
+                    {
+                        case "comment" :
+                            return 1;
+                        case "string" :
+                            return 2;
+                        case "regexp" :
+                            return 3;
+                    }
                 }
+
+                segmentEnd = i;
             }
         }
 

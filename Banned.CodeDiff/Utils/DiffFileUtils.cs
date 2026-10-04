@@ -10,9 +10,9 @@ public static class DiffFileUtils
     {
         var splitLineLength = diffFile.SplitLineLength;
 
-        var splitLines = new List<DiffSplitLineItem>();
+        var splitLines = new List<DiffSplitLineItem>(splitLineLength * 4);
 
-        foreach (var index in DiffTool.NumIterator(splitLineLength, i => i))
+        for (var index = 0; index < splitLineLength; index++)
         {
             splitLines.Add(new DiffSplitLineItem(DiffFileLineType.Hunk, index, index + 1));
 
@@ -30,29 +30,34 @@ public static class DiffFileUtils
     {
         var splitLineLength = diffFile.SplitLineLength;
 
-        return (from index in DiffTool.NumIterator(splitLineLength, i => i)
-                let splitLeftLine = diffFile.GetSplitLeftLine(index)
-                let splitRightLine = diffFile.GetSplitRightLine(index)
-                where splitLeftLine?.IsHidden != true && splitRightLine?.IsHidden != true
-                select new DiffSplitContentLineItem(DiffFileLineType.Content, index, index + 1, splitLeftLine,
-                                                    splitRightLine)).ToList();
+        var splitContentLines = new List<DiffSplitContentLineItem>(splitLineLength);
+
+        for (var index = 0; index < splitLineLength; index++)
+        {
+            var splitLeftLine  = diffFile.GetSplitLeftLine(index);
+            var splitRightLine = diffFile.GetSplitRightLine(index);
+
+            if (splitLeftLine?.IsHidden == true || splitRightLine?.IsHidden == true) continue;
+
+            splitContentLines.Add(new DiffSplitContentLineItem(DiffFileLineType.Content, index, index + 1,
+                                                               splitLeftLine, splitRightLine));
+        }
+
+        return splitContentLines;
     }
 
     public static List<DiffUnifiedLineItem> GetUnifiedLines(DiffFile diffFile)
     {
         var unifiedLineLength = diffFile.UnifiedLineLength;
 
-        var unifiedLines = new List<DiffUnifiedLineItem>();
+        var unifiedLines = new List<DiffUnifiedLineItem>(unifiedLineLength * 4);
 
-        foreach (var index in DiffTool.NumIterator(unifiedLineLength, i => i))
+        for (var index = 0; index < unifiedLineLength; index++)
         {
-            unifiedLines.Add(new DiffUnifiedLineItem(DiffFileLineType.Hunk, index, index + 1));
-
+            unifiedLines.Add(new DiffUnifiedLineItem(DiffFileLineType.Hunk, index, index    + 1));
             unifiedLines.Add(new DiffUnifiedLineItem(DiffFileLineType.Content, index, index + 1));
-
-            unifiedLines.Add(new DiffUnifiedLineItem(DiffFileLineType.Widget, index, index + 1));
-
-            unifiedLines.Add(new DiffUnifiedLineItem(DiffFileLineType.Extend, index, index + 1));
+            unifiedLines.Add(new DiffUnifiedLineItem(DiffFileLineType.Widget, index, index  + 1));
+            unifiedLines.Add(new DiffUnifiedLineItem(DiffFileLineType.Extend, index, index  + 1));
         }
 
         return unifiedLines;
@@ -62,11 +67,19 @@ public static class DiffFileUtils
     {
         var unifiedLineLength = diffFile.UnifiedLineLength;
 
-        return (from index in DiffTool.NumIterator(unifiedLineLength, i => i)
-                let unifiedLine = diffFile.GetUnifiedLine(index)
-                where unifiedLine?.IsHidden != true
-                select new DiffUnifiedContentLineItem(DiffFileLineType.Content, index, index + 1, unifiedLine))
-           .ToList();
+        var unifiedContentLines = new List<DiffUnifiedContentLineItem>(unifiedLineLength);
+
+        for (var index = 0; index < unifiedLineLength; index++)
+        {
+            var unifiedLine = diffFile.GetUnifiedLine(index);
+
+            if (unifiedLine?.IsHidden == true) continue;
+
+            unifiedContentLines.Add(new DiffUnifiedContentLineItem(DiffFileLineType.Content, index, index + 1,
+                                                                   unifiedLine));
+        }
+
+        return unifiedContentLines;
     }
 
     public static (bool Split, bool Unified) CheckCurrentLineIsHidden(DiffFile diffFile, int lineNumber, SplitSide side)

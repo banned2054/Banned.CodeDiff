@@ -232,13 +232,20 @@ public sealed class DiffFile
 
         var tmp = new List<DiffLine>();
 
+        // Reused across hunks (Clear keeps capacity) — getDiffRange only reads the lists
+        // by index while it runs and never retains them, so clearing at each group
+        // boundary matches the original per-hunk fresh lists exactly.
+        var additions = new List<DiffLine>();
+
+        var deletions = new List<DiffLine>();
+
         foreach (var item in _diffListResults)
         {
             var hunks = item.Hunks;
             foreach (var hunk in hunks)
             {
-                var additions = new List<DiffLine>();
-                var deletions = new List<DiffLine>();
+                additions.Clear();
+                deletions.Clear();
                 foreach (var line in hunk.Lines)
                 {
                     switch (line.Type)
@@ -253,8 +260,8 @@ public sealed class DiffFile
                             break;
                         default :
                             DiffTool.GetDiffRange(additions, deletions, GetNewRawLine, GetOldRawLine);
-                            additions = [];
-                            deletions = [];
+                            additions.Clear();
+                            deletions.Clear();
                             break;
                     }
 
