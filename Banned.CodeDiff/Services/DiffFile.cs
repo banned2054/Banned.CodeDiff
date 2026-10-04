@@ -270,14 +270,14 @@ public sealed class DiffFile
                     var newLength     = newNumParts.Length > 1 ? JsNumber(newNumParts[1]) : null;
                     i.HunkInfo = new HunkInfo
                     {
-                        OldStartIndex  = oldStartIndex,
-                        OldLength      = oldLength,
-                        NewStartIndex  = newStartIndex,
-                        NewLength      = newLength,
-                        _OldStartIndex = oldStartIndex,
-                        _OldLength     = oldLength,
-                        _NewStartIndex = newStartIndex,
-                        _NewLength     = newLength,
+                        OldStartIndex          = oldStartIndex,
+                        OldLength              = oldLength,
+                        NewStartIndex          = newStartIndex,
+                        NewLength              = newLength,
+                        OldStartIndexSnapshot  = oldStartIndex,
+                        OldLengthSnapshot      = oldLength,
+                        NewStartIndexSnapshot  = newStartIndex,
+                        NewLengthSnapshot      = newLength,
                     };
 
                     prevHunkLine = i;
@@ -712,19 +712,19 @@ public sealed class DiffFile
                     _splitLeftLines.Add(new SplitLineItem
                     {
                         LineNumber = oldFileLineNumber++, Value = oldRawLine, Diff = oldDiffLine, IsHidden = isHidden,
-                        _IsHidden  = isHidden,
+                        IsHiddenSnapshot = isHidden,
                     });
                     _splitRightLines.Add(new SplitLineItem
                     {
                         LineNumber = newFileLineNumber++, Value = newRawLine, Diff = newDiffLine, IsHidden = isHidden,
-                        _IsHidden  = isHidden,
+                        IsHiddenSnapshot = isHidden,
                     });
                     break;
                 case true :
                     _splitLeftLines.Add(new SplitLineItem
                     {
                         LineNumber = oldFileLineNumber++, Value = oldRawLine, Diff = oldDiffLine, IsHidden = isHidden,
-                        _IsHidden  = isHidden,
+                        IsHiddenSnapshot = isHidden,
                     });
                     _splitRightLines.Add(new SplitLineItem());
                     break;
@@ -736,7 +736,7 @@ public sealed class DiffFile
                         _splitRightLines.Add(new SplitLineItem
                         {
                             LineNumber = newFileLineNumber++, Value = newRawLine, Diff = newDiffLine,
-                            IsHidden   = isHidden, _IsHidden        = isHidden,
+                            IsHidden         = isHidden, IsHiddenSnapshot = isHidden,
                         });
                     }
 
@@ -785,10 +785,10 @@ public sealed class DiffFile
                 IsLast = true,
                 SplitInfo = new HunkLineInfo
                 {
-                    StartHiddenIndex  = hideStart.Value,
-                    EndHiddenIndex    = _splitRightLines.Count,
-                    _StartHiddenIndex = hideStart.Value,
-                    _EndHiddenIndex   = _splitRightLines.Count,
+                    StartHiddenIndex         = hideStart.Value,
+                    EndHiddenIndex           = _splitRightLines.Count,
+                    StartHiddenIndexSnapshot = hideStart.Value,
+                    EndHiddenIndexSnapshot   = _splitRightLines.Count,
 
                     // just for placeholder
                     PlainText     = "",
@@ -901,22 +901,22 @@ public sealed class DiffFile
                 case false when !newLineHasChange :
                     _unifiedLines.Add(new UnifiedLineItem
                     {
-                        OldLineNumber = oldFileLineNumber++,
-                        NewLineNumber = newFileLineNumber++,
-                        Value         = newRawLine,
-                        Diff          = newDiffLine,
-                        IsHidden      = isHidden,
-                        _IsHidden     = isHidden,
+                        OldLineNumber    = oldFileLineNumber++,
+                        NewLineNumber    = newFileLineNumber++,
+                        Value            = newRawLine,
+                        Diff             = newDiffLine,
+                        IsHidden         = isHidden,
+                        IsHiddenSnapshot = isHidden,
                     });
                     break;
                 case true :
                     _unifiedLines.Add(new UnifiedLineItem
                     {
-                        OldLineNumber = oldFileLineNumber++,
-                        Value         = oldRawLine,
-                        Diff          = oldDiffLine,
-                        IsHidden      = isHidden,
-                        _IsHidden     = isHidden,
+                        OldLineNumber    = oldFileLineNumber++,
+                        Value            = oldRawLine,
+                        Diff             = oldDiffLine,
+                        IsHidden         = isHidden,
+                        IsHiddenSnapshot = isHidden,
                     });
                     break;
                 default :
@@ -925,11 +925,11 @@ public sealed class DiffFile
                     {
                         _unifiedLines.Add(new UnifiedLineItem
                         {
-                            NewLineNumber = newFileLineNumber++,
-                            Value         = newRawLine,
-                            Diff          = newDiffLine,
-                            IsHidden      = isHidden,
-                            _IsHidden     = isHidden,
+                            NewLineNumber    = newFileLineNumber++,
+                            Value            = newRawLine,
+                            Diff             = newDiffLine,
+                            IsHidden         = isHidden,
+                            IsHiddenSnapshot = isHidden,
                         });
                     }
 
@@ -978,10 +978,10 @@ public sealed class DiffFile
                 IsLast = true,
                 UnifiedInfo = new HunkLineInfo
                 {
-                    StartHiddenIndex  = hideStart.Value,
-                    EndHiddenIndex    = _unifiedLines.Count,
-                    _StartHiddenIndex = hideStart.Value,
-                    _EndHiddenIndex   = _unifiedLines.Count,
+                    StartHiddenIndex         = hideStart.Value,
+                    EndHiddenIndex           = _unifiedLines.Count,
+                    StartHiddenIndexSnapshot = hideStart.Value,
+                    EndHiddenIndexSnapshot   = _unifiedLines.Count,
 
                     // just for placeholder
                     PlainText     = "",
@@ -1146,21 +1146,21 @@ public sealed class DiffFile
                 UnhideSplitRange(info.EndHiddenIndex - _composeLen, info.EndHiddenIndex);
                 current.SplitInfo = new HunkLineInfo
                 {
-                    StartHiddenIndex = info.StartHiddenIndex,
-                    EndHiddenIndex   = info.EndHiddenIndex - _composeLen,
+                    StartHiddenIndex         = info.StartHiddenIndex,
+                    EndHiddenIndex           = info.EndHiddenIndex - _composeLen,
                     PlainText =
                         $"@@ -{HunkLineInfo.RenderCount(info.OldStartIndex - _composeLen)},{HunkLineInfo.RenderCount(info.OldLength + _composeLen)} +{HunkLineInfo.RenderCount(info.NewStartIndex - _composeLen)},{HunkLineInfo.RenderCount(info.NewLength + _composeLen)}",
-                    _StartHiddenIndex = info._StartHiddenIndex,
-                    _EndHiddenIndex   = info._EndHiddenIndex,
-                    _PlainText        = info._PlainText,
-                    OldStartIndex     = info.OldStartIndex - _composeLen,
-                    OldLength         = info.OldLength     + _composeLen,
-                    NewStartIndex     = info.NewStartIndex - _composeLen,
-                    NewLength         = info.NewLength     + _composeLen,
-                    _OldStartIndex    = info._OldStartIndex,
-                    _OldLength        = info._OldLength,
-                    _NewStartIndex    = info._NewStartIndex,
-                    _NewLength        = info._NewLength,
+                    StartHiddenIndexSnapshot = info.StartHiddenIndexSnapshot,
+                    EndHiddenIndexSnapshot   = info.EndHiddenIndexSnapshot,
+                    PlainTextSnapshot        = info.PlainTextSnapshot,
+                    OldStartIndex            = info.OldStartIndex - _composeLen,
+                    OldLength                = info.OldLength     + _composeLen,
+                    NewStartIndex            = info.NewStartIndex - _composeLen,
+                    NewLength                = info.NewLength     + _composeLen,
+                    OldStartIndexSnapshot    = info.OldStartIndexSnapshot,
+                    OldLengthSnapshot        = info.OldLengthSnapshot,
+                    NewStartIndexSnapshot    = info.NewStartIndexSnapshot,
+                    NewLengthSnapshot        = info.NewLengthSnapshot,
                 };
 
                 _splitHunksLines.Remove(index);
@@ -1251,21 +1251,21 @@ public sealed class DiffFile
                 UnhideUnifiedRange(info.EndHiddenIndex - _composeLen, info.EndHiddenIndex);
                 current.UnifiedInfo = new HunkLineInfo
                 {
-                    StartHiddenIndex = info.StartHiddenIndex,
-                    EndHiddenIndex   = info.EndHiddenIndex - _composeLen,
+                    StartHiddenIndex         = info.StartHiddenIndex,
+                    EndHiddenIndex           = info.EndHiddenIndex - _composeLen,
                     PlainText =
                         $"@@ -{HunkLineInfo.RenderCount(info.OldStartIndex - _composeLen)},{HunkLineInfo.RenderCount(info.OldLength + _composeLen)} +{HunkLineInfo.RenderCount(info.NewStartIndex - _composeLen)},{HunkLineInfo.RenderCount(info.NewLength + _composeLen)}",
-                    _StartHiddenIndex = info._StartHiddenIndex,
-                    _EndHiddenIndex   = info._EndHiddenIndex,
-                    _PlainText        = info._PlainText,
-                    OldStartIndex     = info.OldStartIndex - _composeLen,
-                    OldLength         = info.OldLength     + _composeLen,
-                    NewStartIndex     = info.NewStartIndex - _composeLen,
-                    NewLength         = info.NewLength     + _composeLen,
-                    _OldStartIndex    = info._OldStartIndex,
-                    _OldLength        = info._OldLength,
-                    _NewStartIndex    = info._NewStartIndex,
-                    _NewLength        = info._NewLength,
+                    StartHiddenIndexSnapshot = info.StartHiddenIndexSnapshot,
+                    EndHiddenIndexSnapshot   = info.EndHiddenIndexSnapshot,
+                    PlainTextSnapshot        = info.PlainTextSnapshot,
+                    OldStartIndex            = info.OldStartIndex - _composeLen,
+                    OldLength                = info.OldLength     + _composeLen,
+                    NewStartIndex            = info.NewStartIndex - _composeLen,
+                    NewLength                = info.NewLength     + _composeLen,
+                    OldStartIndexSnapshot    = info.OldStartIndexSnapshot,
+                    OldLengthSnapshot        = info.OldLengthSnapshot,
+                    NewStartIndexSnapshot    = info.NewStartIndexSnapshot,
+                    NewLengthSnapshot        = info.NewLengthSnapshot,
                 };
 
                 _unifiedHunksLines.Remove(index);
@@ -1336,14 +1336,14 @@ public sealed class DiffFile
 
         if (mode == ExpandViewMode.Split)
         {
-            foreach (var item in _splitLeftLines.Where(item => item is { IsHidden: false, _IsHidden: true }))
+            foreach (var item in _splitLeftLines.Where(item => item is { IsHidden: false, IsHiddenSnapshot: true }))
             {
-                item.IsHidden = item._IsHidden;
+                item.IsHidden = item.IsHiddenSnapshot;
             }
 
-            foreach (var item in _splitRightLines.Where(item => item is { IsHidden: false, _IsHidden: true }))
+            foreach (var item in _splitRightLines.Where(item => item is { IsHidden: false, IsHiddenSnapshot: true }))
             {
-                item.IsHidden = item._IsHidden;
+                item.IsHidden = item.IsHiddenSnapshot;
             }
 
             if (_splitHunksLines != null)
@@ -1377,9 +1377,9 @@ public sealed class DiffFile
         }
         else
         {
-            foreach (var item in _unifiedLines.Where(item => item is { IsHidden: false, _IsHidden: true }))
+            foreach (var item in _unifiedLines.Where(item => item is { IsHidden: false, IsHiddenSnapshot: true }))
             {
-                item.IsHidden = item._IsHidden;
+                item.IsHidden = item.IsHiddenSnapshot;
             }
 
             if (_unifiedHunksLines != null)

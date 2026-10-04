@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### 重构 — JS 语法怪癖 .NET 化(行为不变,golden 测试护栏)
+
+- **`_Xxx` 快照字段改为快照语义命名**(`Banned.CodeDiff.Models`,公开 API 重命名,行为不变):
+  `HunkInfo`/`HunkLineInfo` 的 `_OldStartIndex/_OldLength/_NewStartIndex/_NewLength` →
+  `OldStartIndexSnapshot/OldLengthSnapshot/NewStartIndexSnapshot/NewLengthSnapshot`;
+  `HunkLineInfo` 的 `_StartHiddenIndex/_EndHiddenIndex/_PlainText` →
+  `StartHiddenIndexSnapshot/EndHiddenIndexSnapshot/PlainTextSnapshot`;
+  `SplitLineItem`/`UnifiedLineItem` 的 `_IsHidden` → `IsHiddenSnapshot`。
+  可空性(`int?`/`bool?` 等)与数值语义均保持原样(`HunkLineInfo` 与 `HunkInfo` 同名字段
+  的可空性差异是行为锚点,不统一);测试 JSON dump key(`"_oldStartIndex"` 等字面量)不变,
+  golden 输出逐字节一致。
+
 ### M6 — 长行换行模式(上游 diffViewWrap 移植,批次 4)
 
 - **`Banned.CodeDiff.Avalonia`**:`DiffView` 新增可绑定属性 `Wrap`(bool,默认 false,不改变现有宿主

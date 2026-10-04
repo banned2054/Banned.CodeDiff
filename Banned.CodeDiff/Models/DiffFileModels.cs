@@ -16,19 +16,19 @@ public sealed class HunkInfo
 
     public int? NewLength { get; set; }
 
-    public int _OldStartIndex { get; set; }
+    public int OldStartIndexSnapshot { get; set; }
 
-    public int? _OldLength { get; set; }
+    public int? OldLengthSnapshot { get; set; }
 
-    public int _NewStartIndex { get; set; }
+    public int NewStartIndexSnapshot { get; set; }
 
-    public int? _NewLength { get; set; }
+    public int? NewLengthSnapshot { get; set; }
 }
 
 /// <summary>
 /// Port of diff-file.ts type HunkLineInfo. splitInfo/unifiedInfo are the JS
 /// intersection type HunkLineInfo &amp; HunkInfo, so this class carries both groups of
-/// fields (plus their "_" snapshot variants used by collapse/restore).
+/// fields (plus their snapshot counterparts used by collapse/restore).
 /// </summary>
 public sealed class HunkLineInfo
 {
@@ -38,11 +38,11 @@ public sealed class HunkLineInfo
 
     public string? PlainText { get; set; }
 
-    public int _StartHiddenIndex { get; set; }
+    public int StartHiddenIndexSnapshot { get; set; }
 
-    public int _EndHiddenIndex { get; set; }
+    public int EndHiddenIndexSnapshot { get; set; }
 
-    public string? _PlainText { get; set; }
+    public string? PlainTextSnapshot { get; set; }
 
     public int? OldStartIndex { get; set; }
 
@@ -52,13 +52,13 @@ public sealed class HunkLineInfo
 
     public int? NewLength { get; set; }
 
-    public int? _OldStartIndex { get; set; }
+    public int? OldStartIndexSnapshot { get; set; }
 
-    public int? _OldLength { get; set; }
+    public int? OldLengthSnapshot { get; set; }
 
-    public int? _NewStartIndex { get; set; }
+    public int? NewStartIndexSnapshot { get; set; }
 
-    public int? _NewLength { get; set; }
+    public int? NewLengthSnapshot { get; set; }
 
     /// <summary>JS: { ...hunkInfo, startHiddenIndex, endHiddenIndex, plainText, _startHiddenIndex, _endHiddenIndex, _plainText }</summary>
     public static HunkLineInfo FromHunkInfo(
@@ -70,20 +70,20 @@ public sealed class HunkLineInfo
     {
         return new HunkLineInfo
         {
-            StartHiddenIndex  = startHiddenIndex,
-            EndHiddenIndex    = endHiddenIndex,
-            PlainText         = plainText,
-            _StartHiddenIndex = startHiddenIndex,
-            _EndHiddenIndex   = endHiddenIndex,
-            _PlainText        = plainText,
-            OldStartIndex     = hunkInfo.OldStartIndex,
-            OldLength         = hunkInfo.OldLength,
-            NewStartIndex     = hunkInfo.NewStartIndex,
-            NewLength         = hunkInfo.NewLength,
-            _OldStartIndex    = hunkInfo._OldStartIndex,
-            _OldLength        = hunkInfo._OldLength,
-            _NewStartIndex    = hunkInfo._NewStartIndex,
-            _NewLength        = hunkInfo._NewLength,
+            StartHiddenIndex         = startHiddenIndex,
+            EndHiddenIndex           = endHiddenIndex,
+            PlainText                = plainText,
+            StartHiddenIndexSnapshot = startHiddenIndex,
+            EndHiddenIndexSnapshot   = endHiddenIndex,
+            PlainTextSnapshot        = plainText,
+            OldStartIndex            = hunkInfo.OldStartIndex,
+            OldLength                = hunkInfo.OldLength,
+            NewStartIndex            = hunkInfo.NewStartIndex,
+            NewLength                = hunkInfo.NewLength,
+            OldStartIndexSnapshot    = hunkInfo.OldStartIndexSnapshot,
+            OldLengthSnapshot        = hunkInfo.OldLengthSnapshot,
+            NewStartIndexSnapshot    = hunkInfo.NewStartIndexSnapshot,
+            NewLengthSnapshot        = hunkInfo.NewLengthSnapshot,
         };
     }
 
@@ -93,20 +93,20 @@ public sealed class HunkLineInfo
     {
         return new HunkLineInfo
         {
-            StartHiddenIndex  = startHiddenIndex ?? StartHiddenIndex,
-            EndHiddenIndex    = endHiddenIndex   ?? EndHiddenIndex,
-            PlainText         = clearPlainText ? "" : plainText ?? PlainText,
-            _StartHiddenIndex = _StartHiddenIndex,
-            _EndHiddenIndex   = _EndHiddenIndex,
-            _PlainText        = _PlainText,
-            OldStartIndex     = OldStartIndex,
-            OldLength         = OldLength,
-            NewStartIndex     = NewStartIndex,
-            NewLength         = NewLength,
-            _OldStartIndex    = _OldStartIndex,
-            _OldLength        = _OldLength,
-            _NewStartIndex    = _NewStartIndex,
-            _NewLength        = _NewLength,
+            StartHiddenIndex         = startHiddenIndex ?? StartHiddenIndex,
+            EndHiddenIndex           = endHiddenIndex   ?? EndHiddenIndex,
+            PlainText                = clearPlainText ? "" : plainText ?? PlainText,
+            StartHiddenIndexSnapshot = StartHiddenIndexSnapshot,
+            EndHiddenIndexSnapshot   = EndHiddenIndexSnapshot,
+            PlainTextSnapshot        = PlainTextSnapshot,
+            OldStartIndex            = OldStartIndex,
+            OldLength                = OldLength,
+            NewStartIndex            = NewStartIndex,
+            NewLength                = NewLength,
+            OldStartIndexSnapshot    = OldStartIndexSnapshot,
+            OldLengthSnapshot        = OldLengthSnapshot,
+            NewStartIndexSnapshot    = NewStartIndexSnapshot,
+            NewLengthSnapshot        = NewLengthSnapshot,
         };
     }
 
@@ -116,20 +116,20 @@ public sealed class HunkLineInfo
     {
         return new HunkLineInfo
         {
-            StartHiddenIndex  = startHiddenIndex ?? StartHiddenIndex,
-            EndHiddenIndex    = EndHiddenIndex,
-            PlainText         = clearPlainText ? "" : plainText ?? PlainText,
-            _StartHiddenIndex = _StartHiddenIndex,
-            _EndHiddenIndex   = _EndHiddenIndex,
-            _PlainText        = _PlainText,
-            OldStartIndex     = hunkInfo.OldStartIndex,
-            OldLength         = hunkInfo.OldLength,
-            NewStartIndex     = hunkInfo.NewStartIndex,
-            NewLength         = hunkInfo.NewLength,
-            _OldStartIndex    = _OldStartIndex,
-            _OldLength        = _OldLength,
-            _NewStartIndex    = _NewStartIndex,
-            _NewLength        = _NewLength,
+            StartHiddenIndex         = startHiddenIndex ?? StartHiddenIndex,
+            EndHiddenIndex           = EndHiddenIndex,
+            PlainText                = clearPlainText ? "" : plainText ?? PlainText,
+            StartHiddenIndexSnapshot = StartHiddenIndexSnapshot,
+            EndHiddenIndexSnapshot   = EndHiddenIndexSnapshot,
+            PlainTextSnapshot        = PlainTextSnapshot,
+            OldStartIndex            = hunkInfo.OldStartIndex,
+            OldLength                = hunkInfo.OldLength,
+            NewStartIndex            = hunkInfo.NewStartIndex,
+            NewLength                = hunkInfo.NewLength,
+            OldStartIndexSnapshot    = OldStartIndexSnapshot,
+            OldLengthSnapshot        = OldLengthSnapshot,
+            NewStartIndexSnapshot    = NewStartIndexSnapshot,
+            NewLengthSnapshot        = NewLengthSnapshot,
         };
     }
 
@@ -144,20 +144,20 @@ public sealed class HunkLineInfo
     {
         return new HunkLineInfo
         {
-            StartHiddenIndex  = _StartHiddenIndex,
-            EndHiddenIndex    = _EndHiddenIndex,
-            PlainText         = _PlainText,
-            _StartHiddenIndex = _StartHiddenIndex,
-            _EndHiddenIndex   = _EndHiddenIndex,
-            _PlainText        = _PlainText,
-            OldStartIndex     = _OldStartIndex,
-            OldLength         = _OldLength,
-            NewStartIndex     = _NewStartIndex,
-            NewLength         = _NewLength,
-            _OldStartIndex    = _OldStartIndex,
-            _OldLength        = _OldLength,
-            _NewStartIndex    = _NewStartIndex,
-            _NewLength        = _NewLength,
+            StartHiddenIndex         = StartHiddenIndexSnapshot,
+            EndHiddenIndex           = EndHiddenIndexSnapshot,
+            PlainText                = PlainTextSnapshot,
+            StartHiddenIndexSnapshot = StartHiddenIndexSnapshot,
+            EndHiddenIndexSnapshot   = EndHiddenIndexSnapshot,
+            PlainTextSnapshot        = PlainTextSnapshot,
+            OldStartIndex            = OldStartIndexSnapshot,
+            OldLength                = OldLengthSnapshot,
+            NewStartIndex            = NewStartIndexSnapshot,
+            NewLength                = NewLengthSnapshot,
+            OldStartIndexSnapshot    = OldStartIndexSnapshot,
+            OldLengthSnapshot        = OldLengthSnapshot,
+            NewStartIndexSnapshot    = NewStartIndexSnapshot,
+            NewLengthSnapshot        = NewLengthSnapshot,
         };
     }
 }
@@ -173,7 +173,7 @@ public sealed class SplitLineItem
 
     public bool IsHidden { get; set; }
 
-    public bool _IsHidden { get; set; }
+    public bool IsHiddenSnapshot { get; set; }
 
     public SplitLineItem Clone() => (SplitLineItem)MemberwiseClone();
 }
@@ -191,7 +191,7 @@ public sealed class UnifiedLineItem
 
     public bool IsHidden { get; set; }
 
-    public bool _IsHidden { get; set; }
+    public bool IsHiddenSnapshot { get; set; }
 
     public UnifiedLineItem Clone() => (UnifiedLineItem)MemberwiseClone();
 }

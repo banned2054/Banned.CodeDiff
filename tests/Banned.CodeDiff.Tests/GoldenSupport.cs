@@ -210,10 +210,10 @@ public static class GoldenSupport
             ["oldLength"]      = h.OldLength,
             ["newStartIndex"]  = h.NewStartIndex,
             ["newLength"]      = h.NewLength,
-            ["_oldStartIndex"] = h._OldStartIndex,
-            ["_oldLength"]     = h._OldLength,
-            ["_newStartIndex"] = h._NewStartIndex,
-            ["_newLength"]     = h._NewLength,
+            ["_oldStartIndex"] = h.OldStartIndexSnapshot,
+            ["_oldLength"]     = h.OldLengthSnapshot,
+            ["_newStartIndex"] = h.NewStartIndexSnapshot,
+            ["_newLength"]     = h.NewLengthSnapshot,
         };
     }
 
@@ -229,17 +229,17 @@ public static class GoldenSupport
             ["startHiddenIndex"]  = h.StartHiddenIndex,
             ["endHiddenIndex"]    = h.EndHiddenIndex,
             ["plainText"]         = h.PlainText,
-            ["_startHiddenIndex"] = h._StartHiddenIndex,
-            ["_endHiddenIndex"]   = h._EndHiddenIndex,
-            ["_plainText"]        = h._PlainText,
+            ["_startHiddenIndex"] = h.StartHiddenIndexSnapshot,
+            ["_endHiddenIndex"]   = h.EndHiddenIndexSnapshot,
+            ["_plainText"]        = h.PlainTextSnapshot,
             ["oldStartIndex"]     = h.OldStartIndex,
             ["oldLength"]         = h.OldLength,
             ["newStartIndex"]     = h.NewStartIndex,
             ["newLength"]         = h.NewLength,
-            ["_oldStartIndex"]    = h._OldStartIndex,
-            ["_oldLength"]        = h._OldLength,
-            ["_newStartIndex"]    = h._NewStartIndex,
-            ["_newLength"]        = h._NewLength,
+            ["_oldStartIndex"]    = h.OldStartIndexSnapshot,
+            ["_oldLength"]        = h.OldLengthSnapshot,
+            ["_newStartIndex"]    = h.NewStartIndexSnapshot,
+            ["_newLength"]        = h.NewLengthSnapshot,
         };
     }
 
@@ -321,7 +321,7 @@ public static class GoldenSupport
             ["lineNumber"] = it.LineNumber,
             ["value"]      = it.Value,
             ["isHidden"]   = it.IsHidden,
-            ["_isHidden"]  = it._IsHidden,
+            ["_isHidden"]  = it.IsHiddenSnapshot,
             ["diff"]       = DumpDiffLine(it.Diff),
         };
     }
@@ -339,7 +339,7 @@ public static class GoldenSupport
             ["newLineNumber"] = it.NewLineNumber,
             ["value"]         = it.Value,
             ["isHidden"]      = it.IsHidden,
-            ["_isHidden"]     = it._IsHidden,
+            ["_isHidden"]     = it.IsHiddenSnapshot,
             ["diff"]          = DumpDiffLine(it.Diff),
         };
     }
