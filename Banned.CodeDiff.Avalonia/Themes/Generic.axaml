@@ -33,52 +33,84 @@
                                             <Grid MinHeight="22"
                                                   ClipToBounds="True"
                                                   ColumnDefinitions="Auto,*,1,Auto,*">
-                                                <Border Width="{Binding $parent[v:DiffView].NumberColumnWidth}"
+                                                <Border Classes="diff-line-old-num"
+                                                        Width="{Binding $parent[v:DiffView].NumberColumnWidth}"
                                                         Background="{Binding Left.NumberBackground}">
-                                                    <TextBlock Margin="10,2"
-                                                               Foreground="{Binding Left.NumberForeground}"
-                                                               Text="{Binding Left.Number}"
-                                                               TextAlignment="Right"
-                                                               VerticalAlignment="Center" />
+                                                    <Panel>
+                                                        <TextBlock Margin="10,2"
+                                                                   Foreground="{Binding Left.NumberForeground}"
+                                                                   Text="{Binding Left.Number}"
+                                                                   TextAlignment="Right"
+                                                                   VerticalAlignment="Center" />
+                                                        <!-- multi-select overlay + edge strip (upstream _com.css
+                                                             .diff-multi-select-active ::after/::before; the strip is the
+                                                             number cell's right edge — upstream overhangs 2px into the
+                                                             content cell, kept inside here) -->
+                                                        <Rectangle Fill="{Binding Left.SelectionOverlay}"
+                                                                   IsVisible="{Binding Left.IsSelected}" />
+                                                        <Rectangle Width="4"
+                                                                   HorizontalAlignment="Right"
+                                                                   Fill="{Binding Left.SelectionEdgeStrip}"
+                                                                   IsVisible="{Binding Left.IsSelected}" />
+                                                    </Panel>
                                                 </Border>
                                                 <Border Grid.Column="1"
+                                                        Classes="diff-line-old-content"
                                                         Background="{Binding Left.ContentBackground}"
                                                         ClipToBounds="True">
-                                                    <StackPanel Margin="4,2,0,2"
-                                                                Orientation="Horizontal"
-                                                                VerticalAlignment="Center">
-                                                        <TextBlock Margin="0,0,6,0"
-                                                                   Text="{Binding Left.Sign}" />
-                                                        <v:DiffSegmentText Text="{Binding Left.Text}"
-                                                                           HighlightBrush="{Binding Left.HighlightBrush}"
-                                                                           Highlights="{Binding Left.Highlights}"
-                                                                           SyntaxRuns="{Binding Left.SyntaxRuns}" />
-                                                    </StackPanel>
+                                                    <Panel>
+                                                        <StackPanel Margin="4,2,0,2"
+                                                                    Orientation="Horizontal"
+                                                                    VerticalAlignment="Center">
+                                                            <TextBlock Margin="0,0,6,0"
+                                                                       Text="{Binding Left.Sign}" />
+                                                            <v:DiffSegmentText Text="{Binding Left.Text}"
+                                                                               HighlightBrush="{Binding Left.HighlightBrush}"
+                                                                               Highlights="{Binding Left.Highlights}"
+                                                                               SyntaxRuns="{Binding Left.SyntaxRuns}" />
+                                                        </StackPanel>
+                                                        <Rectangle Fill="{Binding Left.SelectionOverlay}"
+                                                                   IsVisible="{Binding Left.IsSelected}" />
+                                                    </Panel>
                                                 </Border>
                                                 <Rectangle Grid.Column="2"
                                                            Fill="{Binding SplitterBrush}" />
                                                 <Border Grid.Column="3"
+                                                        Classes="diff-line-new-num"
                                                         Width="{Binding $parent[v:DiffView].NumberColumnWidth}"
                                                         Background="{Binding Right.NumberBackground}">
-                                                    <TextBlock Margin="10,2"
-                                                               Foreground="{Binding Right.NumberForeground}"
-                                                               Text="{Binding Right.Number}"
-                                                               TextAlignment="Right"
-                                                               VerticalAlignment="Center" />
+                                                    <Panel>
+                                                        <TextBlock Margin="10,2"
+                                                                   Foreground="{Binding Right.NumberForeground}"
+                                                                   Text="{Binding Right.Number}"
+                                                                   TextAlignment="Right"
+                                                                   VerticalAlignment="Center" />
+                                                        <Rectangle Fill="{Binding Right.SelectionOverlay}"
+                                                                   IsVisible="{Binding Right.IsSelected}" />
+                                                        <Rectangle Width="4"
+                                                                   HorizontalAlignment="Right"
+                                                                   Fill="{Binding Right.SelectionEdgeStrip}"
+                                                                   IsVisible="{Binding Right.IsSelected}" />
+                                                    </Panel>
                                                 </Border>
                                                 <Border Grid.Column="4"
+                                                        Classes="diff-line-new-content"
                                                         Background="{Binding Right.ContentBackground}"
                                                         ClipToBounds="True">
-                                                    <StackPanel Margin="4,2,0,2"
-                                                                Orientation="Horizontal"
-                                                                VerticalAlignment="Center">
-                                                        <TextBlock Margin="0,0,6,0"
-                                                                   Text="{Binding Right.Sign}" />
-                                                        <v:DiffSegmentText Text="{Binding Right.Text}"
-                                                                           HighlightBrush="{Binding Right.HighlightBrush}"
-                                                                           Highlights="{Binding Right.Highlights}"
-                                                                           SyntaxRuns="{Binding Right.SyntaxRuns}" />
-                                                    </StackPanel>
+                                                    <Panel>
+                                                        <StackPanel Margin="4,2,0,2"
+                                                                    Orientation="Horizontal"
+                                                                    VerticalAlignment="Center">
+                                                            <TextBlock Margin="0,0,6,0"
+                                                                       Text="{Binding Right.Sign}" />
+                                                            <v:DiffSegmentText Text="{Binding Right.Text}"
+                                                                               HighlightBrush="{Binding Right.HighlightBrush}"
+                                                                               Highlights="{Binding Right.Highlights}"
+                                                                               SyntaxRuns="{Binding Right.SyntaxRuns}" />
+                                                        </StackPanel>
+                                                        <Rectangle Fill="{Binding Right.SelectionOverlay}"
+                                                                   IsVisible="{Binding Right.IsSelected}" />
+                                                    </Panel>
                                                 </Border>
                                             </Grid>
                                         </DataTemplate>
@@ -144,36 +176,58 @@
                                             <Grid MinHeight="22"
                                                   ClipToBounds="True"
                                                   ColumnDefinitions="Auto,Auto,*">
-                                                <Border Width="{Binding $parent[v:DiffView].NumberColumnWidth}"
-                                                        Background="{Binding NumberBackground}">
-                                                    <TextBlock Margin="10,2"
-                                                               Foreground="{Binding NumberForeground}"
-                                                               Text="{Binding OldNumber}"
-                                                               TextAlignment="Right"
-                                                               VerticalAlignment="Center" />
-                                                </Border>
-                                                <Border Grid.Column="1"
+                                                <Border Classes="diff-line-num"
                                                         Width="{Binding $parent[v:DiffView].NumberColumnWidth}"
                                                         Background="{Binding NumberBackground}">
-                                                    <TextBlock Margin="10,2"
-                                                               Foreground="{Binding NumberForeground}"
-                                                               Text="{Binding NewNumber}"
-                                                               TextAlignment="Right"
-                                                               VerticalAlignment="Center" />
+                                                    <Panel>
+                                                        <TextBlock Margin="10,2"
+                                                                   Foreground="{Binding NumberForeground}"
+                                                                   Text="{Binding OldNumber}"
+                                                                   TextAlignment="Right"
+                                                                   VerticalAlignment="Center" />
+                                                        <Rectangle Fill="{Binding SelectionOverlay}"
+                                                                   IsVisible="{Binding IsSelected}" />
+                                                    </Panel>
+                                                </Border>
+                                                <Border Grid.Column="1"
+                                                        Classes="diff-line-num"
+                                                        Width="{Binding $parent[v:DiffView].NumberColumnWidth}"
+                                                        Background="{Binding NumberBackground}">
+                                                    <Panel>
+                                                        <TextBlock Margin="10,2"
+                                                                   Foreground="{Binding NumberForeground}"
+                                                                   Text="{Binding NewNumber}"
+                                                                   TextAlignment="Right"
+                                                                   VerticalAlignment="Center" />
+                                                        <Rectangle Fill="{Binding SelectionOverlay}"
+                                                                   IsVisible="{Binding IsSelected}" />
+                                                        <!-- The upstream strip sits on the joint .diff-line-num
+                                                             cell's right edge — between the new-number column and
+                                                             the content column. -->
+                                                        <Rectangle Width="4"
+                                                                   HorizontalAlignment="Right"
+                                                                   Fill="{Binding SelectionEdgeStrip}"
+                                                                   IsVisible="{Binding IsSelected}" />
+                                                    </Panel>
                                                 </Border>
                                                 <Border Grid.Column="2"
+                                                        Classes="diff-line-content"
                                                         Background="{Binding ContentBackground}"
                                                         ClipToBounds="True">
-                                                    <StackPanel Margin="4,2,0,2"
-                                                                Orientation="Horizontal"
-                                                                VerticalAlignment="Center">
-                                                        <TextBlock Margin="0,0,6,0"
-                                                                   Text="{Binding Sign}" />
-                                                        <v:DiffSegmentText Text="{Binding Text}"
-                                                                           HighlightBrush="{Binding HighlightBrush}"
-                                                                           Highlights="{Binding Highlights}"
-                                                                           SyntaxRuns="{Binding SyntaxRuns}" />
-                                                    </StackPanel>
+                                                    <Panel>
+                                                        <StackPanel Margin="4,2,0,2"
+                                                                    Orientation="Horizontal"
+                                                                    VerticalAlignment="Center">
+                                                            <TextBlock Margin="0,0,6,0"
+                                                                       Text="{Binding Sign}" />
+                                                            <v:DiffSegmentText Text="{Binding Text}"
+                                                                               HighlightBrush="{Binding HighlightBrush}"
+                                                                               Highlights="{Binding Highlights}"
+                                                                               SyntaxRuns="{Binding SyntaxRuns}" />
+                                                        </StackPanel>
+                                                        <Rectangle Fill="{Binding SelectionOverlay}"
+                                                                   IsVisible="{Binding IsSelected}" />
+                                                    </Panel>
                                                 </Border>
                                             </Grid>
                                         </DataTemplate>

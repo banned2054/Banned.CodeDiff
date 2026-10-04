@@ -24,7 +24,9 @@ internal sealed record DiffBrushSet(
     IBrush HunkForeground,
     IBrush AddContentHighlight,
     IBrush DeleteContentHighlight,
-    IBrush Splitter);
+    IBrush Splitter,
+    IBrush MultiSelectOverlay,
+    IBrush MultiSelectBorder);
 
 /// <summary>Light/dark brush sets for the diff view (upstream <c>--diff-*--</c> variables).</summary>
 internal static class DiffBrushes
@@ -62,6 +64,12 @@ internal static class DiffBrushes
     private static readonly IBrush DeleteHighlightDark   = Parse("#713431");
     private static readonly IBrush SplitterDark          = Parse("#3d444d");
 
+    // multiSelect palette (packages/*/src/_com.css): --diff-multi-select-bg #f0c000 at opacity
+    // 0.15 for the cell overlay, --diff-multi-select-border #2588fa solid for the edge strip.
+    // The CSS variables carry no per-theme definitions — both variants use the same fallbacks.
+    private static readonly IBrush MultiSelectOverlay = WithOpacity(Parse("#f0c000"), 0.15);
+    private static readonly IBrush MultiSelectBorder  = Parse("#2588fa");
+
     private static readonly DiffBrushSet LightSet = new(NumberForegroundLight, AddNumberLight, AddContentLight,
                                                         DeleteNumberLight, DeleteContentLight,
                                                         ContextNumberLight, ContextContentLight,
@@ -69,7 +77,7 @@ internal static class DiffBrushes
                                                         EmptyContentLight, HunkNumberLight,
                                                         HunkContentLight, HunkContentLight, HunkForegroundLight,
                                                         AddHighlightLight, DeleteHighlightLight,
-                                                        SplitterLight);
+                                                        SplitterLight, MultiSelectOverlay, MultiSelectBorder);
 
     private static readonly DiffBrushSet DarkSet = new(NumberForegroundDark, AddNumberDark, AddContentDark,
                                                        DeleteNumberDark, DeleteContentDark,
@@ -78,9 +86,15 @@ internal static class DiffBrushes
                                                        EmptyContentDark, HunkNumberDark,
                                                        HunkContentDark, HunkContentDark, HunkForegroundDark,
                                                        AddHighlightDark, DeleteHighlightDark,
-                                                       SplitterDark);
+                                                       SplitterDark, MultiSelectOverlay, MultiSelectBorder);
 
     public static DiffBrushSet Get(ThemeVariant variant) => variant == ThemeVariant.Dark ? DarkSet : LightSet;
 
     private static IBrush Parse(string hex) => new SolidColorBrush(Color.Parse(hex));
+
+    private static IBrush WithOpacity(IBrush brush, double opacity)
+    {
+        var solid = (SolidColorBrush)brush;
+        return new SolidColorBrush(solid.Color, opacity);
+    }
 }

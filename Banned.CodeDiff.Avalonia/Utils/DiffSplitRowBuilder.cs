@@ -43,7 +43,8 @@ internal static class DiffSplitRowBuilder
                 continue;
             }
 
-            rows.Add(new DiffSplitContentRow(CreateCell(file, left, SplitSide.Old, variant, brushes),
+            rows.Add(new DiffSplitContentRow(index + 1,
+                                              CreateCell(file, left, SplitSide.Old, variant, brushes),
                                               CreateCell(file, right, SplitSide.New, variant, brushes),
                                               brushes.Splitter));
         }

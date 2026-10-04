@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using Avalonia.Media;
 using Banned.CodeDiff.Models;
 
@@ -6,19 +7,24 @@ namespace Banned.CodeDiff.Avalonia.Models;
 /// <summary>Base type of unified rows rendered by <see cref="Views.DiffView"/>.</summary>
 public abstract class DiffUnifiedRow : DiffRow;
 
-/// <summary>A unified content row: one diff line with dual (old/new) line numbers.</summary>
-public sealed class DiffUnifiedContentRow : DiffUnifiedRow
+/// <summary>A unified content row: one diff line with dual (old/new) line numbers.
+/// Carries the multi-select highlight state (<see cref="IsSelected"/>) so realized row
+/// containers update in place while a selection drag moves — the Avalonia equivalent of the
+/// upstream <c>.diff-multi-select-active</c> CSS class toggling.</summary>
+public sealed class DiffUnifiedContentRow : DiffUnifiedRow, INotifyPropertyChanged
 {
-    internal DiffUnifiedContentRow(string? oldNumber, string? newNumber, string text, DiffCellKind kind,
+    internal DiffUnifiedContentRow(int? oldLineNumber, int? newLineNumber, string text, DiffCellKind kind,
                                    IReadOnlyList<DiffHighlight> highlights,
                                    IReadOnlyList<DiffSyntaxRun>? syntaxRuns, DiffBrushSet brushes)
     {
-        Highlights = highlights;
-        SyntaxRuns = syntaxRuns;
-        OldNumber  = oldNumber;
-        NewNumber  = newNumber;
-        Text       = text;
-        Kind       = kind;
+        OldLineNumber = oldLineNumber;
+        NewLineNumber = newLineNumber;
+        Highlights    = highlights;
+        SyntaxRuns    = syntaxRuns;
+        OldNumber     = oldLineNumber?.ToString();
+        NewNumber     = newLineNumber?.ToString();
+        Text          = text;
+        Kind          = kind;
         Sign = kind switch
         {
             DiffCellKind.Add    => "+",
@@ -47,13 +53,26 @@ public sealed class DiffUnifiedContentRow : DiffUnifiedRow
             DiffCellKind.Delete => brushes.DeleteContentHighlight,
             _                   => null,
         };
-        NumberForeground = brushes.NumberForeground;
+        NumberForeground   = brushes.NumberForeground;
+        SelectionOverlay   = brushes.MultiSelectOverlay;
+        SelectionEdgeStrip = brushes.MultiSelectBorder;
     }
 
-    /// <summary>Gets the old file line number, or <c>null</c> for added lines.</summary>
+    /// <inheritdoc />
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    /// <summary>Gets the old file line number, or <c>null</c> for added lines — the upstream
+    /// unified DOM's <c>data-line-old-num</c> attribute consumed by multiSelect/dom.ts.</summary>
+    public int? OldLineNumber { get; }
+
+    /// <summary>Gets the new file line number, or <c>null</c> for deleted lines — the upstream
+    /// unified DOM's <c>data-line-new-num</c> attribute consumed by multiSelect/dom.ts.</summary>
+    public int? NewLineNumber { get; }
+
+    /// <summary>Gets the old file line number text, or <c>null</c> for added lines.</summary>
     public string? OldNumber { get; }
 
-    /// <summary>Gets the new file line number, or <c>null</c> for deleted lines.</summary>
+    /// <summary>Gets the new file line number text, or <c>null</c> for deleted lines.</summary>
     public string? NewNumber { get; }
 
     /// <summary>Gets the line text with the trailing newline removed.</summary>
@@ -83,6 +102,33 @@ public sealed class DiffUnifiedContentRow : DiffUnifiedRow
 
     /// <summary>Gets the line-number text brush.</summary>
     public IBrush NumberForeground { get; }
+
+    /// <summary>Gets the multi-select overlay brush (#f0c000 at 15% opacity, upstream
+    /// <c>--diff-multi-select-bg</c>).</summary>
+    public IBrush SelectionOverlay { get; }
+
+    /// <summary>Gets the multi-select edge-strip brush (#2588fa, upstream
+    /// <c>--diff-multi-select-border</c>).</summary>
+    public IBrush SelectionEdgeStrip { get; }
+
+    /// <summary>Gets or sets whether this row is covered by a multi-select range; raised through
+    /// <see cref="PropertyChanged"/> so realized containers update without a row rebuild.</summary>
+    public bool IsSelected
+    {
+        get => _isSelected;
+        internal set
+        {
+            if (_isSelected == value)
+            {
+                return;
+            }
+
+            _isSelected = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsSelected)));
+        }
+    }
+
+    private bool _isSelected;
 }
 
 /// <summary>A unified collapsed hunk placeholder row showing the "@@" header with expand affordances.</summary>
@@ -110,7 +156,7 @@ public sealed class DiffUnifiedHunkRow : DiffUnifiedRow
     }
 
     /// <summary>Gets the unified model index of the hunk — the key passed to
-    /// <see cref="Services.DiffFile.OnUnifiedHunkExpand"/>.</summary>
+    /// <see cref="global::Banned.CodeDiff.Services.DiffFile.OnUnifiedHunkExpand"/>.</summary>
     public int HunkIndex { get; }
 
     /// <summary>Gets whether the model allows expansion at all (not composed from diff-only text).</summary>

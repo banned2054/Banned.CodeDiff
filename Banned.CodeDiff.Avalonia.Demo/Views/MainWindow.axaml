@@ -24,6 +24,7 @@
             <ToggleButton Content="词级高亮" IsChecked="{Binding IsFastDiff}" />
             <ToggleButton Content="语法高亮" IsChecked="{Binding IsSyntax}" />
             <ToggleButton Content="Unified 视图" IsChecked="{Binding IsUnified}" />
+            <ToggleButton Content="启用行选择" IsChecked="{Binding IsSelectionEnabled}" />
             <ToggleButton Content="深色主题" IsChecked="{Binding IsDark}" />
         </StackPanel>
 
@@ -39,9 +40,17 @@
         <Border Grid.Row="2"
                 BorderBrush="Gray"
                 BorderThickness="1">
-            <views:DiffView DiffFile="{Binding DiffFile}" SyntaxHighlight="{Binding IsSyntax}" ViewMode="{Binding ViewMode}" />
+            <views:DiffView x:Name="DiffView"
+                            DiffFile="{Binding DiffFile}"
+                            IsSelectionEnabled="{Binding IsSelectionEnabled}"
+                            SyntaxHighlight="{Binding IsSyntax}"
+                            ViewMode="{Binding ViewMode}" />
         </Border>
 
         <TextBlock Grid.Row="3" Margin="0,8,0,0" Text="{Binding Stats}" />
+        <TextBlock Grid.Row="3"
+                   Margin="0,8,0,0"
+                   HorizontalAlignment="Right"
+                   Text="{Binding SelectionStatus}" />
     </Grid>
 </Window>

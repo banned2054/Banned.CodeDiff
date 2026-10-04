@@ -2,6 +2,36 @@
 
 ## Unreleased
 
+### M6 — 行选择(上游 multiSelect 移植,批次 2)
+
+- **`Banned.CodeDiff`**:数据层移植自 `multiSelect/types.ts` + `multiSelect/data.ts`(+ `dom.ts`
+  的纯函数 `normalizeRange`、`visual.ts` 的纯函数 `changePreselectedLinesToLineRange`):
+  `MultiSelectRange`/`SelectedLine`/`MultiSelectResult`/`MultiSelectState` 等类型与
+  `GetSelectedLinesFromDiffFile_Split/_Unified`,逐行号查询 DiffFile,`IsHide` 来自
+  `CheckCurrentLineIsHidden`,`IsContext` 保留上游 `diff?.type === undefined` 也算 context 的
+  怪癖,`Index` 为 1-based(split/unified 模型索引 +1)。命名差异:`LineRange` 已被
+  change-range 移植占用,multiSelect 范围类型命名 `MultiSelectRange`;side 统一用 `SplitSide`
+  枚举(上游字符串联合)。不移植:`extendDataToPreselectedLines`(评论流适配)。
+- **`Banned.CodeDiff.Avalonia`**:行选择交互移植自 `multiSelect/manager.ts` +
+  `DiffViewWithMultiSelect.tsx`(`Services/DiffSelection.cs` 状态机、`Services/DiffSelectionDom.cs`
+  的 dom.ts 视觉树等价物、`DiffView` 的指针路由)。拖拽从行号列开始(PointerCapture 保证
+  PointerReleased 全局接住,等价上游 document mouseup;拖拽中锁定起始侧;split 拖拽悬停行
+  内容也会延伸选区、unified 悬停行号区才延伸、无起始侧行号的行不延伸,均照上游);release
+  归一化并产出结果,完成后选区经由 preselected 通道保持高亮,新拖拽清空上次选区;数据变化
+  (展开/收起)后同步重算高亮(上游 16ms debounce 是 DOM 批处理优化,不复刻)——隐藏行
+  不高亮但保留在选区,展开后补齐。视觉:上游 `_com.css` 的
+  `#f0c000` 15% 遮罩 + `#2588fa` 4px 边条(light/dark 同值),边条在选中侧行号格右缘
+  (上游 `-2px` 外溢简化为格内 4px);split 按数据层 isContext 决定双侧/单侧高亮,unified
+  整行高亮。公开 API(`DiffView`):`IsSelectionEnabled`(默认 false,与上游默认 true 不同,
+  避免改变既有宿主行为)、`SelectionChanged`/`SelectionCompleted` 事件、
+  `GetSelectionResult()`、`GetSelectionState()`、`ClearSelection()`、`SetPreselectedLines(old/new)`
+  (min/max 大区间合并为上游已知语义)。有意差异:ClearSelection 连 preselected 通道一并清空
+  (上游 manager 的 clearSelection 保留 preselected,单通道移植下保留会导致高亮永远清不掉);
+  DOM 形态分支(wrap/nowrap 双 tr)不移植,以模型行 + side 为键;scopeToHunk 钩子不移植。
+- **Demo**:「启用行选择」开关 + 选区完成后的状态栏(「已选 N 行(old 12-34)」),为批次 3
+  复制功能做铺垫。
+- NOTICE 新增 multiSelect 衍生记录。
+
 ### M6 — 展开 hunk 后的视口锚定(M4 遗留)
 
 - **`Banned.CodeDiff.Avalonia`**:点击展开按钮后视口不再跳变。展开命令先记录锚点

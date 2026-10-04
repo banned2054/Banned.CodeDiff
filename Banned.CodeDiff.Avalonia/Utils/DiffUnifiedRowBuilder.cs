@@ -50,7 +50,7 @@ internal static class DiffUnifiedRowBuilder
             // from the file content, colored with the expand palette (upstream hasDiff=false).
             if (line.Diff is not { } diff)
             {
-                rows.Add(new DiffUnifiedContentRow(line.OldLineNumber?.ToString(), line.NewLineNumber?.ToString(),
+                rows.Add(new DiffUnifiedContentRow(line.OldLineNumber, line.NewLineNumber,
                                                    lineText, DiffCellKind.Expand, [], syntaxRuns, brushes));
                 continue;
             }
@@ -62,7 +62,7 @@ internal static class DiffUnifiedRowBuilder
                 _                   => DiffCellKind.Context,
             };
 
-            rows.Add(new DiffUnifiedContentRow(line.OldLineNumber?.ToString(), line.NewLineNumber?.ToString(),
+            rows.Add(new DiffUnifiedContentRow(line.OldLineNumber, line.NewLineNumber,
                                                lineText, kind, DiffHighlights.Extract(diff, kind), syntaxRuns,
                                                brushes));
         }

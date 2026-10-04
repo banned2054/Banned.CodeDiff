@@ -1,6 +1,7 @@
 using Avalonia.Styling;
 using Banned.CodeDiff.Avalonia.Demo.Models;
 using Banned.CodeDiff.Avalonia.Models;
+using Banned.CodeDiff.Models;
 using Banned.CodeDiff.Services;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
@@ -16,6 +17,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     private DiffViewMode _viewMode      = DiffViewMode.Split;
     private bool         _isFastDiff    = true;
     private bool         _isSyntax      = true;
+    private bool         _isSelectionEnabled;
+    private string       _selectionStatus = "未选择";
     private string       _syntaxFile    = "store.cs";
 
     public MainWindowViewModel()
@@ -127,6 +130,34 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
                 OnPropertyChanged(nameof(Theme));
             }
         }
+    }
+
+    /// <summary>Enables the DiffView line-selection feature (off by default, like the control).</summary>
+    public bool IsSelectionEnabled
+    {
+        get => _isSelectionEnabled;
+        set => Set(ref _isSelectionEnabled, value);
+    }
+
+    /// <summary>Status line for the latest completed selection — groundwork for the M6 copy feature.</summary>
+    public string SelectionStatus
+    {
+        get => _selectionStatus;
+        private set => Set(ref _selectionStatus, value);
+    }
+
+    /// <summary>Called from the view's DiffView.SelectionCompleted handler.</summary>
+    public void OnSelectionCompleted(MultiSelectResult? result)
+    {
+        if (result is not { } completed)
+        {
+            SelectionStatus = "未选择";
+            return;
+        }
+
+        var side = completed.Range.Side == SplitSide.Old ? "old" : "new";
+
+        SelectionStatus = $"已选 {completed.Lines.Count} 行({side} {completed.Range.StartLineNumber}-{completed.Range.EndLineNumber})";
     }
 
     public ThemeVariant Theme => IsDark ? ThemeVariant.Dark : ThemeVariant.Light;

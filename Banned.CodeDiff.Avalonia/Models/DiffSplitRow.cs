@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using Avalonia.Media;
 using Banned.CodeDiff.Models;
 
@@ -26,8 +27,11 @@ public enum DiffCellKind
 /// <summary>Base type of split rows rendered by <see cref="Views.DiffView"/>.</summary>
 public abstract class DiffSplitRow : DiffRow;
 
-/// <summary>One side of a split content row: line number, text, and resolved brushes.</summary>
-public sealed class DiffSplitCellModel
+/// <summary>One side of a split content row: line number, text, and resolved brushes.
+/// Carries the multi-select highlight state (<see cref="IsSelected"/>) so realized row
+/// containers update in place while a selection drag moves — the Avalonia equivalent of the
+/// upstream <c>.diff-multi-select-active</c> CSS class toggling.</summary>
+public sealed class DiffSplitCellModel : INotifyPropertyChanged
 {
     internal DiffSplitCellModel(
         string? number, string text, DiffCellKind kind, IReadOnlyList<DiffHighlight> highlights,
@@ -62,8 +66,13 @@ public sealed class DiffSplitCellModel
                 _                   => (IBrush?)null,
             }
             : null;
-        NumberForeground = brushes.NumberForeground;
+        NumberForeground    = brushes.NumberForeground;
+        SelectionOverlay    = brushes.MultiSelectOverlay;
+        SelectionEdgeStrip  = brushes.MultiSelectBorder;
     }
+
+    /// <inheritdoc />
+    public event PropertyChangedEventHandler? PropertyChanged;
 
     /// <summary>Gets the 1-based file line number, or <c>null</c> when the side is empty.</summary>
     public string? Number { get; }
@@ -95,17 +104,50 @@ public sealed class DiffSplitCellModel
 
     /// <summary>Gets the line-number text brush.</summary>
     public IBrush NumberForeground { get; }
+
+    /// <summary>Gets the multi-select overlay brush (#f0c000 at 15% opacity, upstream
+    /// <c>--diff-multi-select-bg</c>).</summary>
+    public IBrush SelectionOverlay { get; }
+
+    /// <summary>Gets the multi-select edge-strip brush (#2588fa, upstream
+    /// <c>--diff-multi-select-border</c>).</summary>
+    public IBrush SelectionEdgeStrip { get; }
+
+    /// <summary>Gets or sets whether this cell is covered by a multi-select range; raised through
+    /// <see cref="PropertyChanged"/> so realized containers update without a row rebuild.</summary>
+    public bool IsSelected
+    {
+        get => _isSelected;
+        internal set
+        {
+            if (_isSelected == value)
+            {
+                return;
+            }
+
+            _isSelected = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsSelected)));
+        }
+    }
+
+    private bool _isSelected;
 }
 
 /// <summary>A split content row pairing the old (left) and new (right) sides.</summary>
 public sealed class DiffSplitContentRow : DiffSplitRow
 {
-    internal DiffSplitContentRow(DiffSplitCellModel left, DiffSplitCellModel right, IBrush splitter)
+    internal DiffSplitContentRow(int lineIndex, DiffSplitCellModel left, DiffSplitCellModel right, IBrush splitter)
     {
-        Left          = left;
-        Right         = right;
+        LineIndex    = lineIndex;
+        Left         = left;
+        Right        = right;
         SplitterBrush = splitter;
     }
+
+    /// <summary>Gets the 1-based split model index of this row — the upstream <c>data-line</c>
+    /// attribute; the multi-select visual pass (multiSelect/visual.ts) matches selected lines
+    /// against it.</summary>
+    public int LineIndex { get; }
 
     /// <summary>Gets the old (left) side.</summary>
     public DiffSplitCellModel Left { get; }
@@ -144,7 +186,7 @@ public sealed class DiffSplitHunkRow : DiffSplitRow
     }
 
     /// <summary>Gets the split model index of the hunk — the key passed to
-    /// <see cref="Services.DiffFile.OnSplitHunkExpand"/>.</summary>
+    /// <see cref="global::Banned.CodeDiff.Services.DiffFile.OnSplitHunkExpand"/>.</summary>
     public int HunkIndex { get; }
 
     /// <summary>Gets whether the model allows expansion at all (not composed from diff-only text).</summary>
