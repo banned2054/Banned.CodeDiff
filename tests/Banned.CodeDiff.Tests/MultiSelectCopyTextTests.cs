@@ -6,18 +6,18 @@ using NUnit.Framework;
 namespace Banned.CodeDiff.Tests;
 
 /// <summary>
-/// Tests for the native copy-text generation (no upstream counterpart — the JS library has no
-/// copy feature): <see cref="MultiSelectData.GetSelectedTextFromResult"/> flattens a selection
-/// result into clipboard-ready plain text — hidden lines skipped, trailing newlines trimmed like
-/// the render layer, lines joined with a plain '\n'.
+///     Tests for the native copy-text generation (no upstream counterpart — the JS library has no
+///     copy feature): <see cref="MultiSelectData.GetSelectedTextFromResult" /> flattens a selection
+///     result into clipboard-ready plain text — hidden lines skipped, trailing newlines trimmed like
+///     the render layer, lines joined with a plain '\n'.
 /// </summary>
 public class MultiSelectCopyTextTests
 {
     /// <summary>
-    /// 100-line file with two change hunks — collapsed hidden ranges [1,37], [45,87], [96,100]
-    /// old/new; visible windows 38-44 around hunk 1 (old 41 "change-me" → new 41 "changed!") and
-    /// 88-95 around hunk 2 (old 91 "delete-me" → new 91/92 "replaced-1/2", ctx 092 → new 93).
-    /// Same fixture as MultiSelectTests.
+    ///     100-line file with two change hunks — collapsed hidden ranges [1,37], [45,87], [96,100]
+    ///     old/new; visible windows 38-44 around hunk 1 (old 41 "change-me" → new 41 "changed!") and
+    ///     88-95 around hunk 2 (old 91 "delete-me" → new 91/92 "replaced-1/2", ctx 092 → new 93).
+    ///     Same fixture as MultiSelectTests.
     /// </summary>
     private static DiffFile CreateFile()
     {
@@ -73,9 +73,9 @@ public class MultiSelectCopyTextTests
              ctx 094
             """;
 
-        var file = new DiffFile(oldFileName : "sample.txt", oldFileContent : string.Join("\n", oldLines) + "\n",
-                                newFileName : "sample.txt", newFileContent : string.Join("\n", newLines) + "\n",
-                                diffList    : [diff]);
+        var file = new DiffFile("sample.txt", string.Join("\n", oldLines) + "\n",
+                                "sample.txt", string.Join("\n", newLines) + "\n",
+                                [diff]);
         file.Init();
         file.BuildSplitDiffLines();
         file.BuildUnifiedDiffLines();
@@ -83,13 +83,19 @@ public class MultiSelectCopyTextTests
         return file;
     }
 
-    private static MultiSelectResult SplitResult(DiffFile file, SplitSide side, int start, int end) =>
-        new(new MultiSelectRange(side, start, end),
-            MultiSelectData.GetSelectedLinesFromDiffFile_Split(file, new MultiSelectRange(side, start, end)));
+    private static MultiSelectResult SplitResult(DiffFile file, SplitSide side, int start, int end)
+    {
+        return new MultiSelectResult(new MultiSelectRange(side, start, end),
+                                     MultiSelectData.GetSelectedLinesFromDiffFile_Split(file,
+                                         new MultiSelectRange(side, start, end)));
+    }
 
-    private static MultiSelectResult UnifiedResult(DiffFile file, SplitSide side, int start, int end) =>
-        new(new MultiSelectRange(side, start, end),
-            MultiSelectData.GetSelectedLinesFromDiffFile_Unified(file, new MultiSelectRange(side, start, end)));
+    private static MultiSelectResult UnifiedResult(DiffFile file, SplitSide side, int start, int end)
+    {
+        return new MultiSelectResult(new MultiSelectRange(side, start, end),
+                                     MultiSelectData.GetSelectedLinesFromDiffFile_Unified(file,
+                                         new MultiSelectRange(side, start, end)));
+    }
 
     [Test]
     public void NullResult_YieldsEmptyText()
@@ -161,9 +167,9 @@ public class MultiSelectCopyTextTests
     {
         var result = new MultiSelectResult(new MultiSelectRange(SplitSide.New, 1, 3),
         [
-            new SelectedLine(Index: 1, LineNumber: 1, Value: null,    IsHide: false, IsDelete: false, IsAdd: true,  IsContext: false),
-            new SelectedLine(Index: 2, LineNumber: 2, Value: "b\n",   IsHide: false, IsDelete: false, IsAdd: true,  IsContext: false),
-            new SelectedLine(Index: 3, LineNumber: 3, Value: null,    IsHide: false, IsDelete: false, IsAdd: false, IsContext: true),
+            new SelectedLine(1, 1, null, false, false, true, false),
+            new SelectedLine(2, 2, "b\n", false, false, true, false),
+            new SelectedLine(3, 3, null, false, false, false, true)
         ]);
 
         // A null value renders as an empty line, so the copy keeps the line slot.
@@ -175,8 +181,8 @@ public class MultiSelectCopyTextTests
     {
         var result = new MultiSelectResult(new MultiSelectRange(SplitSide.Old, 1, 2),
         [
-            new SelectedLine(Index: 1, LineNumber: 1, Value: "a\r\n", IsHide: false, IsDelete: false, IsAdd: false, IsContext: true),
-            new SelectedLine(Index: 2, LineNumber: 2, Value: "b\n\n", IsHide: false, IsDelete: false, IsAdd: false, IsContext: true),
+            new SelectedLine(1, 1, "a\r\n", false, false, false, true),
+            new SelectedLine(2, 2, "b\n\n", false, false, false, true)
         ]);
 
         // Render parity: the row builders TrimEnd('\r', '\n') every value before display.
@@ -188,10 +194,10 @@ public class MultiSelectCopyTextTests
     {
         var result = new MultiSelectResult(new MultiSelectRange(SplitSide.New, 1, 4),
         [
-            new SelectedLine(Index: 1, LineNumber: 1, Value: "a\n",  IsHide: true,  IsDelete: false, IsAdd: false, IsContext: true),
-            new SelectedLine(Index: 2, LineNumber: 2, Value: null,   IsHide: false, IsDelete: false, IsAdd: false, IsContext: true),
-            new SelectedLine(Index: 3, LineNumber: 3, Value: "c\n",  IsHide: false, IsDelete: true,  IsAdd: false, IsContext: false),
-            new SelectedLine(Index: 4, LineNumber: 4, Value: "d\n",  IsHide: true,  IsDelete: false, IsAdd: true,  IsContext: false),
+            new SelectedLine(1, 1, "a\n", true, false, false, true),
+            new SelectedLine(2, 2, null, false, false, false, true),
+            new SelectedLine(3, 3, "c\n", false, true, false, false),
+            new SelectedLine(4, 4, "d\n", true, false, true, false)
         ]);
 
         Assert.That(MultiSelectData.GetSelectedTextFromResult(result), Is.EqualTo("\nc"));

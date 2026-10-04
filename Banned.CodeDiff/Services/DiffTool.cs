@@ -5,34 +5,30 @@ namespace Banned.CodeDiff.Services;
 /// <summary>Port of packages/core/src/parse/template.ts global switches (template bodies are M2).</summary>
 public static class TemplateOptions
 {
-    private static bool _enableFastDiffTemplate;
-
     /// <summary>JS: getEnableFastDiffTemplate.</summary>
-    public static bool EnableFastDiffTemplate => _enableFastDiffTemplate;
+    public static bool EnableFastDiffTemplate { get; private set; }
+
+    /// <summary>JS: getEnableBuildTemplate.</summary>
+    public static bool EnableBuildTemplate { get; private set; } = true;
 
     public static void SetEnableFastDiffTemplate(bool enable)
     {
-        _enableFastDiffTemplate = enable;
+        EnableFastDiffTemplate = enable;
     }
 
     public static void ResetEnableFastDiffTemplate()
     {
-        _enableFastDiffTemplate = false;
+        EnableFastDiffTemplate = false;
     }
-
-    private static bool _enableBuildTemplate = true;
-
-    /// <summary>JS: getEnableBuildTemplate.</summary>
-    public static bool EnableBuildTemplate => _enableBuildTemplate;
 
     public static void SetEnableBuildTemplate(bool enable)
     {
-        _enableBuildTemplate = enable;
+        EnableBuildTemplate = enable;
     }
 
     public static void ResetEnableBuildTemplate()
     {
-        _enableBuildTemplate = true;
+        EnableBuildTemplate = true;
     }
 }
 
@@ -45,10 +41,7 @@ public static class DiffTool
     /// <summary>Utility function for getting the digit count of the largest line number in an array of diff hunks</summary>
     public static int GetLargestLineNumber(IReadOnlyList<DiffHunk> hunks)
     {
-        if (hunks.Count == 0)
-        {
-            return 0;
-        }
+        if (hunks.Count == 0) return 0;
 
         for (var i = hunks.Count - 1; i >= 0; i--)
         {
@@ -58,10 +51,7 @@ public static class DiffTool
             {
                 var line = hunk.Lines[j];
 
-                if (line.Type == DiffLineType.Hunk)
-                {
-                    continue;
-                }
+                if (line.Type == DiffLineType.Hunk) continue;
 
                 var newLineNumber = line.NewLineNumber ?? 0;
                 var oldLineNumber = line.OldLineNumber ?? 0;
@@ -73,9 +63,9 @@ public static class DiffTool
     }
 
     /// <summary>
-    /// Calculates whether or not a hunk header can be expanded up, down, both, or if
-    /// the space represented by the hunk header is short and expansion there would
-    /// mean merging with the hunk above.
+    ///     Calculates whether or not a hunk header can be expanded up, down, both, or if
+    ///     the space represented by the hunk header is short and expansion there would
+    ///     mean merging with the hunk above.
     /// </summary>
     /// <param name="hunkIndex">Index of the hunk to evaluate within the whole diff.</param>
     /// <param name="hunkHeader">Header of the hunk to evaluate.</param>
@@ -98,29 +88,20 @@ public static class DiffTool
         // The rest of the hunks can be expanded both ways, except those which are too
         // short and therefore the direction of expansion doesn't matter.
         if (hunkIndex == 0)
-        {
             // The top hunk can only be expanded if there is content above it
             return hunkHeader is { OldStartLine: > 1, NewStartLine: > 1 }
                 ? DiffHunkExpansionType.Up
                 : DiffHunkExpansionType.None;
-        }
-        else if (distanceToPrevious <= DefaultDiffExpansionStep)
-        {
-            return DiffHunkExpansionType.Short;
-        }
-        else
-        {
-            return DiffHunkExpansionType.Both;
-        }
+
+        return distanceToPrevious <= DefaultDiffExpansionStep
+            ? DiffHunkExpansionType.Short
+            : DiffHunkExpansionType.Both;
     }
 
     public static List<T> NumIterator<T>(int num, Func<int, T> cb)
     {
         var re = new List<T>();
-        for (var i = 0; i < num; i++)
-        {
-            re.Add(cb(i));
-        }
+        for (var i = 0; i < num; i++) re.Add(cb(i));
 
         return re;
     }
@@ -135,20 +116,16 @@ public static class DiffTool
     /// <summary>JS: a || b || "" (first non-empty string wins).</summary>
     private static string JsOr(string? a, string? b)
     {
-        if (!string.IsNullOrEmpty(a))
-        {
-            return a;
-        }
+        if (!string.IsNullOrEmpty(a)) return a;
 
         return !string.IsNullOrEmpty(b) ? b : "";
     }
 
     /// <summary>
-    /// Compute the word-level diff ranges for each (addition, deletion) pair.
-    ///
-    /// Port of parse/diff-tool.ts getDiffRange. The syntax/template parts
-    /// (getSyntaxDiffTemplate etc.) are built in M2; this port keeps the
-    /// relativeChanges / diffChanges computation and its raw-line cloning semantics.
+    ///     Compute the word-level diff ranges for each (addition, deletion) pair.
+    ///     Port of parse/diff-tool.ts getDiffRange. The syntax/template parts
+    ///     (getSyntaxDiffTemplate etc.) are built in M2; this port keeps the
+    ///     relativeChanges / diffChanges computation and its raw-line cloning semantics.
     /// </summary>
     public static void GetDiffRange(
         List<DiffLine>     additions,

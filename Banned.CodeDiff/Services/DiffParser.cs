@@ -21,17 +21,6 @@ namespace Banned.CodeDiff.Services;
 // in which case s defaults to 1
 public static class DiffParserConstants
 {
-    // in which case s defaults to 1
-    public static readonly Regex DiffHeaderRegex =
-        new(@"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@", RegexOptions.Compiled);
-
-    /// <summary>
-    /// Regular expression matching invisible bidirectional Unicode characters that may
-    /// be interpreted or compiled differently than what it appears. More info:
-    /// https://github.co/hiddenchars
-    /// </summary>
-    public static readonly Regex HiddenBidiCharsRegex = new(@"[\u202A-\u202E]|[\u2066-\u2069]", RegexOptions.Compiled);
-
     public const string DiffPrefixAdd     = "+";
     public const string DiffPrefixDelete  = "-";
     public const string DiffPrefixContext = " ";
@@ -41,26 +30,39 @@ public static class DiffParserConstants
     // https://github.com/MrWangJustToDo/git-diff-view/issues/41
     // some line only have a new line symbol without any other character
     public const string DiffPrefixNewLine = "\n";
+
+    // in which case s defaults to 1
+    public static readonly Regex DiffHeaderRegex =
+        new(@"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@", RegexOptions.Compiled);
+
+    /// <summary>
+    ///     Regular expression matching invisible bidirectional Unicode characters that may
+    ///     be interpreted or compiled differently than what it appears. More info:
+    ///     https://github.co/hiddenchars
+    /// </summary>
+    public static readonly Regex HiddenBidiCharsRegex = new(@"[\u202A-\u202E]|[\u2066-\u2069]", RegexOptions.Compiled);
 }
 
 /// <summary>
-/// A parser for the GNU unified diff format.
-///
-/// See https://www.gnu.org/software/diffutils/manual/html_node/Detailed-Unified.html
+///     A parser for the GNU unified diff format.
+///     See https://www.gnu.org/software/diffutils/manual/html_node/Detailed-Unified.html
 /// </summary>
 public sealed class DiffParser
 {
-    /// <summary>
-    /// Line start pointer. The offset into the text property where the current line
-    /// starts (ie either zero or one character ahead of the last newline character).
-    /// </summary>
-    private int _ls;
+    // JS: /\n\\ No newline at end of file/g
+    private static readonly Regex NoNewlineMarkerRegex = new(@"\n\\ No newline at end of file", RegexOptions.Compiled);
 
     /// <summary>
-    /// Line end pointer. The offset into the text property where the current line ends
-    /// (ie it points to the newline character).
+    ///     Line end pointer. The offset into the text property where the current line ends
+    ///     (ie it points to the newline character).
     /// </summary>
     private int _le;
+
+    /// <summary>
+    ///     Line start pointer. The offset into the text property where the current line
+    ///     starts (ie either zero or one character ahead of the last newline character).
+    /// </summary>
+    private int _ls;
 
     /// <summary>The text buffer containing the raw, unified diff output to be parsed</summary>
     private string _text = "";
@@ -69,6 +71,9 @@ public sealed class DiffParser
     {
         Reset();
     }
+
+    /// <summary>JS export: parseInstance (a shared parser instance).</summary>
+    public static DiffParser Shared { get; } = new();
 
     /// <summary>Resets the internal parser state so that it can be reused.</summary>
     private void Reset()
@@ -79,27 +84,21 @@ public sealed class DiffParser
     }
 
     /// <summary>
-    /// Aligns the internal character pointers at the boundaries of the next line.
-    /// Returns true if successful or false if the end of the diff has been reached.
+    ///     Aligns the internal character pointers at the boundaries of the next line.
+    ///     Returns true if successful or false if the end of the diff has been reached.
     /// </summary>
     private bool NextLine()
     {
         _ls = _le + 1;
 
         // We've reached the end of the diff
-        if (_ls >= _text.Length)
-        {
-            return false;
-        }
+        if (_ls >= _text.Length) return false;
 
         _le = _text.IndexOf('\n', _ls);
 
         // If we can't find the next newline character we'll put our
         // end pointer at the end of the diff string
-        if (_le == -1)
-        {
-            _le = _text.Length;
-        }
+        if (_le == -1) _le = _text.Length;
 
         // We've succeeded if there's anything to read in between the
         // start and the end
@@ -119,25 +118,20 @@ public sealed class DiffParser
     }
 
     /// <summary>
-    /// Advances to the next line and returns it as a substring of the raw diff text.
-    /// Returns null if end of diff was reached.
+    ///     Advances to the next line and returns it as a substring of the raw diff text.
+    ///     Returns null if end of diff was reached.
     /// </summary>
     private string? ReadLine(bool header)
     {
-        if (header)
-        {
-            return NextLine() ? JsSubstring(_text, _ls, _le) : null;
-        }
-        else
-        {
-            // JS: text.substring(ls + 1, le + 1) — substring clamps end at the string
-            // boundary (last line without a trailing newline)
-            return NextLine()
-                ? JsSubstring(_text, _ls + 1, _le + 1)
-                : _text.Length > _ls
-                    ? "\n"
-                    : null;
-        }
+        if (header) return NextLine() ? JsSubstring(_text, _ls, _le) : null;
+
+        // JS: text.substring(ls + 1, le + 1) — substring clamps end at the string
+        // boundary (last line without a trailing newline)
+        return NextLine()
+            ? JsSubstring(_text, _ls + 1, _le + 1)
+            : _text.Length > _ls
+                ? "\n"
+                : null;
     }
 
     /// <summary>Tests if the current line starts with the given search text</summary>
@@ -153,8 +147,8 @@ public sealed class DiffParser
     }
 
     /// <summary>
-    /// Returns the starting character of the next line without advancing the internal
-    /// state. Returns null if advancing would mean reaching the end of the diff.
+    ///     Returns the starting character of the next line without advancing the internal
+    ///     state. Returns null if advancing would mean reaching the end of the diff.
     /// </summary>
     private char? Peek()
     {
@@ -163,19 +157,16 @@ public sealed class DiffParser
     }
 
     /// <summary>
-    /// Parse the diff header, meaning everything from the start of the diff output to
-    /// the end of the line beginning with +++
-    ///
-    /// Example diff header:
-    ///
-    ///   diff --git a/app/src/lib/diff-parser.ts b/app/src/lib/diff-parser.ts
-    ///   index e1d4871..3bd3ee0 100644
-    ///   --- a/app/src/lib/diff-parser.ts
-    ///   +++ b/app/src/lib/diff-parser.ts
-    ///
-    /// Returns header info extracted from the diff header (currently whether it's a
-    /// binary patch) or null if the end of the diff was reached before the +++ line
-    /// could be found (which is a valid state).
+    ///     Parse the diff header, meaning everything from the start of the diff output to
+    ///     the end of the line beginning with +++
+    ///     Example diff header:
+    ///     diff --git a/app/src/lib/diff-parser.ts b/app/src/lib/diff-parser.ts
+    ///     index e1d4871..3bd3ee0 100644
+    ///     --- a/app/src/lib/diff-parser.ts
+    ///     +++ b/app/src/lib/diff-parser.ts
+    ///     Returns header info extracted from the diff header (currently whether it's a
+    ///     binary patch) or null if the end of the diff was reached before the +++ line
+    ///     could be found (which is a valid state).
     /// </summary>
     private DiffHeaderInfo? ParseDiffHeader()
     {
@@ -185,19 +176,14 @@ public sealed class DiffParser
         while (NextLine())
         {
             if (LineStartsWith("Binary files ") && LineEndsWith("differ"))
-            {
                 return new DiffHeaderInfo { IsBinary = true };
-            }
 
             if (LineStartsWith("---"))
             {
                 // JS: hasMinus = true (only consumed by a __DEV__ console error)
             }
 
-            if (LineStartsWith("+++"))
-            {
-                return new DiffHeaderInfo { IsBinary = false };
-            }
+            if (LineStartsWith("+++")) return new DiffHeaderInfo { IsBinary = false };
         }
 
         // It's not an error to not find the +++ line, see the
@@ -205,20 +191,11 @@ public sealed class DiffParser
         return null;
     }
 
-    private sealed class DiffHeaderInfo
-    {
-        /// <summary>
-        /// Whether or not the diff header contained a marker indicating that a diff
-        /// couldn't be produced due to the contents of the new and/or old file was binary.
-        /// </summary>
-        public bool IsBinary { get; init; }
-    }
-
     /// <summary>
-    /// Attempts to convert a RegExp capture group into a number. If the group doesn't
-    /// exist or wasn't captured the function will return the value of the defaultValue
-    /// parameter or throw an error if no default value was provided. If the captured
-    /// string can't be converted to a number an error will be thrown.
+    ///     Attempts to convert a RegExp capture group into a number. If the group doesn't
+    ///     exist or wasn't captured the function will return the value of the defaultValue
+    ///     parameter or throw an error if no default value was provided. If the captured
+    ///     string can't be converted to a number an error will be thrown.
     /// </summary>
     private static int NumberFromGroup(Match m, int group, int? defaultValue = null)
     {
@@ -228,34 +205,25 @@ public sealed class DiffParser
                 ? throw new InvalidOperationException($"Could not parse capture group {group} into number: {g.Value}")
                 : num;
         if (defaultValue == null)
-        {
             throw new
                 InvalidOperationException($"Group {group} missing from regexp match and no defaultValue was provided");
-        }
 
         return defaultValue.Value;
     }
 
     /// <summary>
-    /// Parses a hunk header or throws an error if the given line isn't a well-formed
-    /// hunk header.
-    ///
-    /// We currently only extract the line number information and ignore any hunk
-    /// headings.
-    ///
-    /// Example hunk header (text within ``):
-    ///
-    /// `@@ -84,10 +82,8 @@ export function parseRawDiff(lines: ReadonlyArray&lt;string&gt;): Diff {`
-    ///
-    /// Where everything after the last @@ is what's known as the hunk, or section, heading
+    ///     Parses a hunk header or throws an error if the given line isn't a well-formed
+    ///     hunk header.
+    ///     We currently only extract the line number information and ignore any hunk
+    ///     headings.
+    ///     Example hunk header (text within ``):
+    ///     `@@ -84,10 +82,8 @@ export function parseRawDiff(lines: ReadonlyArray&lt;string&gt;): Diff {`
+    ///     Where everything after the last @@ is what's known as the hunk, or section, heading
     /// </summary>
     private static DiffHunkHeader ParseHunkHeader(string line)
     {
         var m = DiffParserConstants.DiffHeaderRegex.Match(line);
-        if (!m.Success)
-        {
-            throw new InvalidOperationException("Invalid hunk header format");
-        }
+        if (!m.Success) throw new InvalidOperationException("Invalid hunk header format");
 
         // If endLines are missing default to 1, see diffHeaderRe docs
         var oldStartLine = NumberFromGroup(m, 1);
@@ -267,52 +235,40 @@ public sealed class DiffParser
     }
 
     /// <summary>
-    /// Convenience function which lets us leverage the type system to prove exhaustive
-    /// checks in parseHunk.
-    ///
-    /// Takes an arbitrary string and checks to see if the first character of that string
-    /// is one of the allowed prefix characters for diff lines (ie lines in between hunk
-    /// headers).
+    ///     Convenience function which lets us leverage the type system to prove exhaustive
+    ///     checks in parseHunk.
+    ///     Takes an arbitrary string and checks to see if the first character of that string
+    ///     is one of the allowed prefix characters for diff lines (ie lines in between hunk
+    ///     headers).
     /// </summary>
     private static char? ParseLinePrefix(char? c)
     {
-        if (
-            c.HasValue
-         && (
-                c.Value == DiffParserConstants.DiffPrefixAdd[0]
-             || c.Value == DiffParserConstants.DiffPrefixDelete[0]
-             || c.Value == DiffParserConstants.DiffPrefixContext[0]
-             || c.Value == DiffParserConstants.DiffPrefixNoNewline[0]
-             || c.Value == DiffParserConstants.DiffPrefixNewLine[0]
-            )
-        )
-        {
+        if (c.HasValue && (c.Value == DiffParserConstants.DiffPrefixAdd[0]       ||
+                           c.Value == DiffParserConstants.DiffPrefixDelete[0]    ||
+                           c.Value == DiffParserConstants.DiffPrefixContext[0]   ||
+                           c.Value == DiffParserConstants.DiffPrefixNoNewline[0] ||
+                           c.Value == DiffParserConstants.DiffPrefixNewLine[0]))
             return c;
-        }
 
         return null;
     }
 
     /// <summary>
-    /// Parses a hunk, including its header or throws an error if the diff doesn't
-    /// contain a well-formed diff hunk at the current position.
-    ///
-    /// Expects that the position has been advanced to the beginning of a presumed diff
-    /// hunk header.
+    ///     Parses a hunk, including its header or throws an error if the diff doesn't
+    ///     contain a well-formed diff hunk at the current position.
+    ///     Expects that the position has been advanced to the beginning of a presumed diff
+    ///     hunk header.
     /// </summary>
     /// <param name="linesConsumed">
-    /// The number of unified diff lines consumed up until this point by the diff
-    /// parser. Used to give the position and length (in lines) of the parsed hunk
-    /// relative to the overall parsed diff. These numbers have no real meaning in the
-    /// context of a diff and are only used to aid the app in line-selections.
+    ///     The number of unified diff lines consumed up until this point by the diff
+    ///     parser. Used to give the position and length (in lines) of the parsed hunk
+    ///     relative to the overall parsed diff. These numbers have no real meaning in the
+    ///     context of a diff and are only used to aid the app in line-selections.
     /// </param>
     private DiffHunk ParseHunk(int linesConsumed, int hunkIndex, DiffHunk? previousHunk)
     {
         var headerLine = ReadLine(true);
-        if (headerLine == null)
-        {
-            throw new InvalidOperationException("Expected hunk header but reached end of diff");
-        }
+        if (headerLine == null) throw new InvalidOperationException("Expected hunk header but reached end of diff");
 
         var header = ParseHunkHeader(headerLine);
         var lines  = new List<DiffLine> { new(headerLine, DiffLineType.Hunk, 1, null, null) };
@@ -327,10 +283,7 @@ public sealed class DiffParser
         {
             var line = ReadLine(false);
 
-            if (line == null)
-            {
-                throw new InvalidOperationException("Expected unified diff line but reached end of diff");
-            }
+            if (line == null) throw new InvalidOperationException("Expected unified diff line but reached end of diff");
 
             // A marker indicating that the last line in the original or the new file
             // is missing a trailing newline. In other words, the presence of this marker
@@ -342,10 +295,8 @@ public sealed class DiffParser
             {
                 // See https://github.com/git/git/blob/21f862b498925194f8f1ebe8203b7a7df756555b/apply.c#L1725-L1732
                 if (line.Length < 12)
-                {
                     throw new
                         InvalidOperationException("Expected \"no newline at end of file\" marker to be at least 12 bytes long");
-                }
 
                 var previousLineIndex = lines.Count - 1;
                 var previousLine      = lines[previousLineIndex];
@@ -363,30 +314,19 @@ public sealed class DiffParser
             DiffLine diffLine;
 
             if (c == DiffParserConstants.DiffPrefixAdd[0])
-            {
                 diffLine = new DiffLine(line, DiffLineType.Add, diffLineNumber, null, rollingDiffAfterCounter++);
-            }
             else if (c == DiffParserConstants.DiffPrefixDelete[0])
-            {
                 diffLine = new DiffLine(line, DiffLineType.Delete, diffLineNumber, rollingDiffBeforeCounter++, null);
-            }
             else if (c == DiffParserConstants.DiffPrefixContext[0] || c == DiffParserConstants.DiffPrefixNewLine[0])
-            {
                 diffLine = new DiffLine(line, DiffLineType.Context, diffLineNumber, rollingDiffBeforeCounter++,
                                         rollingDiffAfterCounter++);
-            }
             else
-            {
                 return AssertNever($"Unknown DiffLinePrefix: {c}");
-            }
 
             lines.Add(diffLine);
         }
 
-        if (lines.Count == 1)
-        {
-            throw new InvalidOperationException("Malformed diff, empty hunk");
-        }
+        if (lines.Count == 1) throw new InvalidOperationException("Malformed diff, empty hunk");
 
         return new DiffHunk(header, lines, linesConsumed, linesConsumed + lines.Count - 1,
                             DiffTool.GetHunkHeaderExpansionType(hunkIndex, header, previousHunk));
@@ -398,11 +338,11 @@ public sealed class DiffParser
     }
 
     /// <summary>
-    /// Parse a well-formed unified diff into hunks and lines.
+    ///     Parse a well-formed unified diff into hunks and lines.
     /// </summary>
     /// <param name="text">
-    /// A unified diff produced by git diff, git log --patch or any other git plumbing
-    /// command that produces unified diffs.
+    ///     A unified diff produced by git diff, git log --patch or any other git plumbing
+    ///     command that produces unified diffs.
     /// </param>
     public RawDiff Parse(string text)
     {
@@ -417,7 +357,6 @@ public sealed class DiffParser
 
             // empty diff
             if (headerInfo == null)
-            {
                 return new RawDiff
                 {
                     Header             = header,
@@ -425,12 +364,10 @@ public sealed class DiffParser
                     Hunks              = [],
                     IsBinary           = false,
                     MaxLineNumber      = 0,
-                    HasHiddenBidiChars = false,
+                    HasHiddenBidiChars = false
                 };
-            }
 
             if (headerInfo.IsBinary)
-            {
                 return new RawDiff
                 {
                     Header             = header,
@@ -438,9 +375,8 @@ public sealed class DiffParser
                     Hunks              = [],
                     IsBinary           = true,
                     MaxLineNumber      = 0,
-                    HasHiddenBidiChars = false,
+                    HasHiddenBidiChars = false
                 };
-            }
 
             var       hunks         = new List<DiffHunk>();
             var       linesConsumed = 0;
@@ -463,7 +399,7 @@ public sealed class DiffParser
                 Hunks              = hunks,
                 IsBinary           = headerInfo.IsBinary,
                 MaxLineNumber      = DiffTool.GetLargestLineNumber(hunks),
-                HasHiddenBidiChars = DiffParserConstants.HiddenBidiCharsRegex.IsMatch(text),
+                HasHiddenBidiChars = DiffParserConstants.HiddenBidiCharsRegex.IsMatch(text)
             };
         }
         finally
@@ -472,25 +408,25 @@ public sealed class DiffParser
         }
     }
 
-    // JS: /\n\\ No newline at end of file/g
-    private static readonly Regex NoNewlineMarkerRegex = new(@"\n\\ No newline at end of file", RegexOptions.Compiled);
-
     /// <summary>
-    /// JS String.prototype.substring(start, end) — swaps start/end when start &gt; end
-    /// and clamps out-of-range values instead of throwing.
+    ///     JS String.prototype.substring(start, end) — swaps start/end when start &gt; end
+    ///     and clamps out-of-range values instead of throwing.
     /// </summary>
     private static string JsSubstring(string s, int start, int end)
     {
-        if (start > end)
-        {
-            (start, end) = (end, start);
-        }
+        if (start > end) (start, end) = (end, start);
 
         start = Math.Max(0, Math.Min(start, s.Length));
         end   = Math.Max(0, Math.Min(end, s.Length));
         return s.Substring(start, end - start);
     }
 
-    /// <summary>JS export: parseInstance (a shared parser instance).</summary>
-    public static DiffParser Shared { get; } = new();
+    private sealed class DiffHeaderInfo
+    {
+        /// <summary>
+        ///     Whether or not the diff header contained a marker indicating that a diff
+        ///     couldn't be produced due to the contents of the new and/or old file was binary.
+        /// </summary>
+        public bool IsBinary { get; init; }
+    }
 }

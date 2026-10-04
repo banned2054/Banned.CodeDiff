@@ -6,17 +6,17 @@ using NUnit.Framework;
 namespace Banned.CodeDiff.Tests;
 
 /// <summary>
-/// Data-layer tests for the multiSelect port (packages/core/src/multiSelect/data.ts + the pure
-/// helpers of dom.ts/visual.ts): split/unified line extraction against a real-content DiffFile —
-/// line flags (isDelete/isAdd/isContext incl. the missing-DiffLine quirk), hidden-line membership,
-/// 1-based indexes, range normalization, and the preselected-lines-to-range merge.
+///     Data-layer tests for the multiSelect port (packages/core/src/multiSelect/data.ts + the pure
+///     helpers of dom.ts/visual.ts): split/unified line extraction against a real-content DiffFile —
+///     line flags (isDelete/isAdd/isContext incl. the missing-DiffLine quirk), hidden-line membership,
+///     1-based indexes, range normalization, and the preselected-lines-to-range merge.
 /// </summary>
 public class MultiSelectTests
 {
     /// <summary>
-    /// 100-line file with two change hunks — collapsed hidden ranges [1,37] old/new above the
-    /// first hunk (@@ -38,7: old 41 "change-me" → new 41 "changed!") and around the second
-    /// (@@ -88,7 +88,8: old 91 "delete-me" → new 91/92 "replaced-1/2", ctx092 shifts to new 93).
+    ///     100-line file with two change hunks — collapsed hidden ranges [1,37] old/new above the
+    ///     first hunk (@@ -38,7: old 41 "change-me" → new 41 "changed!") and around the second
+    ///     (@@ -88,7 +88,8: old 91 "delete-me" → new 91/92 "replaced-1/2", ctx092 shifts to new 93).
     /// </summary>
     private static DiffFile CreateFile()
     {
@@ -72,9 +72,9 @@ public class MultiSelectTests
              ctx 094
             """;
 
-        var file = new DiffFile(oldFileName : "sample.txt", oldFileContent : string.Join("\n", oldLines) + "\n",
-                                newFileName : "sample.txt", newFileContent : string.Join("\n", newLines) + "\n",
-                                diffList    : [diff]);
+        var file = new DiffFile("sample.txt", string.Join("\n", oldLines) + "\n",
+                                "sample.txt", string.Join("\n", newLines) + "\n",
+                                [diff]);
         file.Init();
         file.BuildSplitDiffLines();
         file.BuildUnifiedDiffLines();
@@ -82,10 +82,14 @@ public class MultiSelectTests
         return file;
     }
 
-    /// <summary>The model keeps the raw file line including its trailing newline (upstream
-    /// SplitLineItem.value semantics; the render layer trims it for display).</summary>
-    private static string Raw(string line) => line + "\n";
-
+    /// <summary>
+    ///     The model keeps the raw file line including its trailing newline (upstream
+    ///     SplitLineItem.value semantics; the render layer trims it for display).
+    /// </summary>
+    private static string Raw(string line)
+    {
+        return line + "\n";
+    }
 
 
     // ---- NormalizeRange (dom.ts) ----
@@ -116,7 +120,7 @@ public class MultiSelectTests
     public void Split_OldRange_CarriesLineFlagsAndValues()
     {
         var lines = MultiSelectData.GetSelectedLinesFromDiffFile_Split(CreateFile(),
-                                                                        new MultiSelectRange(SplitSide.Old, 38, 44));
+                                                                       new MultiSelectRange(SplitSide.Old, 38, 44));
 
         Assert.That(lines.Select(l => l.LineNumber), Is.EqualTo(new[] { 38, 39, 40, 41, 42, 43, 44 }));
 
@@ -140,7 +144,7 @@ public class MultiSelectTests
     public void Split_NewRange_MarksAddition()
     {
         var lines = MultiSelectData.GetSelectedLinesFromDiffFile_Split(CreateFile(),
-                                                                        new MultiSelectRange(SplitSide.New, 41, 42));
+                                                                       new MultiSelectRange(SplitSide.New, 41, 42));
 
         Assert.That(lines.Count, Is.EqualTo(2));
 
@@ -156,7 +160,7 @@ public class MultiSelectTests
     public void Split_ReversedRange_NormalizesToAscendingLines()
     {
         var lines = MultiSelectData.GetSelectedLinesFromDiffFile_Split(CreateFile(),
-                                                                        new MultiSelectRange(SplitSide.Old, 44, 38));
+                                                                       new MultiSelectRange(SplitSide.Old, 44, 38));
 
         Assert.That(lines.Select(l => l.LineNumber), Is.EqualTo(new[] { 38, 39, 40, 41, 42, 43, 44 }));
     }
@@ -166,7 +170,7 @@ public class MultiSelectTests
     {
         // Old lines 35..37 sit in the collapsed range above the first hunk; 38..40 are visible.
         var lines = MultiSelectData.GetSelectedLinesFromDiffFile_Split(CreateFile(),
-                                                                        new MultiSelectRange(SplitSide.Old, 35, 40));
+                                                                       new MultiSelectRange(SplitSide.Old, 35, 40));
 
         Assert.That(lines.Select(l => l.LineNumber), Is.EqualTo(new[] { 35, 36, 37, 38, 39, 40 }));
         Assert.That(lines.Take(3).Select(l => l.IsHide), Is.All.True);
@@ -181,7 +185,7 @@ public class MultiSelectTests
     public void Split_NonexistentLineNumbers_AreSkipped()
     {
         var lines = MultiSelectData.GetSelectedLinesFromDiffFile_Split(CreateFile(),
-                                                                        new MultiSelectRange(SplitSide.Old, 998, 1000));
+                                                                       new MultiSelectRange(SplitSide.Old, 998, 1000));
 
         Assert.That(lines, Is.Empty);
     }
@@ -194,7 +198,8 @@ public class MultiSelectTests
 
         // Old line 10 is a raw file line revealed by the expansion — no DiffLine attached, which
         // upstream still reports as isContext (diff?.type === undefined quirk).
-        var lines = MultiSelectData.GetSelectedLinesFromDiffFile_Split(file, new MultiSelectRange(SplitSide.Old, 10, 11));
+        var lines =
+            MultiSelectData.GetSelectedLinesFromDiffFile_Split(file, new MultiSelectRange(SplitSide.Old, 10, 11));
 
         Assert.That(lines.Count, Is.EqualTo(2));
         Assert.That(lines.Select(l => l.IsHide), Is.All.False);
@@ -209,7 +214,7 @@ public class MultiSelectTests
     public void Unified_OldRange_ReportsOldNumbers()
     {
         var lines = MultiSelectData.GetSelectedLinesFromDiffFile_Unified(CreateFile(),
-                                                                          new MultiSelectRange(SplitSide.Old, 91, 92));
+                                                                         new MultiSelectRange(SplitSide.Old, 91, 92));
 
         Assert.That(lines.Select(l => l.LineNumber), Is.EqualTo(new[] { 91, 92 }));
 
@@ -229,10 +234,11 @@ public class MultiSelectTests
     public void Unified_NewRange_ReportsNewNumbers()
     {
         var lines = MultiSelectData.GetSelectedLinesFromDiffFile_Unified(CreateFile(),
-                                                                          new MultiSelectRange(SplitSide.New, 91, 93));
+                                                                         new MultiSelectRange(SplitSide.New, 91, 93));
 
         Assert.That(lines.Select(l => l.LineNumber), Is.EqualTo(new[] { 91, 92, 93 }));
-        Assert.That(lines.Select(l => l.Value), Is.EqualTo(new[] { Raw("replaced-1"), Raw("replaced-2"), Raw("ctx 092") }));
+        Assert.That(lines.Select(l => l.Value),
+                    Is.EqualTo(new[] { Raw("replaced-1"), Raw("replaced-2"), Raw("ctx 092") }));
         Assert.That(lines.Select(l => l.IsAdd), Is.EqualTo(new[] { true, true, false }));
         Assert.That(lines.Select(l => l.IsContext), Is.EqualTo(new[] { false, false, true }));
 
@@ -248,7 +254,7 @@ public class MultiSelectTests
         // so only an old-side query reports it; its 1-based index sits ahead of the line number
         // because the unified track starts the file's rows after the top collapsed placeholder.
         var lines = MultiSelectData.GetSelectedLinesFromDiffFile_Unified(CreateFile(),
-                                                                          new MultiSelectRange(SplitSide.Old, 91, 91));
+                                                                         new MultiSelectRange(SplitSide.Old, 91, 91));
 
         Assert.That(lines.Select(l => l.Value), Is.EqualTo(new[] { Raw("delete-me") }));
         Assert.That(lines.Single().Index, Is.EqualTo(92));
@@ -259,7 +265,7 @@ public class MultiSelectTests
     {
         // JS: rows whose side number is undefined are skipped by the lineNumber !== undefined guard.
         var lines = MultiSelectData.GetSelectedLinesFromDiffFile_Unified(CreateFile(),
-                                                                          new MultiSelectRange(SplitSide.New, 200, 201));
+                                                                         new MultiSelectRange(SplitSide.New, 200, 201));
 
         Assert.That(lines, Is.Empty);
     }
@@ -269,7 +275,7 @@ public class MultiSelectTests
     {
         // Unified hidden range above the second hunk: new 45..87 are behind the placeholder.
         var lines = MultiSelectData.GetSelectedLinesFromDiffFile_Unified(CreateFile(),
-                                                                          new MultiSelectRange(SplitSide.New, 45, 47));
+                                                                         new MultiSelectRange(SplitSide.New, 45, 47));
 
         Assert.That(lines.Select(l => l.LineNumber), Is.EqualTo(new[] { 45, 46, 47 }));
         Assert.That(lines.Select(l => l.IsHide), Is.All.True);
@@ -281,7 +287,8 @@ public class MultiSelectTests
     public void PreselectedLines_MergeIntoOneMinMaxRangePerSide()
     {
         var ranges = MultiSelectData.ChangePreselectedLinesToLineRange(
-            new MultiSelectPreselectedLines(Old: [10, 5, 7], New: [3, 9]));
+                                                                       new MultiSelectPreselectedLines([10, 5, 7],
+                                                                           [3, 9]));
 
         // Upstream order: the new-side range first, then old.
         Assert.That(ranges, Has.Count.EqualTo(2));
@@ -293,7 +300,7 @@ public class MultiSelectTests
     public void PreselectedLines_EmptySides_ProduceNoRanges()
     {
         Assert.That(MultiSelectData.ChangePreselectedLinesToLineRange(MultiSelectPreselectedLines.Empty), Is.Empty);
-        Assert.That(MultiSelectData.ChangePreselectedLinesToLineRange(new MultiSelectPreselectedLines(Old: [], New: [])),
+        Assert.That(MultiSelectData.ChangePreselectedLinesToLineRange(new MultiSelectPreselectedLines([], [])),
                     Is.Empty);
     }
 }

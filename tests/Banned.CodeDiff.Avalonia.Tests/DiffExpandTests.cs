@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless.NUnit;
@@ -8,21 +7,23 @@ using Banned.CodeDiff.Avalonia.Models;
 using Banned.CodeDiff.Avalonia.Views;
 using Banned.CodeDiff.Services;
 using NUnit.Framework;
+using System.Diagnostics;
+using System.Text;
 
 namespace Banned.CodeDiff.Avalonia.Tests;
 
 /// <summary>
-/// Hunk expand/collapse UI wiring (M4): button placement per hunk position, the three expand
-/// directions against the model state machine, template command wiring, virtualization, and the
-/// large-diff performance baseline. The fixture supplies real old/new file contents — paste-only
-/// diffs compose from the diff text and cannot expand.
+///     Hunk expand/collapse UI wiring (M4): button placement per hunk position, the three expand
+///     directions against the model state machine, template command wiring, virtualization, and the
+///     large-diff performance baseline. The fixture supplies real old/new file contents — paste-only
+///     diffs compose from the diff text and cannot expand.
 /// </summary>
 public class DiffExpandTests
 {
     /// <summary>
-    /// 100-line file with two change hunks: hidden [0,37) above the first hunk, hidden [44,87)
-    /// (43 lines, >= compose length) between them, and a 6-line hidden tail producing the
-    /// synthetic trailing strip keyed at SplitLineLength (101).
+    ///     100-line file with two change hunks: hidden [0,37) above the first hunk, hidden [44,87)
+    ///     (43 lines, >= compose length) between them, and a 6-line hidden tail producing the
+    ///     synthetic trailing strip keyed at SplitLineLength (101).
     /// </summary>
     private static DiffFile CreateExpandableFile()
     {
@@ -78,9 +79,9 @@ public class DiffExpandTests
              ctx 094
             """;
 
-        var file = new DiffFile(oldFileName : "sample.txt", oldFileContent : string.Join("\n", oldLines) + "\n",
-                                newFileName : "sample.txt", newFileContent : string.Join("\n", newLines) + "\n",
-                                diffList    : [diff]);
+        var file = new DiffFile("sample.txt", string.Join("\n", oldLines) + "\n",
+                                "sample.txt", string.Join("\n", newLines) + "\n",
+                                [diff]);
         file.Init();
         file.BuildSplitDiffLines();
         file.BuildUnifiedDiffLines();
@@ -94,8 +95,10 @@ public class DiffExpandTests
         return (T)value!;
     }
 
-    /// <summary>Runs one layout pass: template application of nested controls is driven by the
-    /// layout manager, which headless Show() alone does not trigger.</summary>
+    /// <summary>
+    ///     Runs one layout pass: template application of nested controls is driven by the
+    ///     layout manager, which headless Show() alone does not trigger.
+    /// </summary>
     private static void RunLayoutPass(Window window)
     {
         Assert.That(window.GetLayoutManager(), Is.Not.Null);
@@ -134,8 +137,8 @@ public class DiffExpandTests
 
         // Scroll so the clicked placeholder sits two rows below the viewport top (the offset is 0
         // before, so the viewport top of a row equals its position in the scroll content).
-        var rowHeight = items.ContainerFromItem(view.Rows[7])!.Bounds.Height;
-        var anchorY = 2 * rowHeight;
+        var rowHeight    = items.ContainerFromItem(view.Rows[7])!.Bounds.Height;
+        var anchorY      = 2 * rowHeight;
         var offsetBefore = ViewportTopOf(items, scroller, middle) - anchorY;
         scroller.Offset = new Vector(0, offsetBefore);
         RunLayoutPass(window);
@@ -166,11 +169,11 @@ public class DiffExpandTests
 
         // Expanding the first hunk removes its placeholder; the row that followed it (ctx 038)
         // becomes the anchor that must keep its viewport position.
-        var top = As<DiffSplitHunkRow>(view.Rows[0]);
-        var following = view.Rows[1];
-        var rowHeight = items.ContainerFromItem(following)!.Bounds.Height;
+        var top               = As<DiffSplitHunkRow>(view.Rows[0]);
+        var following         = view.Rows[1];
+        var rowHeight         = items.ContainerFromItem(following)!.Bounds.Height;
         var placeholderHeight = items.ContainerFromItem(top)!.Bounds.Height;
-        var anchorY = ViewportTopOf(items, scroller, following);
+        var anchorY           = ViewportTopOf(items, scroller, following);
 
         Assert.That(scroller.Offset.Y, Is.EqualTo(0));
         Assert.That(anchorY, Is.EqualTo(placeholderHeight).Within(1));
@@ -195,8 +198,8 @@ public class DiffExpandTests
         var view = new DiffView { DiffFile = CreateExpandableFile() };
         var (window, scroller, items) = ShownInView(view);
 
-        var rowHeight = items.ContainerFromItem(view.Rows[7])!.Bounds.Height;
-        var anchorY = 2 * rowHeight;
+        var rowHeight    = items.ContainerFromItem(view.Rows[7])!.Bounds.Height;
+        var anchorY      = 2 * rowHeight;
         var offsetBefore = ViewportTopOf(items, scroller, view.Rows[8]) - anchorY;
         scroller.Offset = new Vector(0, offsetBefore);
         RunLayoutPass(window);
@@ -246,7 +249,7 @@ public class DiffExpandTests
     [AvaloniaTest]
     public void ExpandDown_RevealsFortyLines_AndShrinksHunkRow()
     {
-        var view = new DiffView { DiffFile = CreateExpandableFile() };
+        var view   = new DiffView { DiffFile = CreateExpandableFile() };
         var middle = As<DiffSplitHunkRow>(view.Rows[8]);
 
         view.ExpandHunkDownCommand.Execute(middle);
@@ -300,7 +303,7 @@ public class DiffExpandTests
     [AvaloniaTest]
     public void ExpandUp_RevealsFortyLines_AndMovesHunkRow()
     {
-        var view = new DiffView { DiffFile = CreateExpandableFile() };
+        var view   = new DiffView { DiffFile = CreateExpandableFile() };
         var middle = As<DiffSplitHunkRow>(view.Rows[8]);
 
         view.ExpandHunkUpCommand.Execute(middle);
@@ -321,7 +324,7 @@ public class DiffExpandTests
     [AvaloniaTest]
     public void ExpandAll_RemovesHunkRow()
     {
-        var view = new DiffView { DiffFile = CreateExpandableFile() };
+        var view   = new DiffView { DiffFile = CreateExpandableFile() };
         var middle = As<DiffSplitHunkRow>(view.Rows[8]);
 
         view.ExpandHunkAllCommand.Execute(middle);
@@ -400,8 +403,8 @@ public class DiffExpandTests
     [AvaloniaTest]
     public void HunkRowButtons_AreWiredThroughTheTemplate()
     {
-        var view = new DiffView { DiffFile = CreateExpandableFile() };
-        var window = new Window { Content = view, Width = 900, Height = 600 };
+        var view   = new DiffView { DiffFile = CreateExpandableFile() };
+        var window = new Window { Content    = view, Width = 900, Height = 600 };
         window.Show();
 
         // Headless Show() does not run a layout pass; template application of nested controls
@@ -410,7 +413,8 @@ public class DiffExpandTests
         RunLayoutPass(window);
 
         // Top hunk (1: up) + middle hunk (2: down/up) + trailing strip (1: down).
-        var buttons = view.GetVisualDescendants().OfType<Button>().Where(b => b.Classes.Contains("diffExpand") && b.IsVisible).ToList();
+        var buttons = view.GetVisualDescendants().OfType<Button>()
+                          .Where(b => b.Classes.Contains("diffExpand") && b.IsVisible).ToList();
         Assert.That(buttons.Count, Is.EqualTo(4));
 
         // Executing the middle hunk's bound Down button expands through the template wiring.
@@ -438,43 +442,45 @@ public class DiffExpandTests
             +h
              i
             """;
-        var file = new DiffFile(oldFileName : "", oldFileContent : "", newFileName : "", newFileContent : "",
-                                diffList    : [pureDiff]);
+        var file = new DiffFile("", "", "", "",
+                                [pureDiff]);
         file.Init();
         file.BuildSplitDiffLines();
 
-        var view = new DiffView { DiffFile = file };
-        var window = new Window { Content = view, Width = 900, Height = 600 };
+        var view   = new DiffView { DiffFile = file };
+        var window = new Window { Content    = view, Width = 900, Height = 600 };
         window.Show();
         RunLayoutPass(window);
 
         var hunk = view.Rows.OfType<DiffSplitHunkRow>().Single();
         Assert.That(hunk.IsExpandEnabled, Is.False); // composed from diff-only text
         Assert.That(hunk.CanExpandUp || hunk.CanExpandDown || hunk.CanExpandAll, Is.False);
-        Assert.That(view.GetVisualDescendants().OfType<Button>().Count(b => b.Classes.Contains("diffExpand") && b.IsVisible), Is.EqualTo(0));
+        Assert.That(view.GetVisualDescendants().OfType<Button>()
+                        .Count(b => b.Classes.Contains("diffExpand") && b.IsVisible), Is.EqualTo(0));
     }
 
     /// <summary>
-    /// M4 performance baseline: a ~10k-line model with 98 collapsed hunks must build fast and,
-    /// through VirtualizingStackPanel, realize only the visible slice of containers.
+    ///     M4 performance baseline: a ~10k-line model with 98 collapsed hunks must build fast and,
+    ///     through VirtualizingStackPanel, realize only the visible slice of containers.
     /// </summary>
     [AvaloniaTest]
     public void LargeDiff_VirtualizesRows_AndMeasuresBaseline()
     {
-        var (oldContent, newContent, diff) = CreateLargeSample(clusters : 98, gap : 100);
+        var (oldContent, newContent, diff) = CreateLargeSample(98, 100);
 
         var sw = Stopwatch.StartNew();
-        var file = new DiffFile(oldFileName : "big.txt", oldFileContent : oldContent,
-                                newFileName : "big.txt", newFileContent : newContent, diffList : [diff]);
+        var file = new DiffFile("big.txt", oldContent,
+                                "big.txt", newContent, [diff]);
         file.Init();
         file.BuildSplitDiffLines();
         sw.Stop();
-        TestContext.Out.WriteLine($"[perf] model init+build: {sw.ElapsedMilliseconds} ms, split rows {file.SplitLineLength}");
+        TestContext.Out
+                   .WriteLine($"[perf] model init+build: {sw.ElapsedMilliseconds} ms, split rows {file.SplitLineLength}");
         Assert.That(file.SplitLineLength, Is.GreaterThan(9000));
         Assert.That(file.HasSomeLineCollapsed, Is.True);
 
         sw.Restart();
-        var view = new DiffView { DiffFile = file };
+        var view    = new DiffView { DiffFile = file };
         var visible = view.Rows.Count;
         sw.Stop();
         TestContext.Out.WriteLine($"[perf] row build: {sw.ElapsedMilliseconds} ms, visible rows {visible}");
@@ -497,9 +503,9 @@ public class DiffExpandTests
     /// <summary>One modify (−1/+1) per cluster with 3-line contexts, plus a 120-line tail.</summary>
     private static (string OldContent, string NewContent, string DiffText) CreateLargeSample(int clusters, int gap)
     {
-        var oldLines = new List<string>();
-        var newLines = new List<string>();
-        var diff     = new System.Text.StringBuilder("--- a/big.txt\n+++ b/big.txt\n");
+        var oldLines  = new List<string>();
+        var newLines  = new List<string>();
+        var diff      = new StringBuilder("--- a/big.txt\n+++ b/big.txt\n");
         var oldNumber = 1;
         var newNumber = 1;
 
@@ -518,10 +524,7 @@ public class DiffExpandTests
 
             diff.Append("@@ -").Append(oldStart).Append(",7 +").Append(oldStart).AppendLine(",7 @@");
 
-            for (var k = 3; k > 0; k--)
-            {
-                diff.Append(' ').AppendLine($"ctx {oldNumber - k:D5}");
-            }
+            for (var k = 3; k > 0; k--) diff.Append(' ').AppendLine($"ctx {oldNumber - k:D5}");
 
             diff.Append('-').AppendLine($"removed {oldNumber:D5}");
             oldLines.Add($"removed {oldNumber:D5}");

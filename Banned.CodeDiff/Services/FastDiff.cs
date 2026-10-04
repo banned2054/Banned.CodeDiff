@@ -26,21 +26,21 @@
 namespace Banned.CodeDiff.Services;
 
 /// <summary>
-/// fast-diff's op codes. JS uses the raw numbers -1/1/0; the explicit assignments
-/// keep the wire values (golden JSON dumps them as ints).
+///     fast-diff's op codes. JS uses the raw numbers -1/1/0; the explicit assignments
+///     keep the wire values (golden JSON dumps them as ints).
 /// </summary>
 public enum DiffOp
 {
     Delete = -1,
     Insert = 1,
-    Equal  = 0,
+    Equal  = 0
 }
 
 /// <summary>
-/// The data structure representing a diff is a list of tuples:
-/// [[DELETE, 'Hello'], [INSERT, 'Goodbye'], [EQUAL, ' world.']]
-/// which means: delete 'Hello', add 'Goodbye' and keep ' world.'.
-/// Mutable by design — the cleanup passes rewrite tuples in place, matching the JS arrays.
+///     The data structure representing a diff is a list of tuples:
+///     [[DELETE, 'Hello'], [INSERT, 'Goodbye'], [EQUAL, ' world.']]
+///     which means: delete 'Hello', add 'Goodbye' and keep ' world.'.
+///     Mutable by design — the cleanup passes rewrite tuples in place, matching the JS arrays.
 /// </summary>
 public sealed class DiffTuple(DiffOp op, string text)
 {
@@ -72,10 +72,9 @@ public sealed class CursorInfo
 
 public static class FastDiff
 {
-
     /// <summary>
-    /// Find the differences between two texts. Simplifies the problem by stripping any
-    /// common prefix or suffix off the texts before diffing.
+    ///     Find the differences between two texts. Simplifies the problem by stripping any
+    ///     common prefix or suffix off the texts before diffing.
     /// </summary>
     /// <param name="text1">Old string to be diffed.</param>
     /// <param name="text2">New string to be diffed.</param>
@@ -86,13 +85,13 @@ public static class FastDiff
         var cursor = cursorPos.HasValue
             ? new CursorInfo { OldRange = new CursorRange(cursorPos.Value, 0) }
             : null;
-        return DiffMain(text1, text2, cursor, cleanup, fixUnicode : true, depth : 0);
+        return DiffMain(text1, text2, cursor, cleanup, true, 0);
     }
 
     /// <summary>JS: diff(text1, text2, {oldRange, newRange}, cleanup).</summary>
     public static List<DiffTuple> Diff(string text1, string text2, CursorInfo cursor, bool cleanup = false)
     {
-        return DiffMain(text1, text2, cursor, cleanup, fixUnicode : true, depth : 0);
+        return DiffMain(text1, text2, cursor, cleanup, true, 0);
     }
 
     private static List<DiffTuple> DiffMain(
@@ -109,17 +108,12 @@ public static class FastDiff
         // and uncatchable, so recursion is depth-guarded instead. Legitimate depth is
         // O(log n) (bisect/half-match splits); 1000 is far beyond any real input.
         if (depth > 1000)
-        {
             throw new InvalidOperationException("fast-diff recursion depth exceeded on pathological input");
-        }
 
         // Check for equality
         if (text1 == text2)
         {
-            if (text1.Length > 0)
-            {
-                return [new DiffTuple(DiffOp.Equal, text1)];
-            }
+            if (text1.Length > 0) return [new DiffTuple(DiffOp.Equal, text1)];
 
             return [];
         }
@@ -127,10 +121,7 @@ public static class FastDiff
         if (cursorPos != null)
         {
             var editDiff = FindCursorEditDiff(text1, text2, cursorPos);
-            if (editDiff != null)
-            {
-                return editDiff;
-            }
+            if (editDiff != null) return editDiff;
         }
 
         // Trim off common prefix (speedup).
@@ -149,42 +140,29 @@ public static class FastDiff
         var diffs = DiffCompute(text1, text2, depth);
 
         // Restore the prefix and suffix.
-        if (commonPrefix.Length > 0)
-        {
-            diffs.Insert(0, new DiffTuple(DiffOp.Equal, commonPrefix));
-        }
+        if (commonPrefix.Length > 0) diffs.Insert(0, new DiffTuple(DiffOp.Equal, commonPrefix));
 
-        if (commonSuffix.Length > 0)
-        {
-            diffs.Add(new DiffTuple(DiffOp.Equal, commonSuffix));
-        }
+        if (commonSuffix.Length > 0) diffs.Add(new DiffTuple(DiffOp.Equal, commonSuffix));
 
         DiffCleanupMerge(diffs, fixUnicode);
-        if (cleanup)
-        {
-            DiffCleanupSemantic(diffs);
-        }
+        if (cleanup) DiffCleanupSemantic(diffs);
 
         return diffs;
     }
 
     /// <summary>
-    /// Find the differences between two texts. Assumes that the texts do not have any
-    /// common prefix or suffix.
+    ///     Find the differences between two texts. Assumes that the texts do not have any
+    ///     common prefix or suffix.
     /// </summary>
     private static List<DiffTuple> DiffCompute(string text1, string text2, int depth)
     {
         if (text1.Length == 0)
-        {
             // Just add some text (speedup).
             return [new DiffTuple(DiffOp.Insert, text2)];
-        }
 
         if (text2.Length == 0)
-        {
             // Just delete some text (speedup).
             return [new DiffTuple(DiffOp.Delete, text1)];
-        }
 
         var longText = text1.Length > text2.Length ? text1 : text2;
         var shorText = text1.Length > text2.Length ? text2 : text1;
@@ -196,7 +174,7 @@ public static class FastDiff
             {
                 new(DiffOp.Insert, longText[..i]),
                 new(DiffOp.Equal, shorText),
-                new(DiffOp.Insert, longText[(i + shorText.Length)..]),
+                new(DiffOp.Insert, longText[(i + shorText.Length)..])
             };
             // Swap insertions for deletions if diff is reversed.
             if (text1.Length <= text2.Length) return diffs;
@@ -207,11 +185,9 @@ public static class FastDiff
         }
 
         if (shorText.Length == 1)
-        {
             // Single character string.
             // After the previous speedup, the character can't be an equality.
             return [new DiffTuple(DiffOp.Delete, text1), new DiffTuple(DiffOp.Insert, text2)];
-        }
 
         // Check to see if the problem can be split in two.
         var hm = DiffHalfMatch(text1, text2);
@@ -229,9 +205,9 @@ public static class FastDiff
     }
 
     /// <summary>
-    /// Find the 'middle snake' of a diff, split the problem in two and return the
-    /// recursively constructed diff. See Myers 1986 paper: An O(ND) Difference
-    /// Algorithm and Its Variations.
+    ///     Find the 'middle snake' of a diff, split the problem in two and return the
+    ///     recursively constructed diff. See Myers 1986 paper: An O(ND) Difference
+    ///     Algorithm and Its Variations.
     /// </summary>
     private static List<DiffTuple> DiffBisect(string text1, string text2, int depth)
     {
@@ -270,13 +246,9 @@ public static class FastDiff
                 var k1Offset = vOffset + k1;
                 int x1;
                 if (k1 == -d || (k1 != d && v1[k1Offset - 1] < v1[k1Offset + 1]))
-                {
                     x1 = v1[k1Offset + 1];
-                }
                 else
-                {
                     x1 = v1[k1Offset - 1] + 1;
-                }
 
                 var y1 = x1 - k1;
                 while (x1 < text1Length && y1 < text2Length && text1[x1] == text2[y1])
@@ -303,10 +275,8 @@ public static class FastDiff
                     // Mirror x2 onto top-left coordinate system.
                     var x2 = text1Length - v2[k2Offset];
                     if (x1 >= x2)
-                    {
                         // Overlap detected.
                         return DiffBisectSplit(text1, text2, x1, y1, depth);
-                    }
                 }
             }
 
@@ -316,13 +286,9 @@ public static class FastDiff
                 var k2Offset = vOffset + k2;
                 int x2;
                 if (k2 == -d || (k2 != d && v2[k2Offset - 1] < v2[k2Offset + 1]))
-                {
                     x2 = v2[k2Offset + 1];
-                }
                 else
-                {
                     x2 = v2[k2Offset - 1] + 1;
-                }
 
                 var y2 = x2 - k2;
                 while (x2                          < text1Length && y2 < text2Length &&
@@ -352,10 +318,8 @@ public static class FastDiff
                     // Mirror x2 onto top-left coordinate system.
                     x2 = text1Length - x2;
                     if (x1 >= x2)
-                    {
                         // Overlap detected.
                         return DiffBisectSplit(text1, text2, x1, y1, depth);
-                    }
                 }
             }
         }
@@ -366,7 +330,7 @@ public static class FastDiff
     }
 
     /// <summary>
-    /// Given the location of the 'middle snake', split the diff in two parts and recurse.
+    ///     Given the location of the 'middle snake', split the diff in two parts and recurse.
     /// </summary>
     private static List<DiffTuple> DiffBisectSplit(string text1, string text2, int x, int y, int depth)
     {
@@ -387,10 +351,7 @@ public static class FastDiff
     private static int DiffCommonPrefix(string text1, string text2)
     {
         // Quick check for common null cases.
-        if (text1.Length == 0 || text2.Length == 0 || text1[0] != text2[0])
-        {
-            return 0;
-        }
+        if (text1.Length == 0 || text2.Length == 0 || text1[0] != text2[0]) return 0;
 
         // Binary search.
         // Performance analysis: http://neil.fraser.name/news/2007/10/09/
@@ -400,9 +361,7 @@ public static class FastDiff
         var pointerStart = 0;
         while (pointerMin < pointerMid)
         {
-            if (
-                string.CompareOrdinal(text1, pointerStart, text2, pointerStart, pointerMid - pointerStart) == 0
-            )
+            if (string.CompareOrdinal(text1, pointerStart, text2, pointerStart, pointerMid - pointerStart) == 0)
             {
                 pointerMin   = pointerMid;
                 pointerStart = pointerMin;
@@ -415,10 +374,7 @@ public static class FastDiff
             pointerMid = (pointerMax - pointerMin) / 2 + pointerMin;
         }
 
-        if (IsSurrogatePairStart(text1[pointerMid - 1]))
-        {
-            pointerMid--;
-        }
+        if (IsSurrogatePairStart(text1[pointerMid - 1])) pointerMid--;
 
         return pointerMid;
     }
@@ -430,27 +386,16 @@ public static class FastDiff
         var text1Length = text1.Length;
         var text2Length = text2.Length;
         // Eliminate the null case.
-        if (text1Length == 0 || text2Length == 0)
-        {
-            return 0;
-        }
+        if (text1Length == 0 || text2Length == 0) return 0;
 
         // Truncate the longer string.
         if (text1Length > text2Length)
-        {
-            text1 = text1[(text1Length - text2Length)..];
-        }
-        else if (text1Length < text2Length)
-        {
-            text2 = text2[..text1Length];
-        }
+            text1                                 = text1[(text1Length - text2Length)..];
+        else if (text1Length < text2Length) text2 = text2[..text1Length];
 
         var textLength = Math.Min(text1Length, text2Length);
         // Quick check for the worst case.
-        if (text1 == text2)
-        {
-            return textLength;
-        }
+        if (text1 == text2) return textLength;
 
         // Start by looking for a single character match and increase length until no
         // match is found.
@@ -473,10 +418,7 @@ public static class FastDiff
         {
             var pattern = text1[(textLength - length)..];
             var found   = text2.IndexOf(pattern, StringComparison.Ordinal);
-            if (found == -1)
-            {
-                return best;
-            }
+            if (found == -1) return best;
 
             length += found;
             if (found != 0 && text1[^length..] != text2[..length]) continue;
@@ -489,10 +431,7 @@ public static class FastDiff
     private static int DiffCommonSuffix(string text1, string text2)
     {
         // Quick check for common null cases.
-        if (text1.Length == 0 || text2.Length == 0 || text1[^1] != text2[^1])
-        {
-            return 0;
-        }
+        if (text1.Length == 0 || text2.Length == 0 || text1[^1] != text2[^1]) return 0;
 
         // Binary search.
         // Performance analysis: http://neil.fraser.name/news/2007/10/09/
@@ -516,54 +455,39 @@ public static class FastDiff
             pointerMid = (pointerMax - pointerMin) / 2 + pointerMin;
         }
 
-        if (IsSurrogatePairEnd(text1[^pointerMid]))
-        {
-            pointerMid--;
-        }
+        if (IsSurrogatePairEnd(text1[^pointerMid])) pointerMid--;
 
         return pointerMid;
     }
 
     /// <summary>
-    /// Do the two texts share a substring which is at least half the length of the
-    /// longer text? This speedup can produce non-minimal diffs.
-    /// Returns (prefix of text1, suffix of text1, prefix of text2, suffix of text2,
-    /// common middle) or null when there was no match.
+    ///     Do the two texts share a substring which is at least half the length of the
+    ///     longer text? This speedup can produce non-minimal diffs.
+    ///     Returns (prefix of text1, suffix of text1, prefix of text2, suffix of text2,
+    ///     common middle) or null when there was no match.
     /// </summary>
     private static (string Text1A, string Text1B, string Text2A, string Text2B, string MidCommon)? DiffHalfMatch(
-        string text1,
-        string text2
-    )
+        string text1, string text2)
     {
         var longText  = text1.Length > text2.Length ? text1 : text2;
         var shortText = text1.Length > text2.Length ? text2 : text1;
-        if (longText.Length < 4 || shortText.Length * 2 < longText.Length)
-        {
-            return null; // Pointless.
-        }
+        if (longText.Length < 4 || shortText.Length * 2 < longText.Length) return null; // Pointless.
 
         // First check if the second quarter is the seed for a half-match.
         var hm1 = DiffHalfMatchI(longText, shortText, (longText.Length + 3) / 4);
         // Check again based on the third quarter.
-        var                                       hm2 = DiffHalfMatchI(longText, shortText, (longText.Length + 1) / 2);
+        var hm2 = DiffHalfMatchI(longText, shortText, (longText.Length + 1) / 2);
+
         (string, string, string, string, string)? hm;
-        if (hm1 == null && hm2 == null)
-        {
-            return null;
-        }
-        else if (hm2 == null)
-        {
+        if (hm1 == null && hm2 == null) return null;
+
+        if (hm2 == null)
             hm = hm1;
-        }
         else if (hm1 == null)
-        {
             hm = hm2;
-        }
         else
-        {
             // Both matched. Select the longest.
             hm = hm1.Value.Item5.Length > hm2.Value.Item5.Length ? hm1 : hm2;
-        }
 
         // A half-match was found, sort out the return data.
         string text1a, text1b, text2a, text2b;
@@ -610,9 +534,7 @@ public static class FastDiff
             }
 
             if (bestCommon.Length * 2 >= longtext.Length)
-            {
                 return (bestLongTextA, bestLongTextB, bestShortTextA, bestShortTextB, bestCommon);
-            }
 
             return null;
         }
@@ -653,13 +575,9 @@ public static class FastDiff
             {
                 // An insertion or deletion.
                 if (diffs[pointer].Op == DiffOp.Insert)
-                {
                     lengthInsertions2 += diffs[pointer].Text.Length;
-                }
                 else
-                {
                     lengthDeletions2 += diffs[pointer].Text.Length;
-                }
 
                 // Eliminate an equality that is smaller or equal to the edits on both
                 // sides of it.
@@ -691,10 +609,7 @@ public static class FastDiff
         }
 
         // Normalize the diff.
-        if (changes)
-        {
-            DiffCleanupMerge(diffs, false);
-        }
+        if (changes) DiffCleanupMerge(diffs, false);
 
         DiffCleanupSemanticLossless(diffs);
 
@@ -755,45 +670,32 @@ public static class FastDiff
     }
 
     // JS: whitespaceRegex_ = /\s/ — the exact ECMAScript \s character set.
-    private static bool IsJsWhitespace(char c)
-    {
-        return c is
-            '\t'
-         or '\n'
-         or '\v'
-         or '\f'
-         or '\r'
-         or ' '
-         or '\u00a0'
-         or '\u1680'
-         or (>= '\u2000' and <= '\u200a')
-         or '\u2028'
-         or '\u2029'
-         or '\u202f'
-         or '\u205f'
-         or '\u3000'
-         or '\ufeff';
-    }
+    private static bool IsJsWhitespace(char c) => c is '\t'
+                                                    or '\n'
+                                                    or '\v'
+                                                    or '\f'
+                                                    or '\r'
+                                                    or ' '
+                                                    or '\u00a0'
+                                                    or '\u1680'
+                                                    or >= '\u2000' and <= '\u200a'
+                                                    or '\u2028'
+                                                    or '\u2029'
+                                                    or '\u202f'
+                                                    or '\u205f'
+                                                    or '\u3000'
+                                                    or '\ufeff';
 
     // JS: linebreakRegex_ = /[\r\n]/
-    private static bool IsLineBreak(char c)
-    {
-        return c is '\r' or '\n';
-    }
+    private static bool IsLineBreak(char c) => c is '\r' or '\n';
 
     // JS: blanklineEndRegex_ = /\n\r?\n$/ ($ matches at the very end in JS).
     private static bool MatchesBlankLineEnd(SegmentView s)
     {
         var n = s.Length;
-        if (n < 2 || s[n - 1] != '\n')
-        {
-            return false;
-        }
+        if (n < 2 || s[n - 1] != '\n') return false;
 
-        if (s[n - 2] == '\n')
-        {
-            return true;
-        }
+        if (s[n - 2] == '\n') return true;
 
         return n >= 3 && s[n - 2] == '\r' && s[n - 3] == '\n';
     }
@@ -802,51 +704,20 @@ public static class FastDiff
     private static bool MatchesBlankLineStart(SegmentView s)
     {
         var i = 0;
-        if (i < s.Length && s[i] == '\r')
-        {
-            i++;
-        }
+        if (i < s.Length && s[i] == '\r') i++;
 
-        if (i >= s.Length || s[i] != '\n')
-        {
-            return false;
-        }
+        if (i >= s.Length || s[i] != '\n') return false;
 
         i++;
-        if (i < s.Length && s[i] == '\r')
-        {
-            i++;
-        }
+        if (i < s.Length && s[i] == '\r') i++;
 
         return i < s.Length && s[i] == '\n';
     }
 
     /// <summary>
-    /// A read-only view over up to three contiguous string segments. diff_cleanupSemanticLossless
-    /// scores virtual concatenations (e.g. edit[i..]+equality2[..i]) that JS materializes per
-    /// shift step; the view defers that to the single slice at the winning offset. Indexing and
-    /// length follow the concatenation exactly; an empty segment (length 0) is never dereferenced.
-    /// </summary>
-    private readonly struct SegmentView(
-        string a, int aStart, int aLength,
-        string b, int bStart, int bLength,
-        string c, int cStart, int cLength
-    )
-    {
-        public int Length => aLength + bLength + cLength;
-
-        public char this[int index]
-            => index < aLength
-                ? a[aStart + index]
-                : index < aLength + bLength
-                    ? b[bStart + index - aLength]
-                    : c[cStart + index - aLength - bLength];
-    }
-
-    /// <summary>
-    /// Look for single edits surrounded on both sides by equalities which can be
-    /// shifted sideways to align the edit to a word boundary.
-    /// e.g: The c&lt;ins&gt;at c&lt;/ins&gt;ame. -&gt; The &lt;ins&gt;cat &lt;/ins&gt;came.
+    ///     Look for single edits surrounded on both sides by equalities which can be
+    ///     shifted sideways to align the edit to a word boundary.
+    ///     e.g: The c&lt;ins&gt;at c&lt;/ins&gt;ame. -&gt; The &lt;ins&gt;cat &lt;/ins&gt;came.
     /// </summary>
     private static void DiffCleanupSemanticLossless(List<DiffTuple> diffs)
     {
@@ -855,10 +726,8 @@ public static class FastDiff
         static int DiffCleanupSemanticScore(SegmentView one, SegmentView two)
         {
             if (one.Length == 0 || two.Length == 0)
-            {
                 // Edges are the best.
                 return 6;
-            }
 
             // Each port of this function behaves slightly differently due to subtle
             // differences in each language's definition of things like 'whitespace'.
@@ -877,30 +746,24 @@ public static class FastDiff
             var blankLine2       = lineBreak2       && MatchesBlankLineStart(two);
 
             if (blankLine1 || blankLine2)
-            {
                 // Five points for blank lines.
                 return 5;
-            }
-            else if (lineBreak1 || lineBreak2)
-            {
+
+            if (lineBreak1 || lineBreak2)
                 // Four points for line breaks.
                 return 4;
-            }
-            else if (nonAlphaNumeric1 && !whitespace1 && whitespace2)
-            {
+
+            if (nonAlphaNumeric1 && !whitespace1 && whitespace2)
                 // Three points for end of sentences.
                 return 3;
-            }
-            else if (whitespace1 || whitespace2)
-            {
+
+            if (whitespace1 || whitespace2)
                 // Two points for whitespace.
                 return 2;
-            }
-            else if (nonAlphaNumeric1 || nonAlphaNumeric2)
-            {
+
+            if (nonAlphaNumeric1 || nonAlphaNumeric2)
                 // One point for non-alphanumeric.
                 return 1;
-            }
 
             return 0;
         }
@@ -937,12 +800,14 @@ public static class FastDiff
                 //               over equality2 (max(0, i-len)..i), not a growing prefix,
                 //   equality2 = equality2[i..].
                 var bestOffset = 0;
-                var bestScore  = DiffCleanupSemanticScore(
-                                     new SegmentView(equality1, 0, equality1.Length, edit, 0, 0, equality2, 0, 0),
-                                     new SegmentView(edit, 0, edit.Length, equality2, 0, 0, string.Empty, 0, 0))
-                               + DiffCleanupSemanticScore(
-                                     new SegmentView(edit, 0, edit.Length, equality2, 0, 0, string.Empty, 0, 0),
-                                     new SegmentView(equality2, 0, equality2.Length, string.Empty, 0, 0, string.Empty, 0, 0));
+                var bestScore =
+                    DiffCleanupSemanticScore(new SegmentView(equality1, 0, equality1.Length, edit, 0, 0, equality2, 0,
+                                                             0),
+                                             new SegmentView(edit, 0, edit.Length, equality2, 0, 0, string.Empty, 0,
+                                                             0)) +
+                    DiffCleanupSemanticScore(new SegmentView(edit, 0, edit.Length, equality2, 0, 0, string.Empty, 0, 0),
+                                             new SegmentView(equality2, 0, equality2.Length, string.Empty, 0, 0,
+                                                             string.Empty, 0, 0));
                 if (edit.Length > 0)
                 {
                     // The JS loop guards on edit.length because charAt("") is "" and never
@@ -951,23 +816,20 @@ public static class FastDiff
                     // edit[i] while i < edit.Length, else the equality2 char entering the
                     // window at i - edit.Length.
                     var i = 0;
-                    while (i < equality2.Length &&
+                    while (i                                                        < equality2.Length &&
                            (i < edit.Length ? edit[i] : equality2[i - edit.Length]) == equality2[i])
                     {
                         i++;
-                        var shiftedEdit = new SegmentView(
-                            edit, Math.Min(i, edit.Length), Math.Max(0, edit.Length - i),
-                            equality2, Math.Max(0, i - edit.Length), Math.Min(i, edit.Length),
-                            string.Empty, 0, 0);
-                        var score = DiffCleanupSemanticScore(
-                                        new SegmentView(
-                                            equality1, 0, equality1.Length,
-                                            edit, 0, Math.Min(i, edit.Length),
-                                            equality2, 0, Math.Max(0, i - edit.Length)),
-                                        shiftedEdit)
-                                  + DiffCleanupSemanticScore(
-                                        shiftedEdit,
-                                        new SegmentView(equality2, i, equality2.Length - i, string.Empty, 0, 0, string.Empty, 0, 0));
+                        var shiftedEdit = new SegmentView(edit, Math.Min(i, edit.Length), Math.Max(0, edit.Length - i),
+                                                          equality2, Math.Max(0, i - edit.Length),
+                                                          Math.Min(i, edit.Length), string.Empty, 0, 0);
+                        var score =
+                            DiffCleanupSemanticScore(new SegmentView(equality1, 0, equality1.Length, edit, 0,
+                                                                     Math.Min(i, edit.Length), equality2, 0,
+                                                                     Math.Max(0, i - edit.Length)), shiftedEdit) +
+                            DiffCleanupSemanticScore(shiftedEdit,
+                                                     new SegmentView(equality2, i, equality2.Length - i, string.Empty,
+                                                                     0, 0, string.Empty, 0, 0));
                         // The >= encourages trailing rather than leading whitespace on edits.
                         if (score < bestScore) continue;
                         bestScore  = score;
@@ -977,8 +839,8 @@ public static class FastDiff
 
                 var editTaken     = Math.Min(bestOffset, edit.Length);
                 var bestEquality1 = equality1 + edit[..editTaken] + equality2[..(bestOffset - editTaken)];
-                var bestEdit      = JsSubstring(edit, bestOffset) +
-                                    equality2[Math.Max(0, bestOffset - edit.Length)..bestOffset];
+                var bestEdit = JsSubstring(edit, bestOffset) +
+                               equality2[Math.Max(0, bestOffset - edit.Length)..bestOffset];
                 var bestEquality2 = equality2[bestOffset..];
 
                 if (diffs[pointer - 1].Text != bestEquality1)
@@ -1012,58 +874,8 @@ public static class FastDiff
     }
 
     /// <summary>
-    /// The delete/insert texts accumulated between two equalities by DiffCleanupMerge.
-    /// JS builds them with `+=` per tuple, copying the growing string each time (quadratic
-    /// in the run length); segments defer the join to the one materialization per equality.
-    /// </summary>
-    private sealed class RunText
-    {
-        private readonly List<string> _parts = [];
-
-        public int Length { get; private set; }
-
-        public void Append(string text)
-        {
-            if (text.Length == 0)
-            {
-                return;
-            }
-
-            _parts.Add(text);
-            Length += text.Length;
-        }
-
-        public void Prepend(string text)
-        {
-            if (text.Length == 0)
-            {
-                return;
-            }
-
-            _parts.Insert(0, text);
-            Length += text.Length;
-        }
-
-        public void Clear()
-        {
-            _parts.Clear();
-            Length = 0;
-        }
-
-        public override string ToString()
-        {
-            return _parts.Count switch
-            {
-                0 => string.Empty,
-                1 => _parts[0],
-                _ => string.Concat(_parts),
-            };
-        }
-    }
-
-    /// <summary>
-    /// Reorder and merge like edit sections. Merge equalities. Any edit section can
-    /// move as long as it doesn't cross an equality.
+    ///     Reorder and merge like edit sections. Merge equalities. Any edit section can
+    ///     move as long as it doesn't cross an equality.
     /// </summary>
     private static void DiffCleanupMerge(List<DiffTuple> diffs, bool fixUnicode)
     {
@@ -1147,7 +959,7 @@ public static class FastDiff
                             if (diffs[pointer].Text.Length > 0 && StartsWithPairEnd(diffs[pointer].Text))
                             {
                                 var stray = diffs[pointer].Text[..1];
-                                diffs[pointer].Text =  diffs[pointer].Text[1..];
+                                diffs[pointer].Text = diffs[pointer].Text[1..];
                                 deleteRun.Append(stray);
                                 insertRun.Append(stray);
                             }
@@ -1253,9 +1065,7 @@ public static class FastDiff
             }
 
             if (diffs.Count > 0 && diffs[^1].Text.Length == 0)
-            {
                 diffs.RemoveAt(diffs.Count - 1); // Remove the dummy entry at the end.
-            }
 
             // Second pass: look for single edits surrounded on both sides by equalities
             // which can be shifted sideways to eliminate an equality.
@@ -1292,96 +1102,63 @@ public static class FastDiff
             }
 
             // If shifts were made, the diff needs reordering and another shift sweep.
-            if (changes)
-            {
-                continue;
-            }
+            if (changes) continue;
 
             break;
         }
     }
 
-    private static bool IsSurrogatePairStart(char c)
-    {
-        return c >= 0xd800 && c <= 0xdbff;
-    }
+    private static bool IsSurrogatePairStart(char c)   => c          >= 0xd800 && c <= 0xdbff;
+    private static bool IsSurrogatePairEnd(char   c)   => c          >= 0xdc00 && c <= 0xdfff;
+    private static bool StartsWithPairEnd(string  str) => str.Length > 0       && IsSurrogatePairEnd(str[0]);
+    private static bool EndsWithPairStart(string  str) => str.Length > 0       && IsSurrogatePairStart(str[^1]);
 
-    private static bool IsSurrogatePairEnd(char c)
-    {
-        return c >= 0xdc00 && c <= 0xdfff;
-    }
-
-    private static bool StartsWithPairEnd(string str)
-    {
-        return str.Length > 0 && IsSurrogatePairEnd(str[0]);
-    }
-
-    private static bool EndsWithPairStart(string str)
-    {
-        return str.Length > 0 && IsSurrogatePairStart(str[^1]);
-    }
-
-    private static List<DiffTuple> RemoveEmptyTuples(IEnumerable<DiffTuple> tuples)
-    {
-        return tuples.Where(t => t.Text.Length > 0).ToList();
-    }
+    private static List<DiffTuple> RemoveEmptyTuples(IEnumerable<DiffTuple> tuples) =>
+        tuples.Where(t => t.Text.Length > 0).ToList();
 
     private static List<DiffTuple>? MakeEditSplice(string before, string oldMiddle, string newMiddle, string after)
     {
-        if (EndsWithPairStart(before) || StartsWithPairEnd(after))
-        {
-            return null;
-        }
+        if (EndsWithPairStart(before) || StartsWithPairEnd(after)) return null;
 
-        return RemoveEmptyTuples(
-        [
+        return RemoveEmptyTuples([
             new DiffTuple(DiffOp.Equal, before),
             new DiffTuple(DiffOp.Delete, oldMiddle),
             new DiffTuple(DiffOp.Insert, newMiddle),
-            new DiffTuple(DiffOp.Equal, after),
+            new DiffTuple(DiffOp.Equal, after)
         ]);
     }
 
     /// <summary>JS substring(start) — clamps out-of-range start instead of throwing.</summary>
     private static string JsSubstring(string s, int start)
     {
-        if (start <= 0)
-        {
-            return s;
-        }
+        if (start <= 0) return s;
 
         return start >= s.Length ? "" : s[start..];
     }
 
     /// <summary>
-    /// JS slice(s.length - n) — the suffix slice of findCursorEditDiff's editAfter branch.
-    /// A negative start (n &gt; s.Length) clamps to 0 and returns the whole string; a start
-    /// past the end (n &lt; 0) returns the empty string. Unlike the C# range operators,
-    /// slice never throws on out-of-range bounds.
+    ///     JS slice(s.length - n) — the suffix slice of findCursorEditDiff's editAfter branch.
+    ///     A negative start (n &gt; s.Length) clamps to 0 and returns the whole string; a start
+    ///     past the end (n &lt; 0) returns the empty string. Unlike the C# range operators,
+    ///     slice never throws on out-of-range bounds.
     /// </summary>
     private static string JsSliceSuffix(string s, int n)
     {
-        if (n < 0)
-        {
-            return "";
-        }
+        if (n < 0) return "";
 
-        return n >= s.Length ? s : s[(s.Length - n)..];
+        return n >= s.Length ? s : s[^n..];
     }
 
     /// <summary>
-    /// JS slice(0, s.length - n) — the middle slice of findCursorEditDiff's editAfter branch.
-    /// A negative end (n &gt; s.Length) clamps to 0 and returns the empty string; an end
-    /// past the length (n &lt; 0) returns the whole string.
+    ///     JS slice(0, s.length - n) — the middle slice of findCursorEditDiff's editAfter branch.
+    ///     A negative end (n &gt; s.Length) clamps to 0 and returns the empty string; an end
+    ///     past the length (n &lt; 0) returns the whole string.
     /// </summary>
     private static string JsSliceWithoutSuffix(string s, int n)
     {
-        if (n < 0)
-        {
-            return s;
-        }
+        if (n < 0) return s;
 
-        return n >= s.Length ? "" : s[..(s.Length - n)];
+        return n >= s.Length ? "" : s[..^n];
     }
 
     private static List<DiffTuple>? FindCursorEditDiff(string oldText, string newText, CursorInfo cursorPos)
@@ -1393,14 +1170,11 @@ public static class FastDiff
         var oldLength = oldText.Length;
         var newLength = newText.Length;
 
-        if (oldRange == null)
-        {
-            return null;
-        }
+        if (oldRange == null) return null;
 
         switch (oldRange.Length)
         {
-            case 0 when (newRange == null || newRange.Length == 0) :
+            case 0 when newRange == null || newRange.Length == 0 :
             {
                 // see if we have an insert or delete before or after cursor
                 var oldCursor      = oldRange.Index;
@@ -1411,30 +1185,18 @@ public static class FastDiff
                 // editBefore: is this an insert or delete right before oldCursor?
                 {
                     var newCursor = oldCursor + newLength - oldLength;
-                    if (maybeNewCursor != null && maybeNewCursor != newCursor)
-                    {
-                        goto editAfter;
-                    }
+                    if (maybeNewCursor != null && maybeNewCursor != newCursor) goto editAfter;
 
-                    if (newCursor < 0 || newCursor > newLength)
-                    {
-                        goto editAfter;
-                    }
+                    if (newCursor < 0 || newCursor > newLength) goto editAfter;
 
                     var newBefore = newText[..newCursor];
                     var newAfter  = newText[newCursor..];
-                    if (newAfter != oldAfter)
-                    {
-                        goto editAfter;
-                    }
+                    if (newAfter != oldAfter) goto editAfter;
 
                     var prefixLength = Math.Min(oldCursor, newCursor);
                     var oldPrefix    = oldBefore[..prefixLength];
                     var newPrefix    = newBefore[..prefixLength];
-                    if (oldPrefix != newPrefix)
-                    {
-                        goto editAfter;
-                    }
+                    if (oldPrefix != newPrefix) goto editAfter;
 
                     var oldMiddle = oldBefore[prefixLength..];
                     var newMiddle = newBefore[prefixLength..];
@@ -1444,18 +1206,12 @@ public static class FastDiff
                 // editAfter: is this an insert or delete right after oldCursor?
                 editAfter:
                 {
-                    if (maybeNewCursor != null && maybeNewCursor != oldCursor)
-                    {
-                        return null;
-                    }
+                    if (maybeNewCursor != null && maybeNewCursor != oldCursor) return null;
 
                     var cursor    = oldCursor;
                     var newBefore = cursor >= newText.Length ? newText : newText[..Math.Max(0, cursor)];
                     var newAfter  = JsSubstring(newText, cursor);
-                    if (newBefore != oldBefore)
-                    {
-                        return null;
-                    }
+                    if (newBefore != oldBefore) return null;
 
                     // Invariant (non-local): suffixLength >= 0 is pinned by the
                     // newBefore != oldBefore early-out above — cursor > min(oldLength, newLength)
@@ -1469,10 +1225,7 @@ public static class FastDiff
                     var suffixLength = Math.Min(oldLength - cursor, newLength - cursor);
                     var oldSuffix    = JsSliceSuffix(oldAfter, suffixLength);
                     var newSuffix    = JsSliceSuffix(newAfter, suffixLength);
-                    if (oldSuffix != newSuffix)
-                    {
-                        return null;
-                    }
+                    if (oldSuffix != newSuffix) return null;
 
                     var oldMiddle = JsSliceWithoutSuffix(oldAfter, suffixLength);
                     var newMiddle = JsSliceWithoutSuffix(newAfter, suffixLength);
@@ -1487,17 +1240,11 @@ public static class FastDiff
                 var oldSuffix    = JsSubstring(oldText, oldRange.Index + oldRange.Length);
                 var prefixLength = oldPrefix.Length;
                 var suffixLength = oldSuffix.Length;
-                if (newLength < prefixLength + suffixLength)
-                {
-                    return null;
-                }
+                if (newLength < prefixLength + suffixLength) return null;
 
                 var newPrefix = newText[..prefixLength];
                 var newSuffix = newText[(newLength - suffixLength)..];
-                if (oldPrefix != newPrefix || oldSuffix != newSuffix)
-                {
-                    return null;
-                }
+                if (oldPrefix != newPrefix || oldSuffix != newSuffix) return null;
 
                 var oldMiddle = oldText.Substring(prefixLength, oldLength - suffixLength - prefixLength);
                 var newMiddle = newText.Substring(prefixLength, newLength - suffixLength - prefixLength);
@@ -1505,6 +1252,74 @@ public static class FastDiff
             }
             default :
                 return null;
+        }
+    }
+
+    /// <summary>
+    ///     A read-only view over up to three contiguous string segments. diff_cleanupSemanticLossless
+    ///     scores virtual concatenations (e.g. edit[i..]+equality2[..i]) that JS materializes per
+    ///     shift step; the view defers that to the single slice at the winning offset. Indexing and
+    ///     length follow the concatenation exactly; an empty segment (length 0) is never dereferenced.
+    /// </summary>
+    private readonly struct SegmentView(
+        string a,
+        int    aStart,
+        int    aLength,
+        string b,
+        int    bStart,
+        int    bLength,
+        string c,
+        int    cStart,
+        int    cLength
+    )
+    {
+        public int Length => aLength + bLength + cLength;
+
+        public char this[int index] => index < aLength ? a[aStart + index] :
+            index < aLength + bLength ? b[bStart + index - aLength] : c[cStart + index - aLength - bLength];
+    }
+
+    /// <summary>
+    ///     The delete/insert texts accumulated between two equalities by DiffCleanupMerge.
+    ///     JS builds them with `+=` per tuple, copying the growing string each time (quadratic
+    ///     in the run length); segments defer the join to the one materialization per equality.
+    /// </summary>
+    private sealed class RunText
+    {
+        private readonly List<string> _parts = [];
+
+        public int Length { get; private set; }
+
+        public void Append(string text)
+        {
+            if (text.Length == 0) return;
+
+            _parts.Add(text);
+            Length += text.Length;
+        }
+
+        public void Prepend(string text)
+        {
+            if (text.Length == 0) return;
+
+            _parts.Insert(0, text);
+            Length += text.Length;
+        }
+
+        public void Clear()
+        {
+            _parts.Clear();
+            Length = 0;
+        }
+
+        public override string ToString()
+        {
+            return _parts.Count switch
+            {
+                0 => string.Empty,
+                1 => _parts[0],
+                _ => string.Concat(_parts)
+            };
         }
     }
 }

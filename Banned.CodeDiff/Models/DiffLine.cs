@@ -6,30 +6,33 @@ public enum DiffLineType
     Context = 0,
     Add     = 1,
     Delete  = 2,
-    Hunk    = 3,
+    Hunk    = 3
 }
 
 /// <summary>Port of raw-diff.ts IRawDiff.</summary>
 public sealed class RawDiff
 {
     /// <summary>
-    /// The plain text contents of the diff header. This contains everything from the
-    /// start of the diff up until the first hunk header starts. Note that this does
-    /// not include a trailing newline.
+    ///     The plain text contents of the diff header. This contains everything from the
+    ///     start of the diff up until the first hunk header starts. Note that this does
+    ///     not include a trailing newline.
     /// </summary>
     public string Header { get; init; } = "";
 
     /// <summary>
-    /// The plain text contents of the diff. This contains everything after the diff
-    /// header until the last character in the diff. Does not include a trailing newline
-    /// nor 'no newline at end of file' comments (see <see cref="DiffLine.NoTrailingNewLine"/>).
+    ///     The plain text contents of the diff. This contains everything after the diff
+    ///     header until the last character in the diff. Does not include a trailing newline
+    ///     nor 'no newline at end of file' comments (see <see cref="DiffLine.NoTrailingNewLine" />).
     /// </summary>
     public string Contents { get; init; } = "";
 
     /// <summary>Each hunk in the diff with information about start, and end positions, lines and line statuses.</summary>
     public IReadOnlyList<DiffHunk> Hunks { get; init; } = [];
 
-    /// <summary>Whether or not the unified diff indicates that the contents could not be diffed due to one of the versions being binary.</summary>
+    /// <summary>
+    ///     Whether or not the unified diff indicates that the contents could not be diffed due to one of the versions
+    ///     being binary.
+    /// </summary>
     public bool IsBinary { get; init; }
 
     /// <summary>The largest line number in the diff</summary>
@@ -46,14 +49,14 @@ public enum DiffHunkExpansionType
     None = 0,
 
     /// <summary>
-    /// The hunk header can be expanded up exclusively. Only the first hunk can be
-    /// expanded up exclusively.
+    ///     The hunk header can be expanded up exclusively. Only the first hunk can be
+    ///     expanded up exclusively.
     /// </summary>
     Up = 1,
 
     /// <summary>
-    /// The hunk header can be expanded down exclusively. Only the last hunk (if it's
-    /// the dummy hunk with only one line) can be expanded down exclusively.
+    ///     The hunk header can be expanded down exclusively. Only the last hunk (if it's
+    ///     the dummy hunk with only one line) can be expanded down exclusively.
     /// </summary>
     Down = 2,
 
@@ -61,10 +64,10 @@ public enum DiffHunkExpansionType
     Both = 3,
 
     /// <summary>
-    /// The hunk header represents a short gap that, when expanded, will result in
-    /// merging this hunk and the hunk above.
+    ///     The hunk header represents a short gap that, when expanded, will result in
+    ///     merging this hunk and the hunk above.
     /// </summary>
-    Short = 4,
+    Short = 4
 }
 
 /// <summary>details about the start and end of a diff hunk</summary>
@@ -87,15 +90,12 @@ public sealed class DiffHunkHeader(int oldStartLine, int oldLineCount, int newSt
         return $"@@ -{OldStartLine},{OldLineCount} +{NewStartLine},{NewLineCount} @@";
     }
 
-    public bool Equals(DiffHunkHeader other)
-    {
-        // NOTE: kept identical to the JS original, which compares oldStartLine twice
-        // and never compares newLineCount.
-        return OldStartLine == other.OldStartLine &&
-               OldLineCount == other.OldLineCount &&
-               NewStartLine == other.NewStartLine &&
-               OldStartLine == other.OldStartLine;
-    }
+    // NOTE: kept identical to the JS original, which compares oldStartLine twice
+    // and never compares newLineCount.
+    public bool Equals(DiffHunkHeader other) => OldStartLine == other.OldStartLine &&
+                                                OldLineCount == other.OldLineCount &&
+                                                NewStartLine == other.NewStartLine &&
+                                                OldStartLine == other.OldStartLine;
 }
 
 /// <summary>each diff is made up of a number of hunks</summary>
@@ -122,10 +122,7 @@ public sealed class DiffHunk(
 
     public bool Equals(DiffHunk other)
     {
-        if (ReferenceEquals(this, other))
-        {
-            return true;
-        }
+        if (ReferenceEquals(this, other)) return true;
 
         return Header.Equals(other.Header)                &&
                UnifiedDiffStart == other.UnifiedDiffStart &&
@@ -156,8 +153,8 @@ public class DiffLine(
     public DiffLineType Type { get; } = type;
 
     /// <summary>
-    /// Line number in the original diff patch (before expanding it), or null if it was
-    /// added as part of a diff expansion action.
+    ///     Line number in the original diff patch (before expanding it), or null if it was
+    ///     added as part of a diff expansion action.
     /// </summary>
     public int? OriginalLineNumber { get; } = originalLineNumber;
 
@@ -175,8 +172,8 @@ public class DiffLine(
     public DiffRange? DiffChanges { get; set; }
 
     /// <summary>
-    /// JS field: _diffChanges. Holds the *opposite* line's range (deletion range on an
-    /// addition and vice versa); consumed by the fast-diff syntax template builder.
+    ///     JS field: _diffChanges. Holds the *opposite* line's range (deletion range on an
+    ///     addition and vice versa); consumed by the fast-diff syntax template builder.
     /// </summary>
     public DiffRange? InternalDiffChanges { get; set; }
 
@@ -213,16 +210,13 @@ public class DiffLine(
         return Type is DiffLineType.Add or DiffLineType.Delete;
     }
 
-    public bool Equals(DiffLine? other)
-    {
-        return other is not null                              &&
-               Text               == other.Text               &&
-               Type               == other.Type               &&
-               OriginalLineNumber == other.OriginalLineNumber &&
-               OldLineNumber      == other.OldLineNumber      &&
-               NewLineNumber      == other.NewLineNumber      &&
-               NoTrailingNewLine  == other.NoTrailingNewLine;
-    }
+    public bool Equals(DiffLine? other) => other is not null                              &&
+                                           Text               == other.Text               &&
+                                           Type               == other.Type               &&
+                                           OriginalLineNumber == other.OriginalLineNumber &&
+                                           OldLineNumber      == other.OldLineNumber      &&
+                                           NewLineNumber      == other.NewLineNumber      &&
+                                           NoTrailingNewLine  == other.NoTrailingNewLine;
 
     public DiffLine Clone(string text)
     {
@@ -233,6 +227,8 @@ public class DiffLine(
 public static class DiffLineExtensions
 {
     /// <summary>Port of parse/diff-line.ts checkDiffLineIncludeChange.</summary>
-    public static bool CheckDiffLineIncludeChange(this DiffLine? diffLine) =>
-        diffLine?.Type is DiffLineType.Add or DiffLineType.Delete;
+    public static bool CheckDiffLineIncludeChange(this DiffLine? diffLine)
+    {
+        return diffLine?.Type is DiffLineType.Add or DiffLineType.Delete;
+    }
 }

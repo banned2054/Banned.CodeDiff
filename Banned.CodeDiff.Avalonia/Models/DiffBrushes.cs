@@ -4,8 +4,8 @@ using Avalonia.Styling;
 namespace Banned.CodeDiff.Avalonia.Models;
 
 /// <summary>
-/// Resolved brushes for one theme variant. Values mirror the light/dark CSS variables of the
-/// upstream git-diff-view <c>_base.css</c>; theme switching rebuilds rows with the other set.
+///     Resolved brushes for one theme variant. Values mirror the light/dark CSS variables of the
+///     upstream git-diff-view <c>_base.css</c>; theme switching rebuilds rows with the other set.
 /// </summary>
 internal sealed record DiffBrushSet(
     IBrush NumberForeground,
@@ -88,9 +88,15 @@ internal static class DiffBrushes
                                                        AddHighlightDark, DeleteHighlightDark,
                                                        SplitterDark, MultiSelectOverlay, MultiSelectBorder);
 
-    public static DiffBrushSet Get(ThemeVariant variant) => variant == ThemeVariant.Dark ? DarkSet : LightSet;
+    public static DiffBrushSet Get(ThemeVariant variant)
+    {
+        return variant == ThemeVariant.Dark ? DarkSet : LightSet;
+    }
 
-    private static IBrush Parse(string hex) => new SolidColorBrush(Color.Parse(hex));
+    private static IBrush Parse(string hex)
+    {
+        return new SolidColorBrush(Color.Parse(hex));
+    }
 
     private static IBrush WithOpacity(IBrush brush, double opacity)
     {

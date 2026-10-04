@@ -1,7 +1,7 @@
 using Banned.CodeDiff.Models;
 using Banned.CodeDiff.Services;
-using System.Text.Json.Nodes;
 using NUnit.Framework;
+using System.Text.Json.Nodes;
 
 namespace Banned.CodeDiff.Tests;
 
@@ -34,13 +34,13 @@ public class LinePairGoldenTests
             ["relative"] = new JsonObject
             {
                 ["addRange"] = GoldenSupport.DumpLineRange(relAdd),
-                ["delRange"] = GoldenSupport.DumpLineRange(relDel),
+                ["delRange"] = GoldenSupport.DumpLineRange(relDel)
             },
             ["fastDiff"] = new JsonObject
             {
                 ["addRange"] = GoldenSupport.DumpDiffRange(fastAdd),
-                ["delRange"] = GoldenSupport.DumpDiffRange(fastDel),
-            },
+                ["delRange"] = GoldenSupport.DumpDiffRange(fastDel)
+            }
         };
 
         var diffs = GoldenSupport.Compare(c, actual);

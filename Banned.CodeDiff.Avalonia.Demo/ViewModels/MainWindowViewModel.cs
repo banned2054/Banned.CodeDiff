@@ -11,16 +11,22 @@ namespace Banned.CodeDiff.Avalonia.Demo.ViewModels;
 
 public sealed class MainWindowViewModel : INotifyPropertyChanged
 {
-    private string       _diffText = SampleDiff.ProgramCs;
-    private DiffFile?    _diffFile;
-    private bool         _isDark;
-    private DiffViewMode _viewMode      = DiffViewMode.Split;
-    private bool         _isFastDiff    = true;
-    private bool         _isSyntax      = true;
-    private bool         _isSelectionEnabled;
-    private bool         _isWrap;
-    private string       _selectionStatus = "未选择";
-    private string       _syntaxFile    = "store.cs";
+    private readonly RelayCommand _copySelectionCommand;
+
+    private DiffFile? _diffFile;
+    private string    _diffText = SampleDiff.ProgramCs;
+    private bool      _isDark;
+    private bool      _isFastDiff = true;
+    private bool      _isSelectionEnabled;
+    private bool      _isSyntax = true;
+    private bool      _isWrap;
+    private string    _selectionStatus = "未选择";
+
+    /// <summary>Visible (non-hidden) lines of the latest completed selection — the copyable count.</summary>
+    private int _selectionVisibleLines;
+
+    private string       _syntaxFile = "store.cs";
+    private DiffViewMode _viewMode   = DiffViewMode.Split;
 
     public MainWindowViewModel()
     {
@@ -33,34 +39,27 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         LoadSyntaxSampleCommand = new RelayCommand(LoadNextSyntaxSample);
         ExpandAllCommand        = new RelayCommand(ExpandAll);
         CollapseAllCommand      = new RelayCommand(CollapseAll);
-        _copySelectionCommand   = new RelayCommand(() => CopySelectionRequested?.Invoke(),
-                                                   () => _selectionVisibleLines > 0);
-        CopyOldFileCommand      = new RelayCommand(() => CopyOldFileRequested?.Invoke());
-        CopyNewFileCommand      = new RelayCommand(() => CopyNewFileRequested?.Invoke());
+        _copySelectionCommand = new RelayCommand(() => CopySelectionRequested?.Invoke(),
+                                                 () => _selectionVisibleLines > 0);
+        CopyOldFileCommand = new RelayCommand(() => CopyOldFileRequested?.Invoke());
+        CopyNewFileCommand = new RelayCommand(() => CopyNewFileRequested?.Invoke());
         Render();
     }
 
-    public event PropertyChangedEventHandler? PropertyChanged;
-
-    public ICommand RenderCommand { get; }
-
-    public ICommand LoadSampleCommand { get; }
-
+    public ICommand RenderCommand         { get; }
+    public ICommand LoadSampleCommand     { get; }
     public ICommand LoadExpandableCommand { get; }
 
     /// <summary>Cycles through the multi-language syntax samples (cs → ts → json).</summary>
     public ICommand LoadSyntaxSampleCommand { get; }
 
-    public ICommand ExpandAllCommand { get; }
-
+    public ICommand ExpandAllCommand   { get; }
     public ICommand CollapseAllCommand { get; }
 
-    private readonly RelayCommand _copySelectionCommand;
-
     /// <summary>
-    /// Copies the selected lines (hidden lines skipped) — the code-behind bridges
-    /// <see cref="CopySelectionRequested"/> to <c>DiffView.CopySelectionAsync</c>. Enabled when
-    /// the latest completed selection has at least one visible line.
+    ///     Copies the selected lines (hidden lines skipped) — the code-behind bridges
+    ///     <see cref="CopySelectionRequested" /> to <c>DiffView.CopySelectionAsync</c>. Enabled when
+    ///     the latest completed selection has at least one visible line.
     /// </summary>
     public ICommand CopySelectionCommand => _copySelectionCommand;
 
@@ -69,15 +68,6 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
 
     /// <summary>Copies the whole new-side file — bridged to <c>DiffView.CopyNewFileAsync</c>.</summary>
     public ICommand CopyNewFileCommand { get; }
-
-    /// <summary>Code-behind bridges these to the DiffView copy methods (the VM stays view-pure).</summary>
-    public event Action? CopySelectionRequested;
-
-    /// <summary>See <see cref="CopySelectionRequested"/>.</summary>
-    public event Action? CopyOldFileRequested;
-
-    /// <summary>See <see cref="CopySelectionRequested"/>.</summary>
-    public event Action? CopyNewFileRequested;
 
     public bool IsSyntax
     {
@@ -107,22 +97,15 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         get => _diffFile;
         set
         {
+            if (_diffFile != null) _diffFile.Updated -= OnFileUpdated;
+
+            if (!Set(ref _diffFile, value)) return;
             if (_diffFile != null)
-            {
-                _diffFile.Updated -= OnFileUpdated;
-            }
+                // Expansion mutates the model in place; refresh stats and button states.
+                _diffFile.Updated += OnFileUpdated;
 
-            if (Set(ref _diffFile, value))
-            {
-                if (_diffFile != null)
-                {
-                    // Expansion mutates the model in place; refresh stats and button states.
-                    _diffFile.Updated += OnFileUpdated;
-                }
-
-                OnPropertyChanged(nameof(Stats));
-                OnPropertyChanged(nameof(CanExpandHunks));
-            }
+            OnPropertyChanged(nameof(Stats));
+            OnPropertyChanged(nameof(CanExpandHunks));
         }
     }
 
@@ -142,10 +125,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         {
             var mode = value ? DiffViewMode.Unified : DiffViewMode.Split;
 
-            if (Set(ref _viewMode, mode))
-            {
-                OnPropertyChanged(nameof(ViewMode));
-            }
+            if (Set(ref _viewMode, mode)) OnPropertyChanged(nameof(ViewMode));
         }
     }
 
@@ -154,10 +134,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         get => _isDark;
         set
         {
-            if (Set(ref _isDark, value))
-            {
-                OnPropertyChanged(nameof(Theme));
-            }
+            if (Set(ref _isDark, value)) OnPropertyChanged(nameof(Theme));
         }
     }
 
@@ -168,10 +145,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         set
         {
             if (Set(ref _isSelectionEnabled, value) && !value)
-            {
                 // The control clears its selection when the feature turns off — mirror that here.
                 OnSelectionCompleted(null);
-            }
         }
     }
 
@@ -182,15 +157,40 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         set => Set(ref _isWrap, value);
     }
 
-    /// <summary>Visible (non-hidden) lines of the latest completed selection — the copyable count.</summary>
-    private int _selectionVisibleLines;
-
     /// <summary>Status line for the latest completed selection and copy feedback (M6 copy feature).</summary>
     public string SelectionStatus
     {
         get => _selectionStatus;
         private set => Set(ref _selectionStatus, value);
     }
+
+    public ThemeVariant Theme => IsDark ? ThemeVariant.Dark : ThemeVariant.Light;
+
+    public string Stats
+    {
+        get
+        {
+            var file = DiffFile;
+
+            if (file == null) return "无模型";
+
+            var collapsed = file.HasSomeLineCollapsed ? " / 有折叠行" : "";
+
+            return
+                $"+{file.AdditionLength} -{file.DeletionLength} / split {file.SplitLineLength} 行 / unified {file.UnifiedLineLength} 行{collapsed}";
+        }
+    }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    /// <summary>Code-behind bridges these to the DiffView copy methods (the VM stays view-pure).</summary>
+    public event Action? CopySelectionRequested;
+
+    /// <summary>See <see cref="CopySelectionRequested" />.</summary>
+    public event Action? CopyOldFileRequested;
+
+    /// <summary>See <see cref="CopySelectionRequested" />.</summary>
+    public event Action? CopyNewFileRequested;
 
     /// <summary>Called from the view's DiffView.SelectionCompleted handler.</summary>
     public void OnSelectionCompleted(MultiSelectResult? result)
@@ -205,38 +205,29 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             var side = completed.Range.Side == SplitSide.Old ? "old" : "new";
 
             _selectionVisibleLines = completed.Lines.Count(line => !line.IsHide);
-            SelectionStatus        = $"已选 {_selectionVisibleLines} 行({side} {completed.Range.StartLineNumber}-{completed.Range.EndLineNumber})";
+            SelectionStatus =
+                $"已选 {_selectionVisibleLines} 行({side} {completed.Range.StartLineNumber}-{completed.Range.EndLineNumber})";
         }
 
         _copySelectionCommand.RaiseCanExecuteChanged();
     }
 
     /// <summary>Copy feedback from the code-behind (called after a successful selection copy).</summary>
-    public void OnSelectionCopied() => SelectionStatus = $"已复制 {_selectionVisibleLines} 行";
+    public void OnSelectionCopied()
+    {
+        SelectionStatus = $"已复制 {_selectionVisibleLines} 行";
+    }
 
     /// <summary>Copy feedback from the code-behind (called after a successful old-file copy).</summary>
-    public void OnOldFileCopied() => SelectionStatus = "已复制旧文件内容";
+    public void OnOldFileCopied()
+    {
+        SelectionStatus = "已复制旧文件内容";
+    }
 
     /// <summary>Copy feedback from the code-behind (called after a successful new-file copy).</summary>
-    public void OnNewFileCopied() => SelectionStatus = "已复制新文件内容";
-
-    public ThemeVariant Theme => IsDark ? ThemeVariant.Dark : ThemeVariant.Light;
-
-    public string Stats
+    public void OnNewFileCopied()
     {
-        get
-        {
-            var file = DiffFile;
-
-            if (file == null)
-            {
-                return "无模型";
-            }
-
-            var collapsed = file.HasSomeLineCollapsed ? " / 有折叠行" : "";
-
-            return $"+{file.AdditionLength} -{file.DeletionLength} / split {file.SplitLineLength} 行 / unified {file.UnifiedLineLength} 行{collapsed}";
-        }
+        SelectionStatus = "已复制新文件内容";
     }
 
     private void LoadSample()
@@ -252,9 +243,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         DiffText = diffText;
 
         // Real file contents (not paste-only) keep the expand state machine enabled.
-        var file = new DiffFile(oldFileName : "Sample.cs", oldFileContent : oldContent,
-                                newFileName : "Sample.cs", newFileContent : newContent,
-                                diffList    : [diffText]);
+        var file = new DiffFile("Sample.cs", oldContent, "Sample.cs", newContent, [diffText]);
         file.Init();
         file.BuildSplitDiffLines();
         file.BuildUnifiedDiffLines();
@@ -266,9 +255,9 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     {
         var sample = _syntaxFile switch
         {
-            "store.cs"    => SyntaxSample.TypeScript(),
-            "api.ts"      => SyntaxSample.Json(),
-            _             => SyntaxSample.CSharp(),
+            "store.cs" => SyntaxSample.TypeScript(),
+            "api.ts"   => SyntaxSample.Json(),
+            _          => SyntaxSample.CSharp()
         };
 
         LoadSyntaxSample(sample);
@@ -283,20 +272,22 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         DiffText = diffText;
 
         // Real contents keep expansion enabled and give the syntax engine full files.
-        var file = new DiffFile(oldFileName : fileName, oldFileContent : oldContent,
-                                newFileName : fileName, newFileContent : newContent,
-                                diffList    : [diffText]);
+        var file = new DiffFile(fileName, oldContent, fileName, newContent, [diffText]);
         file.Init();
         file.BuildSplitDiffLines();
         file.BuildUnifiedDiffLines();
         DiffFile = file;
     }
 
-    private void ExpandAll() =>
+    private void ExpandAll()
+    {
         DiffFile?.OnAllExpand(_viewMode == DiffViewMode.Unified ? ExpandViewMode.Unified : ExpandViewMode.Split);
+    }
 
-    private void CollapseAll() =>
+    private void CollapseAll()
+    {
         DiffFile?.OnAllCollapse(_viewMode == DiffViewMode.Unified ? ExpandViewMode.Unified : ExpandViewMode.Split);
+    }
 
     private void OnFileUpdated()
     {
@@ -316,9 +307,9 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             return;
         }
 
-        var file = new DiffFile(oldFileName : ExtractHeaderFile("--- "), oldFileContent : "",
-                                newFileName : ExtractHeaderFile("+++ "), newFileContent : "",
-                                diffList : [DiffText]);
+        var file = new DiffFile(ExtractHeaderFile("--- "), "",
+                                ExtractHeaderFile("+++ "), "",
+                                [DiffText]);
         file.Init();
         file.BuildSplitDiffLines();
         file.BuildUnifiedDiffLines();
@@ -326,9 +317,9 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// Demo-side convenience: pull the file name out of the pasted diff headers so the
-    /// paste-only mode still knows the language (upstream expects callers to pass the
-    /// file name; the core never parses it out of the diff text).
+    ///     Demo-side convenience: pull the file name out of the pasted diff headers so the
+    ///     paste-only mode still knows the language (upstream expects callers to pass the
+    ///     file name; the core never parses it out of the diff text).
     /// </summary>
     private string ExtractHeaderFile(string marker)
     {
@@ -336,23 +327,14 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         {
             var line = raw.TrimEnd('\r');
 
-            if (!line.StartsWith(marker, StringComparison.Ordinal))
-            {
-                continue;
-            }
+            if (!line.StartsWith(marker, StringComparison.Ordinal)) continue;
 
             var name = line[marker.Length..].Trim();
 
-            if (name.StartsWith("a/") || name.StartsWith("b/"))
-            {
-                name = name[2..];
-            }
+            if (name.StartsWith("a/") || name.StartsWith("b/")) name = name[2..];
 
             // Skip git's /dev/null and timestamp-only tails.
-            if (name.Length == 0 || name == "/dev/null")
-            {
-                continue;
-            }
+            if (name.Length == 0 || name == "/dev/null") continue;
 
             var tab = name.IndexOf('\t');
 
@@ -364,16 +346,15 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
 
     private bool Set<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
     {
-        if (EqualityComparer<T>.Default.Equals(field, value))
-        {
-            return false;
-        }
+        if (EqualityComparer<T>.Default.Equals(field, value)) return false;
 
         field = value;
         OnPropertyChanged(propertyName);
         return true;
     }
 
-    private void OnPropertyChanged([CallerMemberName] string? propertyName = null) =>
+    private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+    {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
 }

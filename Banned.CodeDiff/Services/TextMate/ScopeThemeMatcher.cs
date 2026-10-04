@@ -3,24 +3,24 @@ using System.Text.Json;
 namespace Banned.CodeDiff.Services.TextMate;
 
 /// <summary>
-/// Foreground-only port of the vscode-textmate theme matching
-/// (parseTheme / resolveParsedThemeRules / ThemeTrieElement / Theme.match —
-/// source: @shikijs/vscode-textmate, the engine shiki uses, MIT).
-/// TextMateSharp's own Theme.Match mis-resolves descendant selectors on scope
-/// stacks (e.g. "source.cs" matching "string … embedded source"), so the C#
-/// port carries this straight port instead; golden tests compare against
-/// shiki's actual output.
+///     Foreground-only port of the vscode-textmate theme matching
+///     (parseTheme / resolveParsedThemeRules / ThemeTrieElement / Theme.match —
+///     source: @shikijs/vscode-textmate, the engine shiki uses, MIT).
+///     TextMateSharp's own Theme.Match mis-resolves descendant selectors on scope
+///     stacks (e.g. "source.cs" matching "string … embedded source"), so the C#
+///     port carries this straight port instead; golden tests compare against
+///     shiki's actual output.
 /// </summary>
 internal sealed class ScopeThemeMatcher
 {
-    private readonly ThemeTrieElement _root;
-
     /// <summary>
-    /// JS: Theme.getDefaults().foreground — rules with an empty scope become the
-    /// theme defaults (github themes carry the default foreground there). shiki
-    /// falls back to it for tokens whose scopes match nothing.
+    ///     JS: Theme.getDefaults().foreground — rules with an empty scope become the
+    ///     theme defaults (github themes carry the default foreground there). shiki
+    ///     falls back to it for tokens whose scopes match nothing.
     /// </summary>
     private readonly string? _defaultForeground;
+
+    private readonly ThemeTrieElement _root;
 
     private ScopeThemeMatcher(ThemeTrieElement root, string? defaultForeground)
     {
@@ -36,9 +36,7 @@ internal sealed class ScopeThemeMatcher
         // @shikijs/themes files (and shiki itself) use the equivalent tokenColors.
         if (!doc.RootElement.TryGetProperty("tokenColors", out var tokenColors) ||
             tokenColors.ValueKind != JsonValueKind.Array)
-        {
             return new ScopeThemeMatcher(new ThemeTrieElement(null, []), null);
-        }
 
         var parsed = new List<ParsedThemeRule>();
 
@@ -50,27 +48,27 @@ internal sealed class ScopeThemeMatcher
 
             if (!entry.TryGetProperty("settings", out var settings) ||
                 settings.ValueKind != JsonValueKind.Object)
-            {
                 continue;
-            }
 
             List<string> selectors;
 
             if (entry.TryGetProperty("scope", out var scopeElement))
             {
-                if (scopeElement.ValueKind == JsonValueKind.String)
+                switch (scopeElement.ValueKind)
                 {
-                    var scope = scopeElement.GetString()!.Trim(',', ' ');
+                    case JsonValueKind.String :
+                    {
+                        var scope = scopeElement.GetString()!.Trim(',', ' ');
 
-                    selectors = scope.Length == 0 ? [""] : [.. scope.Split(',')];
-                }
-                else if (scopeElement.ValueKind == JsonValueKind.Array)
-                {
-                    selectors = [.. scopeElement.EnumerateArray().Select(s => s.GetString() ?? "")];
-                }
-                else
-                {
-                    selectors = [""];
+                        selectors = scope.Length == 0 ? [""] : [.. scope.Split(',')];
+                        break;
+                    }
+                    case JsonValueKind.Array :
+                        selectors = [.. scopeElement.EnumerateArray().Select(s => s.GetString() ?? "")];
+                        break;
+                    default :
+                        selectors = [""];
+                        break;
                 }
             }
             else
@@ -86,11 +84,9 @@ internal sealed class ScopeThemeMatcher
                 var value = foregroundElement.GetString()!;
 
                 if (IsValidHexColor(value))
-                {
                     // ColorMap.getId upper-cases colors; shiki's output uses the
                     // upper-cased form.
                     foreground = value.ToUpperInvariant();
-                }
             }
 
             foreach (var selector in selectors)
@@ -116,70 +112,53 @@ internal sealed class ScopeThemeMatcher
         {
             var r = StrCmp(a.Scope, b.Scope);
 
-            if (r != 0)
-            {
-                return r;
-            }
+            if (r != 0) return r;
 
             r = StrArrCmp(a.ParentScopes, b.ParentScopes);
 
-            if (r != 0)
-            {
-                return r;
-            }
-
-            return a.Index.CompareTo(b.Index);
+            return r != 0 ? r : a.Index.CompareTo(b.Index);
         });
 
         // JS: resolveParsedThemeRules shifts the empty-scope rules off the sorted
         // list into the theme defaults (later entries overwrite earlier ones).
-        var defaultForeground = (string?)null;
+        string? defaultForeground = null;
 
-        while (parsed.Count >= 1 && parsed[0].Scope.Length == 0)
+        while (parsed is [{ Scope.Length: 0 }, ..])
         {
             var incoming = parsed[0];
 
             parsed.RemoveAt(0);
 
-            if (incoming.Foreground != null)
-            {
-                defaultForeground = incoming.Foreground;
-            }
+            if (incoming.Foreground != null) defaultForeground = incoming.Foreground;
         }
 
         // shiki additionally falls back to the theme's editor.foreground for
         // tokens whose scopes match nothing (the github themes only define the
         // default there).
-        if (doc.RootElement.TryGetProperty("colors", out var colors) &&
-            colors.ValueKind == JsonValueKind.Object &&
+        if (doc.RootElement.TryGetProperty("colors", out var colors)             &&
+            colors.ValueKind == JsonValueKind.Object                             &&
             colors.TryGetProperty("editor.foreground", out var editorForeground) &&
             editorForeground.ValueKind == JsonValueKind.String)
         {
             var value = editorForeground.GetString()!;
 
-            if (IsValidHexColor(value))
-            {
-                defaultForeground = value.ToUpperInvariant();
-            }
+            if (IsValidHexColor(value)) defaultForeground = value.ToUpperInvariant();
         }
 
         var root = new ThemeTrieElement(null, []);
 
-        foreach (var rule in parsed)
-        {
-            root.Insert(0, rule.Scope, rule.ParentScopes, rule.Foreground);
-        }
+        foreach (var rule in parsed) root.Insert(0, rule.Scope, rule.ParentScopes, rule.Foreground);
 
         return new ScopeThemeMatcher(root, defaultForeground);
     }
 
     /// <summary>
-    /// Resolves the foreground color for a token scope stack the way
-    /// vscode-textmate's encoded metadata does: scopes are matched
-    /// innermost-first and the deepest layer with a theme hit wins — a layer
-    /// with no hit inherits the enclosing scope's color (that is why e.g. a
-    /// JSON key's quote punctuation renders in the key color). Falls back to
-    /// the theme default foreground (shiki's colorMap[0]).
+    ///     Resolves the foreground color for a token scope stack the way
+    ///     vscode-textmate's encoded metadata does: scopes are matched
+    ///     innermost-first and the deepest layer with a theme hit wins — a layer
+    ///     with no hit inherits the enclosing scope's color (that is why e.g. a
+    ///     JSON key's quote punctuation renders in the key color). Falls back to
+    ///     the theme default foreground (shiki's colorMap[0]).
     /// </summary>
     public string? MatchForeground(IList<string> scopeStack)
     {
@@ -192,12 +171,8 @@ internal sealed class ScopeThemeMatcher
             // the trie node's main rule (no parent scopes) counts. A main rule
             // with no foreground keeps the enclosing scope's color.
             foreach (var rule in rules)
-            {
                 if (rule.ParentScopes is not { Length: > 0 } && rule.Foreground != null)
-                {
                     return rule.Foreground;
-                }
-            }
         }
 
         return _defaultForeground;
@@ -208,10 +183,7 @@ internal sealed class ScopeThemeMatcher
 
     private static bool ScopePathMatchesParentScopes(IList<string> stack, int from, string[]? parentScopes)
     {
-        if (parentScopes == null || parentScopes.Length == 0)
-        {
-            return true;
-        }
+        if (parentScopes == null || parentScopes.Length == 0) return true;
 
         var position = from;
 
@@ -223,10 +195,7 @@ internal sealed class ScopeThemeMatcher
 
             if (pattern == ">")
             {
-                if (index == parentScopes.Length - 1)
-                {
-                    return false;
-                }
+                if (index == parentScopes.Length - 1) return false;
 
                 pattern = parentScopes[++index];
 
@@ -235,23 +204,14 @@ internal sealed class ScopeThemeMatcher
 
             while (position >= 0)
             {
-                if (MatchesScope(stack[position], pattern))
-                {
-                    break;
-                }
+                if (MatchesScope(stack[position], pattern)) break;
 
-                if (scopeMustMatch)
-                {
-                    return false;
-                }
+                if (scopeMustMatch) return false;
 
                 position--;
             }
 
-            if (position < 0)
-            {
-                return false;
-            }
+            if (position < 0) return false;
 
             position--;
         }
@@ -273,34 +233,19 @@ internal sealed class ScopeThemeMatcher
 
     private static int StrArrCmp(string[]? a, string[]? b)
     {
-        if (a == null && b == null)
+        switch (a)
         {
-            return 0;
+            case null when b == null :
+                return 0;
+            case null :
+                return -1;
         }
 
-        if (a == null)
-        {
-            return -1;
-        }
-
-        if (b == null)
-        {
-            return 1;
-        }
+        if (b == null) return 1;
 
         if (a.Length == b.Length)
         {
-            for (var i = 0; i < a.Length; i++)
-            {
-                var r = StrCmp(a[i], b[i]);
-
-                if (r != 0)
-                {
-                    return r;
-                }
-            }
-
-            return 0;
+            return a.Select((t, i) => StrCmp(t, b[i])).FirstOrDefault(r => r != 0);
         }
 
         return a.Length < b.Length ? -1 : 1;
@@ -313,46 +258,30 @@ internal sealed class ScopeThemeMatcher
 
     private sealed record ParsedThemeRule(string Scope, string[]? ParentScopes, int Index, string? Foreground);
 
-    private sealed class Rule
+    private sealed class Rule(int scopeDepth, string[]? parentScopes, string? foreground)
     {
-        public Rule(int scopeDepth, string[]? parentScopes, string? foreground)
-        {
-            ScopeDepth   = scopeDepth;
-            ParentScopes = parentScopes;
-            Foreground   = foreground;
-        }
-
-        public int      ScopeDepth   { get; set; }
-        public string[]? ParentScopes { get; }
-        public string?  Foreground   { get; set; }
+        public int       ScopeDepth   { get; set; } = scopeDepth;
+        public string[]? ParentScopes { get; }      = parentScopes;
+        public string?   Foreground   { get; set; } = foreground;
 
         public void AcceptOverwrite(int scopeDepth, string? foreground)
         {
-            if (ScopeDepth <= scopeDepth)
-            {
-                ScopeDepth = scopeDepth;
-            }
+            if (ScopeDepth <= scopeDepth) ScopeDepth = scopeDepth;
 
-            if (foreground != null)
-            {
-                Foreground = foreground;
-            }
+            if (foreground != null) Foreground = foreground;
         }
 
-        public Rule Clone() => new(ScopeDepth, ParentScopes, Foreground);
+        public Rule Clone()
+        {
+            return new Rule(ScopeDepth, ParentScopes, Foreground);
+        }
     }
 
-    private sealed class ThemeTrieElement
+    private sealed class ThemeTrieElement(Rule? mainRule, List<Rule> rulesWithParentScopes)
     {
-        private readonly Rule _mainRule;
-        private readonly List<Rule> _rulesWithParentScopes;
         private readonly Dictionary<string, ThemeTrieElement> _children = new();
 
-        public ThemeTrieElement(Rule? mainRule, List<Rule> rulesWithParentScopes)
-        {
-            _mainRule           = mainRule ?? new Rule(0, null, null);
-            _rulesWithParentScopes = rulesWithParentScopes;
-        }
+        private readonly Rule _mainRule = mainRule ?? new Rule(0, null, null);
 
         public List<Rule> Match(string scope)
         {
@@ -364,13 +293,10 @@ internal sealed class ScopeThemeMatcher
 
                 var tail = dotIndex == -1 ? "" : scope[(dotIndex + 1)..];
 
-                if (_children.TryGetValue(head, out var child))
-                {
-                    return child.Match(tail);
-                }
+                if (_children.TryGetValue(head, out var child)) return child.Match(tail);
             }
 
-            var rules = new List<Rule>(_rulesWithParentScopes) { _mainRule };
+            var rules = new List<Rule>(rulesWithParentScopes) { _mainRule };
 
             rules.Sort(CompareBySpecificity);
 
@@ -394,7 +320,7 @@ internal sealed class ScopeThemeMatcher
 
             if (!_children.TryGetValue(head, out var child))
             {
-                child = new ThemeTrieElement(_mainRule.Clone(), [.. _rulesWithParentScopes.Select(r => r.Clone())]);
+                child = new ThemeTrieElement(_mainRule.Clone(), [.. rulesWithParentScopes.Select(r => r.Clone())]);
 
                 _children[head] = child;
             }
@@ -411,25 +337,19 @@ internal sealed class ScopeThemeMatcher
                 return;
             }
 
-            foreach (var rule in _rulesWithParentScopes)
+            foreach (var rule in rulesWithParentScopes.Where(rule => StrArrCmp(rule.ParentScopes, parentScopes) == 0))
             {
-                if (StrArrCmp(rule.ParentScopes, parentScopes) == 0)
-                {
-                    rule.AcceptOverwrite(scopeDepth, foreground);
+                rule.AcceptOverwrite(scopeDepth, foreground);
 
-                    return;
-                }
+                return;
             }
 
-            _rulesWithParentScopes.Add(new Rule(scopeDepth, parentScopes, foreground ?? _mainRule.Foreground));
+            rulesWithParentScopes.Add(new Rule(scopeDepth, parentScopes, foreground ?? _mainRule.Foreground));
         }
 
         private static int CompareBySpecificity(Rule a, Rule b)
         {
-            if (a.ScopeDepth != b.ScopeDepth)
-            {
-                return b.ScopeDepth - a.ScopeDepth;
-            }
+            if (a.ScopeDepth != b.ScopeDepth) return b.ScopeDepth - a.ScopeDepth;
 
             var aParents = a.ParentScopes ?? [];
             var bParents = b.ParentScopes ?? [];
@@ -439,27 +359,15 @@ internal sealed class ScopeThemeMatcher
 
             while (true)
             {
-                if (aIndex < aParents.Length && aParents[aIndex] == ">")
-                {
-                    aIndex++;
-                }
+                if (aIndex < aParents.Length && aParents[aIndex] == ">") aIndex++;
 
-                if (bIndex < bParents.Length && bParents[bIndex] == ">")
-                {
-                    bIndex++;
-                }
+                if (bIndex < bParents.Length && bParents[bIndex] == ">") bIndex++;
 
-                if (aIndex >= aParents.Length || bIndex >= bParents.Length)
-                {
-                    break;
-                }
+                if (aIndex >= aParents.Length || bIndex >= bParents.Length) break;
 
                 var lengthDiff = bParents[bIndex].Length - aParents[aIndex].Length;
 
-                if (lengthDiff != 0)
-                {
-                    return lengthDiff;
-                }
+                if (lengthDiff != 0) return lengthDiff;
 
                 aIndex++;
                 bIndex++;

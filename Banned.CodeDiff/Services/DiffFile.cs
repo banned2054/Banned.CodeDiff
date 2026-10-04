@@ -106,8 +106,7 @@ public sealed class DiffFile
     public int  AdditionLength       { get; private set; }
     public int  DeletionLength       { get; private set; }
     public bool HasSomeLineCollapsed { get; private set; }
-
-    public int UpdateCount { get; private set; }
+    public int  UpdateCount          { get; private set; }
 
     /// <summary>JS: _getTheme.</summary>
     public string? Theme { get; private set; }
@@ -124,9 +123,7 @@ public sealed class DiffFile
     /// <summary>JS: getExpandEnabled.</summary>
     public bool IsExpandEnabled => !IsPureDiffRender && !_composeByRange;
 
-
-    public bool HasExpandSplitAll { get; private set; }
-
+    public bool HasExpandSplitAll   { get; private set; }
     public bool HasExpandUnifiedAll { get; private set; }
 
     // ---- misc accessors ----
@@ -148,14 +145,11 @@ public sealed class DiffFile
     /// <summary>JS: _getIsPureDiffRender.</summary>
     public bool IsPureDiffRender { get; private set; }
 
-    public IReadOnlyList<SplitLineItem> SplitLeftLines => _splitLeftLines;
+    public IReadOnlyList<SplitLineItem>   SplitLeftLines  => _splitLeftLines;
+    public IReadOnlyList<SplitLineItem>   SplitRightLines => _splitRightLines;
+    public IReadOnlyList<UnifiedLineItem> UnifiedLines    => _unifiedLines;
 
-    public IReadOnlyList<SplitLineItem> SplitRightLines => _splitRightLines;
-
-    public IReadOnlyList<UnifiedLineItem> UnifiedLines => _unifiedLines;
-
-    public IReadOnlyCollection<int> SplitHunkLineIndexes => _splitHunksLines?.Keys.ToArray() ?? [];
-
+    public IReadOnlyCollection<int> SplitHunkLineIndexes   => _splitHunksLines?.Keys.ToArray()   ?? [];
     public IReadOnlyCollection<int> UnifiedHunkLineIndexes => _unifiedHunksLines?.Keys.ToArray() ?? [];
 
     public static void ChangeDefaultComposeLength(int compose)
@@ -579,13 +573,10 @@ public sealed class DiffFile
 
     private void SyncSyntax()
     {
-        HighlighterName = !string.IsNullOrEmpty(_oldFileResult?.HighlighterName) ? _oldFileResult!.HighlighterName
-            : !string.IsNullOrEmpty(_newFileResult?.HighlighterName)             ? _newFileResult!.HighlighterName
-                : HighlighterName;
+        HighlighterName = !string.IsNullOrEmpty(_oldFileResult?.HighlighterName) ? _oldFileResult!.HighlighterName :
+            !string.IsNullOrEmpty(_newFileResult?.HighlighterName) ? _newFileResult!.HighlighterName : HighlighterName;
 
-        HighlighterType = _oldFileResult?.HighlighterType
-                       ?? _newFileResult?.HighlighterType
-                       ?? HighlighterType;
+        HighlighterType = _oldFileResult?.HighlighterType ?? _newFileResult?.HighlighterType ?? HighlighterType;
 
         if (!string.IsNullOrEmpty(_oldFileResult?.HighlighterName)) _oldFileSyntaxLines = _oldFileResult!.SyntaxFile;
 
@@ -776,7 +767,6 @@ public sealed class DiffFile
             };
             _splitHunksLines                         ??= new Dictionary<int, DiffLine>();
             _splitHunksLines[_splitRightLines.Count] =   lastDiff;
-            hideStart                                =   null;
         }
 
         SplitLineLength = _splitRightLines.Count;
@@ -955,7 +945,6 @@ public sealed class DiffFile
             };
             _unifiedHunksLines                      ??= new Dictionary<int, DiffLine>();
             _unifiedHunksLines[_unifiedLines.Count] =   lastDiff;
-            hideStart                               =   null;
         }
 
         UnifiedLineLength = _unifiedLines.Count;
@@ -1031,56 +1020,33 @@ public sealed class DiffFile
     ///     O(1) equivalent of <c>lines.FirstOrDefault(i => i.LineNumber == lineNumber)</c>
     ///     — a miss (or a not-yet-built model) returns <c>null</c> like the scan did.
     /// </summary>
-    private static T? GetByLineNumber<T>(List<T> lines, Dictionary<int, int>? index, int lineNumber)
-        where T : class
-    {
-        return index != null && index.TryGetValue(lineNumber, out var i) ? lines[i] : null;
-    }
+    private static T? GetByLineNumber<T>(List<T> lines, Dictionary<int, int>? index, int lineNumber) where T : class =>
+        index != null && index.TryGetValue(lineNumber, out var i) ? lines[i] : null;
 
     /// <summary>
     ///     O(1) equivalent of <c>lines.FindIndex(i => i.LineNumber == lineNumber)</c>
     ///     — a miss (or a not-yet-built model) returns <c>-1</c> like the scan did.
     /// </summary>
-    private static int GetIndexByLineNumber(Dictionary<int, int>? index, int lineNumber)
-    {
-        return index != null && index.TryGetValue(lineNumber, out var i) ? i : -1;
-    }
+    private static int GetIndexByLineNumber(Dictionary<int, int>? index, int lineNumber) =>
+        index != null && index.TryGetValue(lineNumber, out var i) ? i : -1;
 
-
-    public DiffLine? GetSplitHunkLine(int index)
-    {
-        return _splitHunksLines != null && _splitHunksLines.TryGetValue(index, out var h) ? h : null;
-    }
-
+    public DiffLine? GetSplitHunkLine(int index) =>
+        _splitHunksLines != null && _splitHunksLines.TryGetValue(index, out var h) ? h : null;
 
     // ---- unified accessors ----
+    public UnifiedLineItem? GetUnifiedLine(int index) =>
+        index >= 0 && index < _unifiedLines.Count ? _unifiedLines[index] : null;
 
-    public UnifiedLineItem? GetUnifiedLine(int index)
-    {
-        return index >= 0 && index < _unifiedLines.Count ? _unifiedLines[index] : null;
-    }
+    public UnifiedLineItem? GetUnifiedLineByLineNumber(int lineNumber, SplitSide side) => side == SplitSide.Old
+        ? GetByLineNumber(_unifiedLines, _unifiedOldLineNumberIndex, lineNumber)
+        : GetByLineNumber(_unifiedLines, _unifiedNewLineNumberIndex, lineNumber);
 
+    public int GetUnifiedLineIndexByLineNumber(int lineNumber, SplitSide side) => side == SplitSide.Old
+        ? GetIndexByLineNumber(_unifiedOldLineNumberIndex, lineNumber)
+        : GetIndexByLineNumber(_unifiedNewLineNumberIndex, lineNumber);
 
-    public UnifiedLineItem? GetUnifiedLineByLineNumber(int lineNumber, SplitSide side)
-    {
-        return side == SplitSide.Old
-            ? GetByLineNumber(_unifiedLines, _unifiedOldLineNumberIndex, lineNumber)
-            : GetByLineNumber(_unifiedLines, _unifiedNewLineNumberIndex, lineNumber);
-    }
-
-
-    public int GetUnifiedLineIndexByLineNumber(int lineNumber, SplitSide side)
-    {
-        return side == SplitSide.Old
-            ? GetIndexByLineNumber(_unifiedOldLineNumberIndex, lineNumber)
-            : GetIndexByLineNumber(_unifiedNewLineNumberIndex, lineNumber);
-    }
-
-
-    public DiffLine? GetUnifiedHunkLine(int index)
-    {
-        return _unifiedHunksLines != null && _unifiedHunksLines.TryGetValue(index, out var h) ? h : null;
-    }
+    public DiffLine? GetUnifiedHunkLine(int index) =>
+        _unifiedHunksLines != null && _unifiedHunksLines.TryGetValue(index, out var h) ? h : null;
 
     private void UnhideSplitRange(int start, int end)
     {
@@ -1114,11 +1080,8 @@ public sealed class DiffFile
             case HunkExpandDirection.All :
             {
                 UnhideSplitRange(info.StartHiddenIndex, info.EndHiddenIndex);
-                current.SplitInfo = info.WithHunkInfo(
-                                                      current.HunkInfo ?? new HunkInfo(),
-                                                      info.EndHiddenIndex,
-                                                      current.Text
-                                                     );
+                current.SplitInfo =
+                    info.WithHunkInfo(current.HunkInfo ?? new HunkInfo(), info.EndHiddenIndex, current.Text);
                 break;
             }
             case HunkExpandDirection.Down :
@@ -1202,8 +1165,7 @@ public sealed class DiffFile
             {
                 UnhideUnifiedRange(info.StartHiddenIndex, info.EndHiddenIndex);
                 current.UnifiedInfo = info.WithHunkInfo(current.HunkInfo ?? new HunkInfo(),
-                                                        info.EndHiddenIndex,
-                                                        current.Text);
+                                                        info.EndHiddenIndex, current.Text);
                 break;
             }
             case HunkExpandDirection.Down :

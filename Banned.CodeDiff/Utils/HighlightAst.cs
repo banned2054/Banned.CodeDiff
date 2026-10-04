@@ -3,10 +3,10 @@ using Banned.CodeDiff.Models;
 namespace Banned.CodeDiff.Utils;
 
 /// <summary>
-/// Port of packages/utils/src/highlightAST.ts (processAST): walks the
-/// highlighter-produced tree, splits text nodes containing newlines into
-/// per-line child nodes, and buckets everything into 1-based per-line
-/// <see cref="SyntaxLine"/> records. Shared by every highlighter engine.
+///     Port of packages/utils/src/highlightAST.ts (processAST): walks the
+///     highlighter-produced tree, splits text nodes containing newlines into
+///     per-line child nodes, and buckets everything into 1-based per-line
+///     <see cref="SyntaxLine" /> records. Shared by every highlighter engine.
 /// </summary>
 public static class HighlightAst
 {
@@ -29,13 +29,13 @@ public static class HighlightAst
                     Value       = node.Value,
                     LineNumber  = line,
                     ValueLength = valueLength,
-                    NodeList    = [new SyntaxNodeSpan { Node = node, Wrapper = wrapper }],
+                    NodeList    = [new SyntaxNodeSpan { Node = node, Wrapper = wrapper }]
                 };
             }
             else
             {
-                node.StartIndex = item.ValueLength;
-                node.EndIndex   = node.StartIndex + valueLength - 1;
+                node.StartIndex  =  item.ValueLength;
+                node.EndIndex    =  node.StartIndex + valueLength - 1;
                 item.Value       += node.Value;
                 item.ValueLength += valueLength;
                 item.NodeList!.Add(new SyntaxNodeSpan { Node = node, Wrapper = wrapper });
@@ -64,21 +64,21 @@ public static class HighlightAst
                     for (var i = 0; i < lines.Length; i++)
                     {
                         // JS: i === lines.length - 1 ? lines[i] : lines[i] + "\n"
-                        var value       = i == lines.Length - 1 ? lines[i] : lines[i] + "\n";
+                        var value = i == lines.Length - 1 ? lines[i] : lines[i] + "\n";
 
                         // JS: i === 0 ? lineNumber : ++lineNumber
-                        var line        = i == 0 ? lineNumber : ++lineNumber;
+                        var line = i == 0 ? lineNumber : ++lineNumber;
 
                         var child = new SyntaxNode
                         {
-                            Type       = "text",
-                            Value      = value,
+                            Type  = "text",
+                            Value = value,
 
                             // JS: Infinity placeholder — immediately overwritten by
                             // AppendToLine below, never used in computation.
                             StartIndex = int.MaxValue,
                             EndIndex   = int.MaxValue,
-                            LineNumber = line,
+                            LineNumber = line
                         };
 
                         AppendToLine(line, child, wrapper);
@@ -91,12 +91,10 @@ public static class HighlightAst
                     continue;
                 }
 
-                if (node.Children != null)
-                {
-                    LoopAst(node.Children, node);
+                if (node.Children == null) continue;
+                LoopAst(node.Children, node);
 
-                    node.LineNumber = lineNumber;
-                }
+                node.LineNumber = lineNumber;
             }
         }
 

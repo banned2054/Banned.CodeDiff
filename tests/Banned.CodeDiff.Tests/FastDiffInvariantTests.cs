@@ -4,11 +4,11 @@ using NUnit.Framework;
 namespace Banned.CodeDiff.Tests;
 
 /// <summary>
-/// Hand-pinned anchors around two non-local invariants of the fast-diff port that the
-/// generated golden set does not cover (its cursor values never go below 0):
-/// DiffCommonOverlap's loop slices and findCursorEditDiff's editAfter suffix slices.
-/// Every expectation below was produced by running fast-diff@1.3.0 in tests/js-harness
-/// (node) — the same reference the golden data is generated from.
+///     Hand-pinned anchors around two non-local invariants of the fast-diff port that the
+///     generated golden set does not cover (its cursor values never go below 0):
+///     DiffCommonOverlap's loop slices and findCursorEditDiff's editAfter suffix slices.
+///     Every expectation below was produced by running fast-diff@1.3.0 in tests/js-harness
+///     (node) — the same reference the golden data is generated from.
 /// </summary>
 public class FastDiffInvariantTests
 {
@@ -20,28 +20,28 @@ public class FastDiffInvariantTests
         // slice clamps (whole/empty) — the port must clamp, not throw, and land on the
         // same fallback-to-general-diff result JS produces.
         AssertCursor(
-            "abcdef", "abcXYdef", 0,
-            (0, "abc"), (1, "XY"), (0, "def"));
+                     "abcdef", "abcXYdef", 0,
+                     (0, "abc"), (1, "XY"), (0, "def"));
         AssertCursor(
-            "abcdef", "abcXYdef", 3,
-            (0, "abc"), (1, "XY"), (0, "def"));
+                     "abcdef", "abcXYdef", 3,
+                     (0, "abc"), (1, "XY"), (0, "def"));
         AssertCursor(
-            "abc", "abcdefghij", -5,
-            (0, "abc"), (1, "defghij"));
+                     "abc", "abcdefghij", -5,
+                     (0, "abc"), (1, "defghij"));
         AssertCursor(
-            "abcdefghij", "abc", -5,
-            (0, "abc"), (-1, "defghij"));
+                     "abcdefghij", "abc", -5,
+                     (0, "abc"), (-1, "defghij"));
         AssertCursor(
-            "abc", "abd", -1,
-            (0, "ab"), (-1, "c"), (1, "d"));
+                     "abc", "abd", -1,
+                     (0, "ab"), (-1, "c"), (1, "d"));
         AssertCursor(
-            "abc", "abcd", 10,
-            (0, "abc"), (1, "d"));
+                     "abc", "abcd", 10,
+                     (0, "abc"), (1, "d"));
         // Equal texts take diff_main's early-return before findCursorEditDiff runs —
         // the editAfter invariant leans on that exclusion for the cursor-beyond-both case.
         AssertCursor(
-            "abc", "abc", -5,
-            (0, "abc"));
+                     "abc", "abc", -5,
+                     (0, "abc"));
     }
 
     [Test]
@@ -62,17 +62,17 @@ public class FastDiffInvariantTests
         // loop through `length += found` iterations; the loop-top and compare slices
         // there rely on length staying <= textLength (see the invariant comment).
         AssertCleanup(
-            "The quick xxx fox", "The quick dog xxx",
-            (0, "The quick "), (-1, "xxx fo"), (1, "dog xx"), (0, "x"));
+                      "The quick xxx fox", "The quick dog xxx",
+                      (0, "The quick "), (-1, "xxx fo"), (1, "dog xx"), (0, "x"));
         AssertCleanup(
-            "aaa1234abcdefzzz", "bbb5678;abcdefyyy",
-            (-1, "aaa1234"), (1, "bbb5678;"), (0, "abcdef"), (-1, "zzz"), (1, "yyy"));
+                      "aaa1234abcdefzzz", "bbb5678;abcdefyyy",
+                      (-1, "aaa1234"), (1, "bbb5678;"), (0, "abcdef"), (-1, "zzz"), (1, "yyy"));
         AssertCleanup(
-            "prefix abcxxx suffix", "prefix xxxdef suffix",
-            (0, "prefix "), (-1, "abc"), (0, "xxx"), (1, "def"), (0, " suffix"));
+                      "prefix abcxxx suffix", "prefix xxxdef suffix",
+                      (0, "prefix "), (-1, "abc"), (0, "xxx"), (1, "def"), (0, " suffix"));
         AssertCleanup(
-            "xxabcd", "abcdxx",
-            (-1, "xx"), (0, "abcd"), (1, "xx"));
+                      "xxabcd", "abcdxx",
+                      (-1, "xx"), (0, "abcd"), (1, "xx"));
     }
 
     [Test]
@@ -82,11 +82,11 @@ public class FastDiffInvariantTests
         // right-shift; the trailing-whitespace preference of the >= comparison shows
         // up in which offset wins.
         AssertCleanup(
-            "The xxxcat came.", "The catxxx came.",
-            (0, "The "), (-1, "xxx"), (0, "cat"), (1, "xxx"), (0, " came."));
+                      "The xxxcat came.", "The catxxx came.",
+                      (0, "The "), (-1, "xxx"), (0, "cat"), (1, "xxx"), (0, " came."));
         AssertCleanup(
-            "New value.  ", "New value. ",
-            (0, "New value. "), (-1, " "));
+                      "New value.  ", "New value. ",
+                      (0, "New value. "), (-1, " "));
     }
 
     private static void AssertCursor(string a, string b, int cursor, params (int Op, string Text)[] expected)
@@ -99,7 +99,7 @@ public class FastDiffInvariantTests
 
     private static void AssertCleanup(string a, string b, params (int Op, string Text)[] expected)
     {
-        var result = FastDiff.Diff(a, b, (int?)null, cleanup : true);
+        var result = FastDiff.Diff(a, b, (int?)null, true);
 
         Assert.That(Dump(result), Is.EqualTo(DumpExpected(expected)),
                     $"{a} vs {b}");

@@ -1,71 +1,51 @@
 namespace Banned.CodeDiff.Models;
 
 /// <summary>
-/// Port of diff-file.ts type HunkInfo. Start indexes are always present in a
-/// parser-valid hunk header ("@@ -(\d+)(?:,(\d+))? +... @@"); the counts may be
-/// omitted ("@@ -1 +1 @@"), which is Number(undefined) = NaN in JS — represented
-/// here as null.
+///     Port of diff-file.ts type HunkInfo. Start indexes are always present in a
+///     parser-valid hunk header ("@@ -(\d+)(?:,(\d+))? +... @@"); the counts may be
+///     omitted ("@@ -1 +1 @@"), which is Number(undefined) = NaN in JS — represented
+///     here as null.
 /// </summary>
 public sealed class HunkInfo
 {
-    public int OldStartIndex { get; set; }
-
-    public int? OldLength { get; set; }
-
-    public int NewStartIndex { get; set; }
-
-    public int? NewLength { get; set; }
-
-    public int OldStartIndexSnapshot { get; set; }
-
-    public int? OldLengthSnapshot { get; set; }
-
-    public int NewStartIndexSnapshot { get; set; }
-
-    public int? NewLengthSnapshot { get; set; }
+    public int  OldStartIndex         { get; set; }
+    public int? OldLength             { get; set; }
+    public int  NewStartIndex         { get; set; }
+    public int? NewLength             { get; set; }
+    public int  OldStartIndexSnapshot { get; set; }
+    public int? OldLengthSnapshot     { get; set; }
+    public int  NewStartIndexSnapshot { get; set; }
+    public int? NewLengthSnapshot     { get; set; }
 }
 
 /// <summary>
-/// Port of diff-file.ts type HunkLineInfo. splitInfo/unifiedInfo are the JS
-/// intersection type HunkLineInfo &amp; HunkInfo, so this class carries both groups of
-/// fields (plus their snapshot counterparts used by collapse/restore).
+///     Port of diff-file.ts type HunkLineInfo. splitInfo/unifiedInfo are the JS
+///     intersection type HunkLineInfo &amp; HunkInfo, so this class carries both groups of
+///     fields (plus their snapshot counterparts used by collapse/restore).
 /// </summary>
 public sealed class HunkLineInfo
 {
-    public int StartHiddenIndex { get; set; }
+    public int     StartHiddenIndex         { get; set; }
+    public int     EndHiddenIndex           { get; set; }
+    public string? PlainText                { get; set; }
+    public int     StartHiddenIndexSnapshot { get; set; }
+    public int     EndHiddenIndexSnapshot   { get; set; }
+    public string? PlainTextSnapshot        { get; set; }
+    public int?    OldStartIndex            { get; set; }
+    public int?    OldLength                { get; set; }
+    public int?    NewStartIndex            { get; set; }
+    public int?    NewLength                { get; set; }
+    public int?    OldStartIndexSnapshot    { get; set; }
+    public int?    OldLengthSnapshot        { get; set; }
+    public int?    NewStartIndexSnapshot    { get; set; }
+    public int?    NewLengthSnapshot        { get; set; }
 
-    public int EndHiddenIndex { get; set; }
-
-    public string? PlainText { get; set; }
-
-    public int StartHiddenIndexSnapshot { get; set; }
-
-    public int EndHiddenIndexSnapshot { get; set; }
-
-    public string? PlainTextSnapshot { get; set; }
-
-    public int? OldStartIndex { get; set; }
-
-    public int? OldLength { get; set; }
-
-    public int? NewStartIndex { get; set; }
-
-    public int? NewLength { get; set; }
-
-    public int? OldStartIndexSnapshot { get; set; }
-
-    public int? OldLengthSnapshot { get; set; }
-
-    public int? NewStartIndexSnapshot { get; set; }
-
-    public int? NewLengthSnapshot { get; set; }
-
-    /// <summary>JS: { ...hunkInfo, startHiddenIndex, endHiddenIndex, plainText, _startHiddenIndex, _endHiddenIndex, _plainText }</summary>
+    /// <summary>
+    ///     JS: { ...hunkInfo, startHiddenIndex, endHiddenIndex, plainText, _startHiddenIndex, _endHiddenIndex, _plainText
+    ///     }
+    /// </summary>
     public static HunkLineInfo FromHunkInfo(
-        HunkInfo hunkInfo,
-        int      startHiddenIndex,
-        int      endHiddenIndex,
-        string?  plainText
+        HunkInfo hunkInfo, int startHiddenIndex, int endHiddenIndex, string? plainText
     )
     {
         return new HunkLineInfo
@@ -83,13 +63,13 @@ public sealed class HunkLineInfo
             OldStartIndexSnapshot    = hunkInfo.OldStartIndexSnapshot,
             OldLengthSnapshot        = hunkInfo.OldLengthSnapshot,
             NewStartIndexSnapshot    = hunkInfo.NewStartIndexSnapshot,
-            NewLengthSnapshot        = hunkInfo.NewLengthSnapshot,
+            NewLengthSnapshot        = hunkInfo.NewLengthSnapshot
         };
     }
 
     /// <summary>JS: { ...current.splitInfo, startHiddenIndex } (field-wise copy with overrides).</summary>
-    public HunkLineInfo With(int? startHiddenIndex = null, int? endHiddenIndex = null, string? plainText = null,
-                             bool clearPlainText   = false)
+    public HunkLineInfo With(
+        int? startHiddenIndex = null, int? endHiddenIndex = null, string? plainText = null, bool clearPlainText = false)
     {
         return new HunkLineInfo
         {
@@ -106,13 +86,13 @@ public sealed class HunkLineInfo
             OldStartIndexSnapshot    = OldStartIndexSnapshot,
             OldLengthSnapshot        = OldLengthSnapshot,
             NewStartIndexSnapshot    = NewStartIndexSnapshot,
-            NewLengthSnapshot        = NewLengthSnapshot,
+            NewLengthSnapshot        = NewLengthSnapshot
         };
     }
 
     /// <summary>JS: { ...current.splitInfo, ...current.hunkInfo, plainText: current.text, startHiddenIndex } (expand "all").</summary>
-    public HunkLineInfo WithHunkInfo(HunkInfo hunkInfo, int? startHiddenIndex = null, string? plainText = null,
-                                     bool     clearPlainText = false)
+    public HunkLineInfo WithHunkInfo(
+        HunkInfo hunkInfo, int? startHiddenIndex = null, string? plainText = null, bool clearPlainText = false)
     {
         return new HunkLineInfo
         {
@@ -129,7 +109,7 @@ public sealed class HunkLineInfo
             OldStartIndexSnapshot    = OldStartIndexSnapshot,
             OldLengthSnapshot        = OldLengthSnapshot,
             NewStartIndexSnapshot    = NewStartIndexSnapshot,
-            NewLengthSnapshot        = NewLengthSnapshot,
+            NewLengthSnapshot        = NewLengthSnapshot
         };
     }
 
@@ -157,7 +137,7 @@ public sealed class HunkLineInfo
             OldStartIndexSnapshot    = OldStartIndexSnapshot,
             OldLengthSnapshot        = OldLengthSnapshot,
             NewStartIndexSnapshot    = NewStartIndexSnapshot,
-            NewLengthSnapshot        = NewLengthSnapshot,
+            NewLengthSnapshot        = NewLengthSnapshot
         };
     }
 }
@@ -165,40 +145,37 @@ public sealed class HunkLineInfo
 /// <summary>Port of diff-file.ts interface SplitLineItem.</summary>
 public sealed class SplitLineItem
 {
-    public int? LineNumber { get; set; }
+    public int?      LineNumber       { get; set; }
+    public string?   Value            { get; set; }
+    public DiffLine? Diff             { get; set; }
+    public bool      IsHidden         { get; set; }
+    public bool      IsHiddenSnapshot { get; set; }
 
-    public string? Value { get; set; }
-
-    public DiffLine? Diff { get; set; }
-
-    public bool IsHidden { get; set; }
-
-    public bool IsHiddenSnapshot { get; set; }
-
-    public SplitLineItem Clone() => (SplitLineItem)MemberwiseClone();
+    public SplitLineItem Clone()
+    {
+        return (SplitLineItem)MemberwiseClone();
+    }
 }
 
 /// <summary>Port of diff-file.ts interface UnifiedLineItem.</summary>
 public sealed class UnifiedLineItem
 {
-    public int? OldLineNumber { get; set; }
+    public int?      OldLineNumber    { get; set; }
+    public int?      NewLineNumber    { get; set; }
+    public string?   Value            { get; set; }
+    public DiffLine? Diff             { get; set; }
+    public bool      IsHidden         { get; set; }
+    public bool      IsHiddenSnapshot { get; set; }
 
-    public int? NewLineNumber { get; set; }
-
-    public string? Value { get; set; }
-
-    public DiffLine? Diff { get; set; }
-
-    public bool IsHidden { get; set; }
-
-    public bool IsHiddenSnapshot { get; set; }
-
-    public UnifiedLineItem Clone() => (UnifiedLineItem)MemberwiseClone();
+    public UnifiedLineItem Clone()
+    {
+        return (UnifiedLineItem)MemberwiseClone();
+    }
 }
 
 /// <summary>Port of diff-file-utils.ts enum SplitSide.</summary>
 public enum SplitSide
 {
     Old = 1,
-    New = 2,
+    New = 2
 }

@@ -1,4 +1,3 @@
-using System.Text;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Presenters;
@@ -12,37 +11,38 @@ using Avalonia.Media.TextFormatting;
 using Avalonia.VisualTree;
 using Banned.CodeDiff.Avalonia.Models;
 using Banned.CodeDiff.Avalonia.Views;
-using Banned.CodeDiff.Models;
 using Banned.CodeDiff.Services;
-using Banned.CodeDiff.Utils;
 using NUnit.Framework;
+using System.Text;
 
 namespace Banned.CodeDiff.Avalonia.Tests;
 
 /// <summary>
-/// Wrap-mode UI wiring (M6 batch 4, upstream diffViewWrap): long lines wrap at the view width
-/// (upstream white-space pre-wrap), rows grow over several text lines, split rows keep both
-/// sides the height of the taller one, word highlights and syntax segments fragment per
-/// wrapped line, the selection overlay covers the wrapped height, and the virtualized panel
-/// stays correct while scrolling variable-height rows. Wrap defaults to off — the other
-/// fixtures' nowrap assertions are that path's regression guard.
+///     Wrap-mode UI wiring (M6 batch 4, upstream diffViewWrap): long lines wrap at the view width
+///     (upstream white-space pre-wrap), rows grow over several text lines, split rows keep both
+///     sides the height of the taller one, word highlights and syntax segments fragment per
+///     wrapped line, the selection overlay covers the wrapped height, and the virtualized panel
+///     stays correct while scrolling variable-height rows. Wrap defaults to off — the other
+///     fixtures' nowrap assertions are that path's regression guard.
 /// </summary>
 public class DiffWrapTests
 {
     /// <summary>A ~343-character line: 30 repeated words plus a distinguishing tail.</summary>
-    private static string LongLine(string tail) =>
-        string.Join(" ", Enumerable.Repeat("prefixword", 30)) + " " + tail;
+    private static string LongLine(string tail)
+    {
+        return string.Join(" ", Enumerable.Repeat("prefixword", 30)) + " " + tail;
+    }
 
     /// <summary>
-    /// A paste-only diff: three context rows around each delete/add pair, the paired lines
-    /// ~343 characters so a narrow window wraps them over many text lines. With equal
-    /// old/new counts per group the pairs get fast-diff word-level highlight ranges.
+    ///     A paste-only diff: three context rows around each delete/add pair, the paired lines
+    ///     ~343 characters so a narrow window wraps them over many text lines. With equal
+    ///     old/new counts per group the pairs get fast-diff word-level highlight ranges.
     /// </summary>
     private static DiffFile CreateWrapFile(int groups)
     {
         var count = groups * 8;
         var diff = new StringBuilder("--- a/wrap.txt\n+++ b/wrap.txt\n")
-            .Append("@@ -1,").Append(count).Append(" +1,").Append(count).Append(" @@\n");
+                  .Append("@@ -1,").Append(count).Append(" +1,").Append(count).Append(" @@\n");
 
         for (var i = 0; i < groups; i++)
         {
@@ -56,8 +56,8 @@ public class DiffWrapTests
             diff.Append(" context ").AppendLine($"{i:000}");
         }
 
-        var file = new DiffFile(oldFileName : "", oldFileContent : "", newFileName : "", newFileContent : "",
-                                diffList    : [diff.ToString()]);
+        var file = new DiffFile("", "", "", "",
+                                [diff.ToString()]);
         file.Init();
 
         return file;
@@ -68,16 +68,16 @@ public class DiffWrapTests
     {
         var diff = "--- a/asym.txt\n+++ b/asym.txt\n@@ -1,3 +1,3 @@\n ctx\n-" + LongLine("old-tail") +
                    "\n+short replacement\n ctx\n";
-        var file = new DiffFile(oldFileName : "", oldFileContent : "", newFileName : "", newFileContent : "",
-                                diffList    : [diff]);
+        var file = new DiffFile("", "", "", "",
+                                [diff]);
         file.Init();
 
         return file;
     }
 
     /// <summary>
-    /// 100-line file with two change hunks — the DiffExpandTests layout (rows[8] is the middle
-    /// hunk placeholder; expanding it down reveals 40 rows).
+    ///     100-line file with two change hunks — the DiffExpandTests layout (rows[8] is the middle
+    ///     hunk placeholder; expanding it down reveals 40 rows).
     /// </summary>
     private static DiffFile CreateExpandableFile()
     {
@@ -133,9 +133,9 @@ public class DiffWrapTests
              ctx 094
             """;
 
-        var file = new DiffFile(oldFileName : "sample.txt", oldFileContent : string.Join("\n", oldLines) + "\n",
-                                newFileName : "sample.txt", newFileContent : string.Join("\n", newLines) + "\n",
-                                diffList    : [diff]);
+        var file = new DiffFile("sample.txt", string.Join("\n", oldLines) + "\n",
+                                "sample.txt", string.Join("\n", newLines) + "\n",
+                                [diff]);
         file.Init();
         file.BuildSplitDiffLines();
 
@@ -156,8 +156,8 @@ public class DiffWrapTests
     }
 
     private static (Window Window, ScrollViewer Scroller, ItemsControl Items) ShownInView(DiffView view,
-                                                                                          double width = 360,
-                                                                                          double height = 240)
+        double                                                                                     width  = 360,
+        double                                                                                     height = 240)
     {
         var window = new Window { Content = view, Width = width, Height = height };
         window.Show();
@@ -196,7 +196,10 @@ public class DiffWrapTests
         return point!.Value;
     }
 
-    private static string? ClipboardText(Window window) => window.Clipboard!.TryGetTextAsync().Result;
+    private static string? ClipboardText(Window window)
+    {
+        return window.Clipboard!.TryGetTextAsync().Result;
+    }
 
     private static DiffSegmentText NewSegment(string text)
     {
@@ -205,7 +208,7 @@ public class DiffWrapTests
             Text       = text,
             FontFamily = FontFamily.Parse("Menlo, Consolas, monospace"),
             FontSize   = 14,
-            Foreground = Brushes.Black,
+            Foreground = Brushes.Black
         };
     }
 
@@ -215,7 +218,7 @@ public class DiffWrapTests
     public void SegmentText_NoWrap_MeasuresFullWidth_EvenUnderNarrowConstraint()
     {
         var segment = NewSegment(LongLine("tail"));
-        var window = new Window { Content = segment };
+        var window  = new Window { Content = segment };
         window.Show();
 
         segment.Measure(new Size(120, 500));
@@ -254,12 +257,12 @@ public class DiffWrapTests
     {
         var text = LongLine("tail");
         var layout = new TextLayout(text, new Typeface(FontFamily.Parse("Menlo, Consolas, monospace")), 14,
-                                    Brushes.Black, textWrapping: TextWrapping.Wrap, maxWidth: 120);
+                                    Brushes.Black, textWrapping : TextWrapping.Wrap, maxWidth : 120);
 
         Assert.That(layout.TextLines.Count, Is.GreaterThan(3));
 
-        var line0 = layout.TextLines[0];
-        var line1 = layout.TextLines[1];
+        var line0           = layout.TextLines[0];
+        var line1           = layout.TextLines[1];
         var secondLineStart = line1.FirstTextSourceIndex;
 
         // HitTestTextPosition reports the second line's own y offset — the fragment anchor.
@@ -268,7 +271,8 @@ public class DiffWrapTests
         // A highlight fully inside the second line sits on the second line's band (a single
         // character — the narrow headless layout fits only a handful of characters per line).
         var rects = DiffSegmentText.ComputeHighlightRects(
-            layout, text.Length, [new DiffHighlight(secondLineStart + 1, 1)]).ToList();
+                                                          layout, text.Length,
+                                                          [new DiffHighlight(secondLineStart + 1, 1)]).ToList();
 
         Assert.That(rects, Has.Count.EqualTo(1));
         Assert.That(rects[0].Y, Is.EqualTo(line0.Height).Within(0.01));
@@ -277,7 +281,8 @@ public class DiffWrapTests
         // A range crossing the first line break fragments: the first piece runs to the first
         // line's end, the second starts at the next line's left edge.
         var spanning = DiffSegmentText.ComputeHighlightRects(
-            layout, text.Length, [new DiffHighlight(2, secondLineStart)]).ToList();
+                                                             layout, text.Length,
+                                                             [new DiffHighlight(2, secondLineStart)]).ToList();
 
         Assert.That(spanning, Has.Count.EqualTo(2));
         Assert.That(spanning[0].Y, Is.EqualTo(0).Within(0.01));
@@ -289,7 +294,7 @@ public class DiffWrapTests
     [AvaloniaTest]
     public void SegmentText_Wrap_SyntaxSegmentSplitsAtLineBreaks()
     {
-        var text = LongLine("tail");
+        var text    = LongLine("tail");
         var segment = NewSegment(text);
         segment.Wrap       = true;
         segment.SyntaxRuns = [new DiffSyntaxRun(0, text.Length, Brushes.Red)];
@@ -325,7 +330,7 @@ public class DiffWrapTests
         Assert.That(view.Wrap, Is.False);
 
         var (window, _, items) = ShownInView(view);
-        var row = view.Rows.OfType<DiffSplitContentRow>().Single(r => r.Left.Kind == DiffCellKind.Delete);
+        var row       = view.Rows.OfType<DiffSplitContentRow>().Single(r => r.Left.Kind == DiffCellKind.Delete);
         var container = items.ContainerFromItem(row)!;
 
         var nowrapHeight = container.Bounds.Height;
@@ -349,15 +354,18 @@ public class DiffWrapTests
         var view = new DiffView { DiffFile = CreateAsymFile(), Wrap = true };
         var (window, _, items) = ShownInView(view);
 
-        var pair = view.Rows.OfType<DiffSplitContentRow>().Single(r => r.Left.Kind == DiffCellKind.Delete);
-        var context = view.Rows.OfType<DiffSplitContentRow>().First(r => r.Left.Kind == DiffCellKind.Context);
+        var pair    = view.Rows.OfType<DiffSplitContentRow>().Single(r => r.Left.Kind == DiffCellKind.Delete);
+        var context = view.Rows.OfType<DiffSplitContentRow>().First(r => r.Left.Kind  == DiffCellKind.Context);
 
         var container = items.ContainerFromItem(pair)!;
-        var grid = container.GetVisualDescendants().OfType<Grid>().First(g => g.ColumnDefinitions.Count == 5);
+        var grid      = container.GetVisualDescendants().OfType<Grid>().First(g => g.ColumnDefinitions.Count == 5);
 
-        Border? Cell(int column) => grid.Children.OfType<Border>().FirstOrDefault(b => Grid.GetColumn(b) == column);
+        Border? Cell(int column)
+        {
+            return grid.Children.OfType<Border>().FirstOrDefault(b => Grid.GetColumn(b) == column);
+        }
 
-        var leftContent = Cell(1);
+        var leftContent  = Cell(1);
         var rightContent = Cell(4);
 
         Assert.That(leftContent, Is.Not.Null);
@@ -377,13 +385,13 @@ public class DiffWrapTests
     public void DiffView_UnifiedWrap_RowsGrow_AndNumberColumnsStayFixed()
     {
         var view = new DiffView { DiffFile = CreateWrapFile(1), ViewMode = DiffViewMode.Unified, Wrap = true };
-        var (window, _, items) = ShownInView(view, width: 300);
+        var (window, _, items) = ShownInView(view, 300);
 
-        var delete = view.Rows.OfType<DiffUnifiedContentRow>().Single(r => r.Kind == DiffCellKind.Delete);
-        var context = view.Rows.OfType<DiffUnifiedContentRow>().First(r => r.Kind == DiffCellKind.Context);
+        var delete  = view.Rows.OfType<DiffUnifiedContentRow>().Single(r => r.Kind == DiffCellKind.Delete);
+        var context = view.Rows.OfType<DiffUnifiedContentRow>().First(r => r.Kind  == DiffCellKind.Context);
 
         var container = items.ContainerFromItem(delete)!;
-        var grid = container.GetVisualDescendants().OfType<Grid>().First(g => g.ColumnDefinitions.Count == 3);
+        var grid      = container.GetVisualDescendants().OfType<Grid>().First(g => g.ColumnDefinitions.Count == 3);
 
         var oldNumber = grid.Children.OfType<Border>().Single(b => Grid.GetColumn(b) == 0);
         var newNumber = grid.Children.OfType<Border>().Single(b => Grid.GetColumn(b) == 1);
@@ -410,7 +418,7 @@ public class DiffWrapTests
 
         // The differing tail sits ~330 characters into the line — deep in the wrapped rows.
         var segment = items.ContainerFromItem(row)!.GetVisualDescendants().OfType<DiffSegmentText>().First();
-        var layout = segment.CurrentLayout;
+        var layout  = segment.CurrentLayout;
 
         Assert.That(layout, Is.Not.Null);
         Assert.That(layout!.TextLines.Count, Is.GreaterThan(3));
@@ -430,14 +438,14 @@ public class DiffWrapTests
         var view = new DiffView { DiffFile = CreateWrapFile(1), Wrap = true, IsSelectionEnabled = true };
         var (window, _, items) = ShownInView(view);
 
-        var row = view.Rows.OfType<DiffSplitContentRow>().Single(r => r.Left.Kind == DiffCellKind.Delete);
+        var row       = view.Rows.OfType<DiffSplitContentRow>().Single(r => r.Left.Kind == DiffCellKind.Delete);
         var container = items.ContainerFromItem(row)!;
         var rowHeight = container.Bounds.Height;
 
         Assert.That(rowHeight, Is.GreaterThan(60));
 
         // Old line 4 is the delete row's line — select it (rows: ctx, ctx, ctx, delete, …).
-        view.SetPreselectedLines(oldLines: [4]);
+        view.SetPreselectedLines([4]);
         RunLayoutPass(window);
 
         Assert.That(row.Left.IsSelected, Is.True);
@@ -452,7 +460,7 @@ public class DiffWrapTests
     public void DiffView_Wrap_CopySelectionText_IsUnaffectedByWrapping()
     {
         var view = new DiffView { DiffFile = CreateWrapFile(1), Wrap = true, IsSelectionEnabled = true };
-        var (window, _, items) = ShownInView(view, height: 760);
+        var (window, _, items) = ShownInView(view, height : 760);
 
         // Old-number cell of the delete row (old line 4) — its rendered height spans many text
         // lines; the drag pipeline must still resolve it.
@@ -481,7 +489,7 @@ public class DiffWrapTests
             RunLayoutPass(window);
         }
 
-        var lastRow = view.Rows[^1];
+        var lastRow   = view.Rows[^1];
         var container = items.ContainerFromItem(lastRow);
 
         Assert.That(container, Is.Not.Null, "the last row must be realized at the bottom");
@@ -535,7 +543,7 @@ public class DiffWrapTests
     public void DiffView_Wrap_ExpandHunk_KeepsViewportWithinBounds()
     {
         var view = new DiffView { DiffFile = CreateExpandableFile(), Wrap = true };
-        var (window, scroller, items) = ShownInView(view, width: 300, height: 220);
+        var (window, scroller, items) = ShownInView(view, 300, 220);
 
         view.ExpandHunkDownCommand.Execute(As<DiffSplitHunkRow>(view.Rows[8]));
         RunLayoutPass(window);

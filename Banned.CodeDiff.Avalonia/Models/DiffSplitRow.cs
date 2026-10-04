@@ -1,6 +1,6 @@
-using System.ComponentModel;
 using Avalonia.Media;
 using Banned.CodeDiff.Models;
+using System.ComponentModel;
 
 namespace Banned.CodeDiff.Avalonia.Models;
 
@@ -19,34 +19,40 @@ public enum DiffCellKind
     /// <summary>Deleted line (left side only in split view).</summary>
     Delete = 3,
 
-    /// <summary>Raw file line revealed by hunk expansion (no DiffLine); upstream colors it with
-    /// <c>--diff-expand-content--</c> instead of the plain-context background.</summary>
-    Expand = 4,
+    /// <summary>
+    ///     Raw file line revealed by hunk expansion (no DiffLine); upstream colors it with
+    ///     <c>--diff-expand-content--</c> instead of the plain-context background.
+    /// </summary>
+    Expand = 4
 }
 
-/// <summary>Base type of split rows rendered by <see cref="Views.DiffView"/>.</summary>
+/// <summary>Base type of split rows rendered by <see cref="Views.DiffView" />.</summary>
 public abstract class DiffSplitRow : DiffRow;
 
-/// <summary>One side of a split content row: line number, text, and resolved brushes.
-/// Carries the multi-select highlight state (<see cref="IsSelected"/>) so realized row
-/// containers update in place while a selection drag moves — the Avalonia equivalent of the
-/// upstream <c>.diff-multi-select-active</c> CSS class toggling.</summary>
+/// <summary>
+///     One side of a split content row: line number, text, and resolved brushes.
+///     Carries the multi-select highlight state (<see cref="IsSelected" />) so realized row
+///     containers update in place while a selection drag moves — the Avalonia equivalent of the
+///     upstream <c>.diff-multi-select-active</c> CSS class toggling.
+/// </summary>
 public sealed class DiffSplitCellModel : INotifyPropertyChanged
 {
+    private bool _isSelected;
+
     internal DiffSplitCellModel(
-        string? number, string text, DiffCellKind kind, IReadOnlyList<DiffHighlight> highlights,
+        string?                       number, string text, DiffCellKind kind, IReadOnlyList<DiffHighlight> highlights,
         IReadOnlyList<DiffSyntaxRun>? syntaxRuns, DiffBrushSet brushes)
     {
-        Highlights  = highlights;
-        SyntaxRuns  = syntaxRuns;
-        Number      = number;
-        Text        = text;
-        Kind        = kind;
+        Highlights = highlights;
+        SyntaxRuns = syntaxRuns;
+        Number     = number;
+        Text       = text;
+        Kind       = kind;
         Sign = kind switch
         {
             DiffCellKind.Add    => "+",
             DiffCellKind.Delete => "-",
-            _                   => " ",
+            _                   => " "
         };
 
         (NumberBackground, ContentBackground) = kind switch
@@ -55,24 +61,21 @@ public sealed class DiffSplitCellModel : INotifyPropertyChanged
             DiffCellKind.Delete  => (brushes.DeleteNumber, brushes.DeleteContent),
             DiffCellKind.Context => (brushes.ContextNumber, brushes.ContextContent),
             // --diff-expand-lineNumber-- shares the plain number value; only the content differs.
-            DiffCellKind.Expand  => (brushes.ContextNumber, brushes.ExpandContent),
-            _                    => (brushes.EmptyNumber, brushes.EmptyContent),
+            DiffCellKind.Expand => (brushes.ContextNumber, brushes.ExpandContent),
+            _                   => (brushes.EmptyNumber, brushes.EmptyContent)
         };
         HighlightBrush = highlights.Count > 0
             ? kind switch
             {
                 DiffCellKind.Add    => brushes.AddContentHighlight,
                 DiffCellKind.Delete => brushes.DeleteContentHighlight,
-                _                   => (IBrush?)null,
+                _                   => null
             }
             : null;
-        NumberForeground    = brushes.NumberForeground;
-        SelectionOverlay    = brushes.MultiSelectOverlay;
-        SelectionEdgeStrip  = brushes.MultiSelectBorder;
+        NumberForeground   = brushes.NumberForeground;
+        SelectionOverlay   = brushes.MultiSelectOverlay;
+        SelectionEdgeStrip = brushes.MultiSelectBorder;
     }
-
-    /// <inheritdoc />
-    public event PropertyChangedEventHandler? PropertyChanged;
 
     /// <summary>Gets the 1-based file line number, or <c>null</c> when the side is empty.</summary>
     public string? Number { get; }
@@ -86,11 +89,13 @@ public sealed class DiffSplitCellModel : INotifyPropertyChanged
     /// <summary>Gets the sign glyph ("+", "-", or " ") shown before the text.</summary>
     public string Sign { get; }
 
-    /// <summary>Gets the word-level highlight ranges within <see cref="Text"/>.</summary>
+    /// <summary>Gets the word-level highlight ranges within <see cref="Text" />.</summary>
     public IReadOnlyList<DiffHighlight> Highlights { get; }
 
-    /// <summary>Gets the syntax-colored runs within <see cref="Text"/>, or <c>null</c> when the
-    /// line renders plain (no syntax data, or over the 150-span degradation guard).</summary>
+    /// <summary>
+    ///     Gets the syntax-colored runs within <see cref="Text" />, or <c>null</c> when the
+    ///     line renders plain (no syntax data, or over the 150-span degradation guard).
+    /// </summary>
     public IReadOnlyList<DiffSyntaxRun>? SyntaxRuns { get; }
 
     /// <summary>Gets the word-level highlight brush, or <c>null</c> when there is nothing to highlight.</summary>
@@ -105,32 +110,36 @@ public sealed class DiffSplitCellModel : INotifyPropertyChanged
     /// <summary>Gets the line-number text brush.</summary>
     public IBrush NumberForeground { get; }
 
-    /// <summary>Gets the multi-select overlay brush (#f0c000 at 15% opacity, upstream
-    /// <c>--diff-multi-select-bg</c>).</summary>
+    /// <summary>
+    ///     Gets the multi-select overlay brush (#f0c000 at 15% opacity, upstream
+    ///     <c>--diff-multi-select-bg</c>).
+    /// </summary>
     public IBrush SelectionOverlay { get; }
 
-    /// <summary>Gets the multi-select edge-strip brush (#2588fa, upstream
-    /// <c>--diff-multi-select-border</c>).</summary>
+    /// <summary>
+    ///     Gets the multi-select edge-strip brush (#2588fa, upstream
+    ///     <c>--diff-multi-select-border</c>).
+    /// </summary>
     public IBrush SelectionEdgeStrip { get; }
 
-    /// <summary>Gets or sets whether this cell is covered by a multi-select range; raised through
-    /// <see cref="PropertyChanged"/> so realized containers update without a row rebuild.</summary>
+    /// <summary>
+    ///     Gets or sets whether this cell is covered by a multi-select range; raised through
+    ///     <see cref="PropertyChanged" /> so realized containers update without a row rebuild.
+    /// </summary>
     public bool IsSelected
     {
         get => _isSelected;
         internal set
         {
-            if (_isSelected == value)
-            {
-                return;
-            }
+            if (_isSelected == value) return;
 
             _isSelected = value;
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsSelected)));
         }
     }
 
-    private bool _isSelected;
+    /// <inheritdoc />
+    public event PropertyChangedEventHandler? PropertyChanged;
 }
 
 /// <summary>A split content row pairing the old (left) and new (right) sides.</summary>
@@ -138,15 +147,17 @@ public sealed class DiffSplitContentRow : DiffSplitRow
 {
     internal DiffSplitContentRow(int lineIndex, DiffSplitCellModel left, DiffSplitCellModel right, IBrush splitter)
     {
-        LineIndex    = lineIndex;
-        Left         = left;
-        Right        = right;
+        LineIndex     = lineIndex;
+        Left          = left;
+        Right         = right;
         SplitterBrush = splitter;
     }
 
-    /// <summary>Gets the 1-based split model index of this row — the upstream <c>data-line</c>
-    /// attribute; the multi-select visual pass (multiSelect/visual.ts) matches selected lines
-    /// against it.</summary>
+    /// <summary>
+    ///     Gets the 1-based split model index of this row — the upstream <c>data-line</c>
+    ///     attribute; the multi-select visual pass (multiSelect/visual.ts) matches selected lines
+    ///     against it.
+    /// </summary>
     public int LineIndex { get; }
 
     /// <summary>Gets the old (left) side.</summary>
@@ -162,8 +173,8 @@ public sealed class DiffSplitContentRow : DiffSplitRow
 /// <summary>A collapsed hunk placeholder row showing the "@@" header with its expand affordances.</summary>
 public sealed class DiffSplitHunkRow : DiffSplitRow
 {
-    internal DiffSplitHunkRow(int hunkIndex, DiffLine hunk, bool expandEnabled, int composeLength,
-                              string hunkText, DiffBrushSet brushes)
+    internal DiffSplitHunkRow(int    hunkIndex, DiffLine     hunk, bool expandEnabled, int composeLength,
+                              string hunkText,  DiffBrushSet brushes)
     {
         HunkIndex = hunkIndex;
 
@@ -172,10 +183,10 @@ public sealed class DiffSplitHunkRow : DiffSplitRow
         var (up, down, all) = DiffHunkExpand.Buttons(expandEnabled && info != null, hunk.IsFirst == true,
                                                      hunk.IsLast == true, hiddenCount, composeLength);
 
-        IsExpandEnabled = expandEnabled && info != null;
-        CanExpandUp     = up;
-        CanExpandDown   = down;
-        CanExpandAll    = all;
+        IsExpandEnabled   = expandEnabled && info != null;
+        CanExpandUp       = up;
+        CanExpandDown     = down;
+        CanExpandAll      = all;
         HunkText          = hunkText;
         NumberBackground  = brushes.HunkNumber;
         ContentBackground = brushes.HunkContent;
@@ -185,8 +196,10 @@ public sealed class DiffSplitHunkRow : DiffSplitRow
         SplitterBrush     = brushes.Splitter;
     }
 
-    /// <summary>Gets the split model index of the hunk — the key passed to
-    /// <see cref="global::Banned.CodeDiff.Services.DiffFile.OnSplitHunkExpand"/>.</summary>
+    /// <summary>
+    ///     Gets the split model index of the hunk — the key passed to
+    ///     <see cref="global::Banned.CodeDiff.Services.DiffFile.OnSplitHunkExpand" />.
+    /// </summary>
     public int HunkIndex { get; }
 
     /// <summary>Gets whether the model allows expansion at all (not composed from diff-only text).</summary>

@@ -4,8 +4,8 @@ namespace Banned.CodeDiff.Models;
 // the lowlight/highlighter milestone, not the core/parse port).
 
 /// <summary>
-/// JS type: SyntaxNode.properties (className + free-form extras).
-/// Only className and style are consumed by the template builders.
+///     JS type: SyntaxNode.properties (className + free-form extras).
+///     Only className and style are consumed by the template builders.
 /// </summary>
 public sealed class SyntaxNodeProperties
 {

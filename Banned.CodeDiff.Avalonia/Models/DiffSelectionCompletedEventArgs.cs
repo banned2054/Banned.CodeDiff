@@ -3,8 +3,8 @@ using Banned.CodeDiff.Models;
 namespace Banned.CodeDiff.Avalonia.Models;
 
 /// <summary>
-/// Payload of <see cref="Views.DiffView.SelectionCompleted"/> — the upstream manager's
-/// onSelectionComplete(result); the result is <c>null</c> when the release happened without a range.
+///     Payload of <see cref="Views.DiffView.SelectionCompleted" /> — the upstream manager's
+///     onSelectionComplete(result); the result is <c>null</c> when the release happened without a range.
 /// </summary>
 public sealed class DiffSelectionCompletedEventArgs : EventArgs
 {

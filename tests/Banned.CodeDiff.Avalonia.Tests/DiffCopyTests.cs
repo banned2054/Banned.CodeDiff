@@ -7,7 +7,6 @@ using Avalonia.Input.Platform;
 using Avalonia.VisualTree;
 using Banned.CodeDiff.Avalonia.Models;
 using Banned.CodeDiff.Avalonia.Views;
-using Banned.CodeDiff.Models;
 using Banned.CodeDiff.Services;
 using Banned.CodeDiff.Utils;
 using NUnit.Framework;
@@ -15,11 +14,11 @@ using NUnit.Framework;
 namespace Banned.CodeDiff.Avalonia.Tests;
 
 /// <summary>
-/// Copy-feature UI wiring (M6 batch 3, native port feature — no upstream counterpart): the
-/// DiffView copy commands track the selection lifecycle through CanExecute/CanExecuteChanged and
-/// write the generated text to the real clipboard. The Avalonia headless platform provides a
-/// working IClipboard (verified by probe), so the tests assert the final clipboard content — the
-/// copy tasks complete synchronously there, making .Result safe on the UI thread.
+///     Copy-feature UI wiring (M6 batch 3, native port feature — no upstream counterpart): the
+///     DiffView copy commands track the selection lifecycle through CanExecute/CanExecuteChanged and
+///     write the generated text to the real clipboard. The Avalonia headless platform provides a
+///     working IClipboard (verified by probe), so the tests assert the final clipboard content — the
+///     copy tasks complete synchronously there, making .Result safe on the UI thread.
 /// </summary>
 public class DiffCopyTests
 {
@@ -77,9 +76,9 @@ public class DiffCopyTests
              ctx 094
             """;
 
-        var file = new DiffFile(oldFileName : "sample.txt", oldFileContent : string.Join("\n", oldLines) + "\n",
-                                newFileName : "sample.txt", newFileContent : string.Join("\n", newLines) + "\n",
-                                diffList    : [diff]);
+        var file = new DiffFile("sample.txt", string.Join("\n", oldLines) + "\n",
+                                "sample.txt", string.Join("\n", newLines) + "\n",
+                                [diff]);
         file.Init();
         file.BuildSplitDiffLines();
         file.BuildUnifiedDiffLines();
@@ -120,8 +119,10 @@ public class DiffCopyTests
         return point!.Value;
     }
 
-    /// <summary>Drags an old-side selection over rows 7→9 (old lines 44..88, spanning the
-    /// collapsed [45,87]) — the DiffSelectionTests layout.</summary>
+    /// <summary>
+    ///     Drags an old-side selection over rows 7→9 (old lines 44..88, spanning the
+    ///     collapsed [45,87]) — the DiffSelectionTests layout.
+    /// </summary>
     private static void SelectOld44To88(Window window, ItemsControl items, DiffView view)
     {
         window.MouseDown(CellCenter(window, items, view.Rows[7], 0), MouseButton.Left);
@@ -129,7 +130,10 @@ public class DiffCopyTests
         window.MouseUp(CellCenter(window, items, view.Rows[9], 0), MouseButton.Left);
     }
 
-    private static string? ClipboardText(Window window) => window.Clipboard!.TryGetTextAsync().Result;
+    private static string? ClipboardText(Window window)
+    {
+        return window.Clipboard!.TryGetTextAsync().Result;
+    }
 
     // ---- CopySelectionCommand ----
 
@@ -308,8 +312,8 @@ public class DiffCopyTests
         var view = new DiffView();
         var (window, _) = ShownInView(view);
 
-        var oldFileRaised  = 0;
-        var newFileRaised  = 0;
+        var oldFileRaised = 0;
+        var newFileRaised = 0;
         view.CopyOldFileCommand.CanExecuteChanged += (_, _) => oldFileRaised++;
         view.CopyNewFileCommand.CanExecuteChanged += (_, _) => newFileRaised++;
 
@@ -346,8 +350,8 @@ public class DiffCopyTests
             +// done
             """;
 
-        var file = new DiffFile(oldFileName : "", oldFileContent : "", newFileName : "", newFileContent : "",
-                                diffList : [sample]);
+        var file = new DiffFile("", "", "", "",
+                                [sample]);
         file.Init();
         file.BuildSplitDiffLines();
         file.BuildUnifiedDiffLines();

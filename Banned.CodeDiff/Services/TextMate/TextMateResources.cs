@@ -1,18 +1,18 @@
-using System.Reflection;
 using System.Text;
 using System.Text.Json;
 using TextMateSharp.Internal.Grammars.Reader;
 using TextMateSharp.Internal.Types;
 using TextMateSharp.Registry;
+using TextMateSharp.Themes;
 
 namespace Banned.CodeDiff.Services.TextMate;
 
 /// <summary>
-/// Loads the TextMate grammars and GitHub light/dark themes embedded from
-/// @shikijs/langs / @shikijs/themes (see tests/js-harness/extract-textmate.mjs)
-/// and builds the language table (lang id + aliases → scope name) the same way
-/// the upstream shiki engine resolves languages. Also the IRegistryOptions
-/// implementation feeding the TextMateSharp <see cref="Registry"/>.
+///     Loads the TextMate grammars and GitHub light/dark themes embedded from
+///     @shikijs/langs / @shikijs/themes (see tests/js-harness/extract-textmate.mjs)
+///     and builds the language table (lang id + aliases → scope name) the same way
+///     the upstream shiki engine resolves languages. Also the IRegistryOptions
+///     implementation feeding the TextMateSharp <see cref="Registry" />.
 /// </summary>
 internal sealed class TextMateResources : IRegistryOptions
 {
@@ -24,8 +24,6 @@ internal sealed class TextMateResources : IRegistryOptions
 
     private static readonly Lazy<TextMateResources> _instance = new(() => new TextMateResources());
 
-    public static TextMateResources Instance => _instance.Value;
-
     private readonly Dictionary<string, IRawGrammar> _grammars = new();
 
     // lang id / alias ("csharp", "cs", "c#", ...) → scope name; first registration
@@ -34,11 +32,11 @@ internal sealed class TextMateResources : IRegistryOptions
 
     private readonly Dictionary<string, ScopeThemeMatcher> _themes = new();
 
-    private Registry? _registry;
+    private ScopeThemeMatcher? _darkTheme;
 
     private ScopeThemeMatcher? _lightTheme;
 
-    private ScopeThemeMatcher? _darkTheme;
+    private Registry? _registry;
 
     private TextMateResources()
     {
@@ -47,8 +45,8 @@ internal sealed class TextMateResources : IRegistryOptions
         // Every embedded grammar registers, including dependency grammars pulled
         // in by the shiki bundles (e.g. vue needs html-derivative, vue-directives).
         foreach (var resourceName in assembly.GetManifestResourceNames()
-                     .Where(n => n.StartsWith(GrammarResourcePrefix, StringComparison.Ordinal))
-                     .OrderBy(n => n, StringComparer.Ordinal))
+                                             .Where(n => n.StartsWith(GrammarResourcePrefix, StringComparison.Ordinal))
+                                             .OrderBy(n => n, StringComparer.Ordinal))
         {
             var bytes = ReadResource(resourceName);
 
@@ -70,38 +68,53 @@ internal sealed class TextMateResources : IRegistryOptions
 
             if (root.TryGetProperty("name", out var nameElement) &&
                 nameElement.ValueKind == JsonValueKind.String)
-            {
                 _langToScope.TryAdd(nameElement.GetString()!, scopeName);
-            }
 
-            if (root.TryGetProperty("aliases", out var aliasesElement) &&
-                aliasesElement.ValueKind == JsonValueKind.Array)
-            {
-                foreach (var alias in aliasesElement.EnumerateArray())
-                {
-                    if (alias.ValueKind == JsonValueKind.String)
-                    {
-                        _langToScope.TryAdd(alias.GetString()!, scopeName);
-                    }
-                }
-            }
+            if (!root.TryGetProperty("aliases", out var aliasesElement) ||
+                aliasesElement.ValueKind != JsonValueKind.Array) continue;
+            foreach (var alias in aliasesElement.EnumerateArray()
+                                                .Where(alias => alias.ValueKind == JsonValueKind.String))
+                _langToScope.TryAdd(alias.GetString()!, scopeName);
         }
 
         foreach (var themeName in new[] { LightThemeName, DarkThemeName })
-        {
             _themes[themeName] =
-                ScopeThemeMatcher.FromThemeJson(ReadResource($"Banned.CodeDiff.Resources.TextMate.themes.{themeName}.json"));
-        }
+                ScopeThemeMatcher
+                   .FromThemeJson(ReadResource($"Banned.CodeDiff.Resources.TextMate.themes.{themeName}.json"));
     }
 
-    /// <summary>Resolves a language id / alias (e.g. "cs", "ts", "vue") to a scope name;
-    /// <c>null</c> when the language is not registered (mirrors shiki getLanguage).</summary>
+    public static TextMateResources Instance => _instance.Value;
+
+    IRawGrammar IRegistryOptions.GetGrammar(string scopeName)
+    {
+        return _grammars.TryGetValue(scopeName, out var grammar) ? grammar : null!;
+    }
+
+    IRawTheme IRegistryOptions.GetTheme(string name)
+    {
+        return EmptyTheme.Instance;
+    }
+
+    IRawTheme IRegistryOptions.GetDefaultTheme()
+    {
+        return EmptyTheme.Instance;
+    }
+
+    ICollection<string> IRegistryOptions.GetInjections(string scopeName)
+    {
+        return Array.Empty<string>();
+    }
+
+    /// <summary>
+    ///     Resolves a language id / alias (e.g. "cs", "ts", "vue") to a scope name;
+    ///     <c>null</c> when the language is not registered (mirrors shiki getLanguage).
+    /// </summary>
     public string? ResolveScope(string? lang)
     {
         return lang != null && _langToScope.TryGetValue(lang, out var scope) ? scope : null;
     }
 
-    /// <summary>The shared <see cref="Registry"/> (single oniguruma state; global by design).</summary>
+    /// <summary>The shared <see cref="Registry" /> (single oniguruma state; global by design).</summary>
     public Registry GetRegistry()
     {
         return _registry ??= new Registry(this);
@@ -109,53 +122,11 @@ internal sealed class TextMateResources : IRegistryOptions
 
     public (ScopeThemeMatcher Light, ScopeThemeMatcher Dark) GetThemes()
     {
-        if (_lightTheme == null || _darkTheme == null)
-        {
-            _lightTheme = _themes[LightThemeName];
-            _darkTheme  = _themes[DarkThemeName];
-        }
+        if (_lightTheme != null && _darkTheme != null) return (_lightTheme, _darkTheme);
+        _lightTheme = _themes[LightThemeName];
+        _darkTheme  = _themes[DarkThemeName];
 
         return (_lightTheme, _darkTheme);
-    }
-
-    IRawGrammar IRegistryOptions.GetGrammar(string scopeName)
-    {
-        return _grammars.TryGetValue(scopeName, out var grammar) ? grammar : null!;
-    }
-
-    TextMateSharp.Themes.IRawTheme IRegistryOptions.GetTheme(string name)
-    {
-        return EmptyTheme.Instance;
-    }
-
-    TextMateSharp.Themes.IRawTheme IRegistryOptions.GetDefaultTheme()
-    {
-        return EmptyTheme.Instance;
-    }
-
-    /// <summary>
-    /// The registry only uses the theme to build token metadata; token colors
-    /// are resolved by <see cref="ScopeThemeMatcher"/> instead, so an empty
-    /// theme suffices here.
-    /// </summary>
-    private sealed class EmptyTheme : TextMateSharp.Themes.IRawTheme
-    {
-        public static readonly EmptyTheme Instance = new();
-
-        public string GetName() => "empty";
-
-        public string GetInclude() => "";
-
-        public ICollection<TextMateSharp.Themes.IRawThemeSetting> GetSettings() => [];
-
-        public ICollection<TextMateSharp.Themes.IRawThemeSetting> GetTokenColors() => [];
-
-        public ICollection<KeyValuePair<string, object>> GetGuiColors() => [];
-    }
-
-    ICollection<string> IRegistryOptions.GetInjections(string scopeName)
-    {
-        return Array.Empty<string>();
     }
 
     private static byte[] ReadResource(string resourceName)
@@ -170,5 +141,40 @@ internal sealed class TextMateResources : IRegistryOptions
         stream.CopyTo(memory);
 
         return memory.ToArray();
+    }
+
+    /// <summary>
+    ///     The registry only uses the theme to build token metadata; token colors
+    ///     are resolved by <see cref="ScopeThemeMatcher" /> instead, so an empty
+    ///     theme suffices here.
+    /// </summary>
+    private sealed class EmptyTheme : IRawTheme
+    {
+        public static readonly EmptyTheme Instance = new();
+
+        public string GetName()
+        {
+            return "empty";
+        }
+
+        public string GetInclude()
+        {
+            return "";
+        }
+
+        public ICollection<IRawThemeSetting> GetSettings()
+        {
+            return [];
+        }
+
+        public ICollection<IRawThemeSetting> GetTokenColors()
+        {
+            return [];
+        }
+
+        public ICollection<KeyValuePair<string, object>> GetGuiColors()
+        {
+            return [];
+        }
     }
 }

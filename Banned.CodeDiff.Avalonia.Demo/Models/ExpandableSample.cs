@@ -3,13 +3,15 @@ using System.Text;
 namespace Banned.CodeDiff.Avalonia.Demo.Models;
 
 /// <summary>
-/// Deterministic synthetic sample with real old/new file contents, so hunk expansion is enabled
-/// (paste-only diffs compose from the diff text and cannot expand). The unchanged gaps vary in
-/// size to exercise every expand affordance: single up/down, the expand-all button for short
-/// hidden ranges, the stacked down+up pair for long ones, and the trailing strip.
+///     Deterministic synthetic sample with real old/new file contents, so hunk expansion is enabled
+///     (paste-only diffs compose from the diff text and cannot expand). The unchanged gaps vary in
+///     size to exercise every expand affordance: single up/down, the expand-all button for short
+///     hidden ranges, the stacked down+up pair for long ones, and the trailing strip.
 /// </summary>
 public static class ExpandableSample
 {
+    private const int Tail = 60;
+
     // (gap before, deleted lines, added lines) per change cluster; every gap keeps the 3-line
     // contexts of adjacent hunks disjoint (>= 8 unchanged lines in between).
     private static readonly (int Gap, int Deletes, int Adds)[] Clusters =
@@ -19,10 +21,8 @@ public static class ExpandableSample
         (25, 0, 1),
         (90, 2, 3),
         (15, 1, 1),
-        (30, 0, 2),
+        (30, 0, 2)
     ];
-
-    private const int Tail = 60;
 
     public static (string OldContent, string NewContent, string DiffText) Create()
     {
@@ -50,13 +50,10 @@ public static class ExpandableSample
             var newStart = newNumber - 3;
 
             diff.Append("@@ -").Append(oldStart).Append(',').Append(6 + deletes)
-                .Append(" +").Append(newStart).Append(',').Append(6 + adds)
+                .Append(" +").Append(newStart).Append(',').Append(6   + adds)
                 .AppendLine(" @@");
 
-            for (var k = 3; k > 0; k--)
-            {
-                diff.Append(' ').AppendLine($"ctx {oldNumber - k:D3}");
-            }
+            for (var k = 3; k > 0; k--) diff.Append(' ').AppendLine($"ctx {oldNumber - k:D3}");
 
             for (var k = 0; k < deletes; k++)
             {

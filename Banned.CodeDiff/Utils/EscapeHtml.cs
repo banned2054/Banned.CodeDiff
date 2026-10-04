@@ -10,10 +10,7 @@ public static class EscapeHtml
 
         var firstIndex = IndexOfSpecialChar(str);
 
-        if (firstIndex < 0)
-        {
-            return str;
-        }
+        if (firstIndex < 0) return str;
 
         var html      = "";
         var lastIndex = 0;
@@ -43,10 +40,7 @@ public static class EscapeHtml
                     continue;
             }
 
-            if (lastIndex != index)
-            {
-                html += str.Substring(lastIndex, index - lastIndex);
-            }
+            if (lastIndex != index) html += str.Substring(lastIndex, index - lastIndex);
 
             lastIndex =  index + 1;
             html      += escaped;
@@ -58,7 +52,6 @@ public static class EscapeHtml
     private static int IndexOfSpecialChar(string str)
     {
         for (var i = 0; i < str.Length; i++)
-        {
             switch (str[i])
             {
                 case '"' :
@@ -68,7 +61,6 @@ public static class EscapeHtml
                 case '>' :
                     return i;
             }
-        }
 
         return -1;
     }

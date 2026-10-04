@@ -13,10 +13,10 @@ using NUnit.Framework;
 namespace Banned.CodeDiff.Avalonia.Tests;
 
 /// <summary>
-/// Line-selection UI wiring (M6 batch 2, upstream multiSelect): drag over line-number cells
-/// selects ranges through the pointer-capture pipeline (headless MouseDown/Move/Up drive real
-/// routed events), highlights covered rows, fires the public events, and re-applies the
-/// highlight when an expansion reveals hidden members of the selection.
+///     Line-selection UI wiring (M6 batch 2, upstream multiSelect): drag over line-number cells
+///     selects ranges through the pointer-capture pipeline (headless MouseDown/Move/Up drive real
+///     routed events), highlights covered rows, fires the public events, and re-applies the
+///     highlight when an expansion reveals hidden members of the selection.
 /// </summary>
 public class DiffSelectionTests
 {
@@ -43,8 +43,8 @@ public class DiffSelectionTests
 
     private static DiffFile CreateSampleFile()
     {
-        var file = new DiffFile(oldFileName : "", oldFileContent : "", newFileName : "", newFileContent : "",
-                                diffList : [Sample]);
+        var file = new DiffFile("", "", "", "",
+                                [Sample]);
         file.Init();
         file.BuildSplitDiffLines();
         file.BuildUnifiedDiffLines();
@@ -53,8 +53,8 @@ public class DiffSelectionTests
     }
 
     /// <summary>
-    /// 100-line file with two change hunks — hidden ranges [1,37], [45,87], [96,100] old/new;
-    /// the middle placeholder is <c>view.Rows[8]</c> (see DiffExpandTests for the layout).
+    ///     100-line file with two change hunks — hidden ranges [1,37], [45,87], [96,100] old/new;
+    ///     the middle placeholder is <c>view.Rows[8]</c> (see DiffExpandTests for the layout).
     /// </summary>
     private static DiffFile CreateExpandableFile()
     {
@@ -110,9 +110,9 @@ public class DiffSelectionTests
              ctx 094
             """;
 
-        var file = new DiffFile(oldFileName : "sample.txt", oldFileContent : string.Join("\n", oldLines) + "\n",
-                                newFileName : "sample.txt", newFileContent : string.Join("\n", newLines) + "\n",
-                                diffList    : [diff]);
+        var file = new DiffFile("sample.txt", string.Join("\n", oldLines) + "\n",
+                                "sample.txt", string.Join("\n", newLines) + "\n",
+                                [diff]);
         file.Init();
         file.BuildSplitDiffLines();
         file.BuildUnifiedDiffLines();
@@ -160,14 +160,17 @@ public class DiffSelectionTests
         return (window, view.GetVisualDescendants().OfType<ItemsControl>().Single());
     }
 
-    private static DiffSplitContentRow SplitRow(DiffView view, int index) => As<DiffSplitContentRow>(view.Rows[index]);
+    private static DiffSplitContentRow SplitRow(DiffView view, int index)
+    {
+        return As<DiffSplitContentRow>(view.Rows[index]);
+    }
 
     [AvaloniaTest]
     public void Selection_IsDisabledByDefault()
     {
         var view = new DiffView { DiffFile = CreateSampleFile() };
         var (window, items) = ShownInView(view);
-        var changed = 0;
+        var changed   = 0;
         var completed = 0;
         view.SelectionChanged   += (_, _) => changed++;
         view.SelectionCompleted += (_, _) => completed++;
@@ -189,7 +192,7 @@ public class DiffSelectionTests
         var view = new DiffView { DiffFile = CreateSampleFile(), IsSelectionEnabled = true };
         var (window, items) = ShownInView(view);
 
-        var changes = new List<MultiSelectRange?>();
+        var                changes   = new List<MultiSelectRange?>();
         MultiSelectResult? completed = null;
         view.SelectionChanged   += (_, e) => changes.Add(e.Range);
         view.SelectionCompleted += (_, e) => completed = e.Result;
@@ -349,7 +352,7 @@ public class DiffSelectionTests
         var view = new DiffView { DiffFile = CreateSampleFile(), IsSelectionEnabled = true };
 
         // Old lines 4 and 6 with a gap — the upstream-known semantics highlight the gap too.
-        view.SetPreselectedLines(oldLines: [4, 6]);
+        view.SetPreselectedLines([4, 6]);
 
         Assert.That(SplitRow(view, 3).Left.IsSelected, Is.True);
         Assert.That(SplitRow(view, 5).Left.IsSelected && SplitRow(view, 5).Right.IsSelected, Is.True);
@@ -394,10 +397,13 @@ public class DiffSelectionTests
     [AvaloniaTest]
     public void Unified_PressPicksSideByRowNumbers_AndSkipsNumberlessRows()
     {
-        var view = new DiffView { DiffFile = CreateSampleFile(), ViewMode = DiffViewMode.Unified,
-                                  IsSelectionEnabled = true };
+        var view = new DiffView
+        {
+            DiffFile           = CreateSampleFile(), ViewMode = DiffViewMode.Unified,
+            IsSelectionEnabled = true
+        };
         var (window, items) = ShownInView(view);
-        var changes = new List<MultiSelectRange?>();
+        var                changes   = new List<MultiSelectRange?>();
         MultiSelectResult? completed = null;
         view.SelectionChanged   += (_, e) => changes.Add(e.Range);
         view.SelectionCompleted += (_, e) => completed = e.Result;
@@ -420,8 +426,11 @@ public class DiffSelectionTests
     [AvaloniaTest]
     public void Unified_SelectionFlagsWholeRow()
     {
-        var view = new DiffView { DiffFile = CreateSampleFile(), ViewMode = DiffViewMode.Unified,
-                                  IsSelectionEnabled = true };
+        var view = new DiffView
+        {
+            DiffFile           = CreateSampleFile(), ViewMode = DiffViewMode.Unified,
+            IsSelectionEnabled = true
+        };
         var (window, items) = ShownInView(view);
 
         // Old-number cell of the old-4 delete row — no new number, so the side resolves to old;

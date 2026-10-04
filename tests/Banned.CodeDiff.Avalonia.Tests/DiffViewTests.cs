@@ -1,4 +1,3 @@
-using System.Globalization;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless.NUnit;
@@ -7,7 +6,6 @@ using Avalonia.Media.TextFormatting;
 using Avalonia.VisualTree;
 using Banned.CodeDiff.Avalonia.Models;
 using Banned.CodeDiff.Avalonia.Views;
-using Banned.CodeDiff.Models;
 using Banned.CodeDiff.Services;
 using NUnit.Framework;
 
@@ -38,8 +36,8 @@ public class DiffViewTests
 
     private static DiffFile CreateSampleFile()
     {
-        var file = new DiffFile(oldFileName: "", oldFileContent: "", newFileName: "", newFileContent: "",
-                                diffList: [Sample]);
+        var file = new DiffFile("", "", "", "",
+                                [Sample]);
         file.Init();
         file.BuildSplitDiffLines();
         return file;
@@ -81,8 +79,8 @@ public class DiffViewTests
     [AvaloniaTest]
     public void DiffView_AppliesControlTheme_And_InstantiatesTemplate()
     {
-        var view = new DiffView { DiffFile = CreateSampleFile() };
-        var window = new Window { Content = view };
+        var view   = new DiffView { DiffFile = CreateSampleFile() };
+        var window = new Window { Content    = view };
         window.Show();
 
         // The ControlTheme (loaded through the consumer-style include in TestAppStyles) must have
@@ -97,8 +95,8 @@ public class DiffViewTests
     {
         var view = new DiffView { DiffFile = CreateSampleFile() };
 
-        var pair = As<DiffSplitContentRow>(view.Rows[3]);
-        var addBrush = As<SolidColorBrush>(pair.Right.ContentBackground);
+        var pair        = As<DiffSplitContentRow>(view.Rows[3]);
+        var addBrush    = As<SolidColorBrush>(pair.Right.ContentBackground);
         var deleteBrush = As<SolidColorBrush>(pair.Left.ContentBackground);
 
         // Upstream git-diff-view light values: --diff-add-content-- / --diff-del-content--.
@@ -207,8 +205,10 @@ public class DiffViewTests
         TemplateOptions.SetEnableFastDiffTemplate(true);
         var view = new DiffView { DiffFile = CreateSampleFile(), ViewMode = DiffViewMode.Unified };
 
-        Assert.That(As<DiffUnifiedContentRow>(view.Rows[10]).Highlights, Is.EqualTo(new[] { new DiffHighlight(11, 1) }));
-        Assert.That(As<DiffUnifiedContentRow>(view.Rows[11]).Highlights, Is.EqualTo(new[] { new DiffHighlight(11, 1) }));
+        Assert.That(As<DiffUnifiedContentRow>(view.Rows[10]).Highlights,
+                    Is.EqualTo(new[] { new DiffHighlight(11, 1) }));
+        Assert.That(As<DiffUnifiedContentRow>(view.Rows[11]).Highlights,
+                    Is.EqualTo(new[] { new DiffHighlight(11, 1) }));
     }
 
     [AvaloniaTest]
@@ -221,9 +221,9 @@ public class DiffViewTests
         var rects = DiffSegmentText.ComputeHighlightRects(layout, line.Length, [new DiffHighlight(11, 1)]).ToList();
         Assert.That(rects, Has.Count.EqualTo(1));
         var rect = rects[0];
-        Assert.That(rect.X > 0, Is.True);
-        Assert.That(rect.Width > 0, Is.True);
-        Assert.That(rect.Right <= layout.TextLines[0].WidthIncludingTrailingWhitespace + 0.01, Is.True);
+        Assert.That(rect.X      > 0, Is.True);
+        Assert.That(rect.Width  > 0, Is.True);
+        Assert.That(rect.Right  <= layout.TextLines[0].WidthIncludingTrailingWhitespace + 0.01, Is.True);
         Assert.That(rect.Height > 0, Is.True);
 
         // Out-of-range and empty ranges produce no rectangles.
@@ -236,19 +236,19 @@ public class DiffViewTests
     {
         var segment = new DiffSegmentText
         {
-            Text = "    return 1;",
-            FontFamily = FontFamily.Parse("Menlo, Consolas, monospace"),
-            FontSize = 14,
-            Foreground = Brushes.Black,
-            Highlights = [new DiffHighlight(11, 1)],
-            HighlightBrush = Brushes.OrangeRed,
+            Text           = "    return 1;",
+            FontFamily     = FontFamily.Parse("Menlo, Consolas, monospace"),
+            FontSize       = 14,
+            Foreground     = Brushes.Black,
+            Highlights     = [new DiffHighlight(11, 1)],
+            HighlightBrush = Brushes.OrangeRed
         };
         var window = new Window { Content = segment };
         window.Show();
         segment.Measure(new Size(1000, 200));
         segment.Arrange(new Rect(0, 0, 1000, 200));
 
-        Assert.That(segment.DesiredSize.Width > 0, Is.True);
+        Assert.That(segment.DesiredSize.Width  > 0, Is.True);
         Assert.That(segment.DesiredSize.Height > 0, Is.True);
     }
 }

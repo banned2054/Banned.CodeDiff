@@ -14,9 +14,9 @@ using NUnit.Framework;
 namespace Banned.CodeDiff.Avalonia.Tests;
 
 /// <summary>
-/// M5 syntax wiring: DiffView drives DiffFile.InitSyntax (built-in TextMate engine),
-/// rows carry syntax runs resolved per theme variant, the toggle disables them,
-/// and the 150-span degradation guard holds.
+///     M5 syntax wiring: DiffView drives DiffFile.InitSyntax (built-in TextMate engine),
+///     rows carry syntax runs resolved per theme variant, the toggle disables them,
+///     and the 150-span degradation guard holds.
 /// </summary>
 public class DiffSyntaxTests
 {
@@ -63,7 +63,7 @@ public class DiffSyntaxTests
         +            return a + b + 1;
                  }
              }
-        """,
+        """
     ];
 
     private static DiffFile CreateCsFile()
@@ -73,7 +73,10 @@ public class DiffSyntaxTests
     }
 
     /// <summary>Index of the "return" keyword inside the (indented) line text.</summary>
-    private static int ReturnRunStart(string text) => text.IndexOf("return", StringComparison.Ordinal);
+    private static int ReturnRunStart(string text)
+    {
+        return text.IndexOf("return", StringComparison.Ordinal);
+    }
 
     [AvaloniaTest]
     public void SplitRows_CarrySyntaxRuns_WithKeywordColor()
@@ -89,7 +92,8 @@ public class DiffSyntaxTests
         // "return" is a keyword: github-light keyword color #d73a49 (upper-cased like shiki).
         var returnRun = runs!.First(r => r.Start == ReturnRunStart(row.Right.Text));
 
-        Assert.That(((SolidColorBrush)returnRun.Foreground).Color.ToString(), Is.EqualTo("#FFD73A49".ToLowerInvariant()));
+        Assert.That(((SolidColorBrush)returnRun.Foreground).Color.ToString(),
+                    Is.EqualTo("#FFD73A49".ToLowerInvariant()));
 
         // The left (old) side resolves from the old file's syntax table as well.
         Assert.That(row.Left.SyntaxRuns, Is.Not.Null);
@@ -106,7 +110,8 @@ public class DiffSyntaxTests
 
         var returnRun = row.SyntaxRuns!.First(r => r.Start == ReturnRunStart(row.Text));
 
-        Assert.That(((SolidColorBrush)returnRun.Foreground).Color.ToString(), Is.EqualTo("#FFD73A49".ToLowerInvariant()));
+        Assert.That(((SolidColorBrush)returnRun.Foreground).Color.ToString(),
+                    Is.EqualTo("#FFD73A49".ToLowerInvariant()));
     }
 
     [AvaloniaTest]
@@ -143,7 +148,8 @@ public class DiffSyntaxTests
 
         var lightRun = lightRow.Right.SyntaxRuns!.First(r => r.Start == ReturnRunStart(lightRow.Right.Text));
 
-        Assert.That(((SolidColorBrush)lightRun.Foreground).Color.ToString(), Is.EqualTo("#FFD73A49".ToLowerInvariant()));
+        Assert.That(((SolidColorBrush)lightRun.Foreground).Color.ToString(),
+                    Is.EqualTo("#FFD73A49".ToLowerInvariant()));
 
         window.RequestedThemeVariant = ThemeVariant.Dark;
 
@@ -165,13 +171,11 @@ public class DiffSyntaxTests
             var line = new SyntaxLine { Value = value, LineNumber = 1, ValueLength = value.Length, NodeList = [] };
 
             for (var i = 0; i < spanCount; i++)
-            {
                 line.NodeList!.Add(new SyntaxNodeSpan
                 {
-                    Node    = new SyntaxNode { Value = "x", StartIndex = i, EndIndex = i },
-                    Wrapper = new SyntaxNode { Properties = style },
+                    Node    = new SyntaxNode { Value      = "x", StartIndex = i, EndIndex = i },
+                    Wrapper = new SyntaxNode { Properties = style }
                 });
-            }
 
             return line;
         }
@@ -191,7 +195,8 @@ public class DiffSyntaxTests
         // Dark variant picks the dark variable.
         var dark = DiffSyntaxRuns.Extract(Line(1, "a"), 1, ThemeVariant.Dark);
 
-        Assert.That(((SolidColorBrush)dark![0].Foreground).Color.ToString(), Is.EqualTo("#FFF97583".ToLowerInvariant()));
+        Assert.That(((SolidColorBrush)dark![0].Foreground).Color.ToString(),
+                    Is.EqualTo("#FFF97583".ToLowerInvariant()));
     }
 
     [AvaloniaTest]
@@ -199,15 +204,15 @@ public class DiffSyntaxTests
     {
         var text = new DiffSegmentText
         {
-            Text = "return a + b;",
+            Text       = "return a + b;",
             FontFamily = FontFamily.Parse("Menlo, Consolas, monospace"),
             FontSize   = 14,
             Foreground = Brushes.Black,
             SyntaxRuns =
             [
                 new DiffSyntaxRun(0, 6, new SolidColorBrush(Color.FromRgb(0xD7, 0x3A, 0x49))),
-                new DiffSyntaxRun(6, 8, new SolidColorBrush(Color.FromRgb(0x24, 0x29, 0x2E))),
-            ],
+                new DiffSyntaxRun(6, 8, new SolidColorBrush(Color.FromRgb(0x24, 0x29, 0x2E)))
+            ]
         };
 
         var window = new Window { Content = text };

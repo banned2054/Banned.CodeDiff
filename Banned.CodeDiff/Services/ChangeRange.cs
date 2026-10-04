@@ -6,21 +6,19 @@ namespace Banned.CodeDiff.Services;
 /// <summary>Port of packages/core/src/parse/change-range.ts.</summary>
 public static class ChangeRange
 {
-    private static int _maxLengthToIgnoreLineDiff = 1000;
+    /// <summary>JS: getMaxLengthToIgnoreLineDiff.</summary>
+    public static int MaxLengthToIgnoreLineDiff { get; private set; } = 1000;
 
     /// <summary>Change the maximum length of a line to ignore line diff.</summary>
     public static void ChangeMaxLengthToIgnoreLineDiff(int length)
     {
-        _maxLengthToIgnoreLineDiff = length;
+        MaxLengthToIgnoreLineDiff = length;
     }
 
     public static void ResetMaxLengthToIgnoreLineDiff()
     {
-        _maxLengthToIgnoreLineDiff = 1000;
+        MaxLengthToIgnoreLineDiff = 1000;
     }
-
-    /// <summary>JS: getMaxLengthToIgnoreLineDiff.</summary>
-    public static int MaxLengthToIgnoreLineDiff => _maxLengthToIgnoreLineDiff;
 
     /// <summary>Get the maximum position in the range.</summary>
     private static int RangeMax(TextRange range)
@@ -39,10 +37,7 @@ public static class ChangeRange
         var length = 0;
         while (Math.Abs(length) < max)
         {
-            if (stringA[startA + length] != stringB[startB + length])
-            {
-                break;
-            }
+            if (stringA[startA + length] != stringB[startB + length]) break;
 
             length += stride;
         }
@@ -52,7 +47,7 @@ public static class ChangeRange
 
     private static bool IsInValidString(string s)
     {
-        return s.Trim().Length == 0 || s.Length >= _maxLengthToIgnoreLineDiff;
+        return s.Trim().Length == 0 || s.Length >= MaxLengthToIgnoreLineDiff;
     }
 
     private static (NewLineSymbol? AddSymbol, string AddString, NewLineSymbol? DelSymbol, string DelString)
@@ -86,10 +81,7 @@ public static class ChangeRange
 
         var hasNewLineChanged = addition.NoTrailingNewLine != deletion.NoTrailingNewLine;
 
-        if (aSymbol == bSymbol && !hasNewLineChanged)
-        {
-            return (null, stringA, null, stringB);
-        }
+        if (aSymbol == bSymbol && !hasNewLineChanged) return (null, stringA, null, stringB);
 
         return (
             hasNewLineChanged
@@ -136,30 +128,28 @@ public static class ChangeRange
         var (addSymbol, addString, delSymbol, delString) = CheckNewLineSymbolChange(addition, deletion);
 
         if (addString == delString && addSymbol.HasValue && delSymbol.HasValue)
-        {
             return (
                 new LineRange
                 {
                     Range = new TextRange
                     {
                         Location = addString.Length,
-                        Length   = stringA.Length - addString.Length,
+                        Length   = stringA.Length - addString.Length
                     },
                     HasLineChange = true,
-                    NewLineSymbol = addSymbol,
+                    NewLineSymbol = addSymbol
                 },
                 new LineRange
                 {
                     Range = new TextRange
                     {
                         Location = delString.Length,
-                        Length   = stringB.Length - delString.Length,
+                        Length   = stringB.Length - delString.Length
                     },
                     HasLineChange = true,
-                    NewLineSymbol = delSymbol,
+                    NewLineSymbol = delSymbol
                 }
             );
-        }
 
         var delRange = new TextRange(0, delString.Length);
         var addRange = new TextRange(0, addString.Length);
@@ -181,7 +171,7 @@ public static class ChangeRange
         {
             Location = delRange.Location + prefixLength, Length = delRange.Length - prefixLength
         };
-        addRange = new TextRange(Location : addRange.Location + prefixLength, Length : addRange.Length - prefixLength);
+        addRange = new TextRange(addRange.Location + prefixLength, addRange.Length - prefixLength);
 
         var suffixLength = CommonLength(delString, delRange, addString, addRange, true);
 
@@ -196,7 +186,7 @@ public static class ChangeRange
                 HasLineChange =
                     (addString[..addRange.Location] + addString[(addRange.Location + addRange.Length)..]).Trim()
                    .Length
-                  > 0,
+                  > 0
             },
             new LineRange
             {
@@ -204,7 +194,7 @@ public static class ChangeRange
                 HasLineChange =
                     (delString[..delRange.Location] + delString[(delRange.Location + delRange.Length)..]).Trim()
                    .Length
-                  > 0,
+                  > 0
             }
         );
     }
@@ -214,12 +204,10 @@ public static class ChangeRange
         var (addSymbol, addString, delSymbol, delString) = CheckNewLineSymbolChange(addition, deletion);
 
         if (IsInValidString(addString) || IsInValidString(delString))
-        {
             return (
                 new DiffRange { Range = [], HasLineChange = addSymbol.HasValue, NewLineSymbol = addSymbol },
                 new DiffRange { Range = [], HasLineChange = delSymbol.HasValue, NewLineSymbol = delSymbol }
             );
-        }
 
         var diffRange = FastDiff.Diff(delString, addString, 0, true);
 

@@ -1,18 +1,22 @@
-using System.ComponentModel;
 using Avalonia.Media;
 using Banned.CodeDiff.Models;
+using System.ComponentModel;
 
 namespace Banned.CodeDiff.Avalonia.Models;
 
-/// <summary>Base type of unified rows rendered by <see cref="Views.DiffView"/>.</summary>
+/// <summary>Base type of unified rows rendered by <see cref="Views.DiffView" />.</summary>
 public abstract class DiffUnifiedRow : DiffRow;
 
-/// <summary>A unified content row: one diff line with dual (old/new) line numbers.
-/// Carries the multi-select highlight state (<see cref="IsSelected"/>) so realized row
-/// containers update in place while a selection drag moves — the Avalonia equivalent of the
-/// upstream <c>.diff-multi-select-active</c> CSS class toggling.</summary>
+/// <summary>
+///     A unified content row: one diff line with dual (old/new) line numbers.
+///     Carries the multi-select highlight state (<see cref="IsSelected" />) so realized row
+///     containers update in place while a selection drag moves — the Avalonia equivalent of the
+///     upstream <c>.diff-multi-select-active</c> CSS class toggling.
+/// </summary>
 public sealed class DiffUnifiedContentRow : DiffUnifiedRow, INotifyPropertyChanged
 {
+    private bool _isSelected;
+
     internal DiffUnifiedContentRow(int? oldLineNumber, int? newLineNumber, string text, DiffCellKind kind,
                                    IReadOnlyList<DiffHighlight> highlights,
                                    IReadOnlyList<DiffSyntaxRun>? syntaxRuns, DiffBrushSet brushes)
@@ -29,14 +33,14 @@ public sealed class DiffUnifiedContentRow : DiffUnifiedRow, INotifyPropertyChang
         {
             DiffCellKind.Add    => "+",
             DiffCellKind.Delete => "-",
-            _                   => " ",
+            _                   => " "
         };
 
         NumberBackground = kind switch
         {
             DiffCellKind.Add    => brushes.AddNumber,
             DiffCellKind.Delete => brushes.DeleteNumber,
-            _                   => brushes.ContextNumber,
+            _                   => brushes.ContextNumber
         };
         ContentBackground = kind switch
         {
@@ -45,28 +49,29 @@ public sealed class DiffUnifiedContentRow : DiffUnifiedRow, INotifyPropertyChang
             // Raw revealed rows use --diff-expand-content--; the number cell keeps the plain
             // number value (--diff-expand-lineNumber-- is numerically identical upstream).
             DiffCellKind.Expand => brushes.ExpandContent,
-            _                   => brushes.ContextContent,
+            _                   => brushes.ContextContent
         };
         HighlightBrush = kind switch
         {
             DiffCellKind.Add    => brushes.AddContentHighlight,
             DiffCellKind.Delete => brushes.DeleteContentHighlight,
-            _                   => null,
+            _                   => null
         };
         NumberForeground   = brushes.NumberForeground;
         SelectionOverlay   = brushes.MultiSelectOverlay;
         SelectionEdgeStrip = brushes.MultiSelectBorder;
     }
 
-    /// <inheritdoc />
-    public event PropertyChangedEventHandler? PropertyChanged;
-
-    /// <summary>Gets the old file line number, or <c>null</c> for added lines — the upstream
-    /// unified DOM's <c>data-line-old-num</c> attribute consumed by multiSelect/dom.ts.</summary>
+    /// <summary>
+    ///     Gets the old file line number, or <c>null</c> for added lines — the upstream
+    ///     unified DOM's <c>data-line-old-num</c> attribute consumed by multiSelect/dom.ts.
+    /// </summary>
     public int? OldLineNumber { get; }
 
-    /// <summary>Gets the new file line number, or <c>null</c> for deleted lines — the upstream
-    /// unified DOM's <c>data-line-new-num</c> attribute consumed by multiSelect/dom.ts.</summary>
+    /// <summary>
+    ///     Gets the new file line number, or <c>null</c> for deleted lines — the upstream
+    ///     unified DOM's <c>data-line-new-num</c> attribute consumed by multiSelect/dom.ts.
+    /// </summary>
     public int? NewLineNumber { get; }
 
     /// <summary>Gets the old file line number text, or <c>null</c> for added lines.</summary>
@@ -84,11 +89,13 @@ public sealed class DiffUnifiedContentRow : DiffUnifiedRow, INotifyPropertyChang
     /// <summary>Gets the sign glyph ("+", "-", or " ") shown before the text.</summary>
     public string Sign { get; }
 
-    /// <summary>Gets the word-level highlight ranges within <see cref="Text"/>.</summary>
+    /// <summary>Gets the word-level highlight ranges within <see cref="Text" />.</summary>
     public IReadOnlyList<DiffHighlight> Highlights { get; }
 
-    /// <summary>Gets the syntax-colored runs within <see cref="Text"/>, or <c>null</c> when the
-    /// line renders plain (no syntax data, or over the 150-span degradation guard).</summary>
+    /// <summary>
+    ///     Gets the syntax-colored runs within <see cref="Text" />, or <c>null</c> when the
+    ///     line renders plain (no syntax data, or over the 150-span degradation guard).
+    /// </summary>
     public IReadOnlyList<DiffSyntaxRun>? SyntaxRuns { get; }
 
     /// <summary>Gets the word-level highlight brush, or <c>null</c> when there is nothing to highlight.</summary>
@@ -103,39 +110,43 @@ public sealed class DiffUnifiedContentRow : DiffUnifiedRow, INotifyPropertyChang
     /// <summary>Gets the line-number text brush.</summary>
     public IBrush NumberForeground { get; }
 
-    /// <summary>Gets the multi-select overlay brush (#f0c000 at 15% opacity, upstream
-    /// <c>--diff-multi-select-bg</c>).</summary>
+    /// <summary>
+    ///     Gets the multi-select overlay brush (#f0c000 at 15% opacity, upstream
+    ///     <c>--diff-multi-select-bg</c>).
+    /// </summary>
     public IBrush SelectionOverlay { get; }
 
-    /// <summary>Gets the multi-select edge-strip brush (#2588fa, upstream
-    /// <c>--diff-multi-select-border</c>).</summary>
+    /// <summary>
+    ///     Gets the multi-select edge-strip brush (#2588fa, upstream
+    ///     <c>--diff-multi-select-border</c>).
+    /// </summary>
     public IBrush SelectionEdgeStrip { get; }
 
-    /// <summary>Gets or sets whether this row is covered by a multi-select range; raised through
-    /// <see cref="PropertyChanged"/> so realized containers update without a row rebuild.</summary>
+    /// <summary>
+    ///     Gets or sets whether this row is covered by a multi-select range; raised through
+    ///     <see cref="PropertyChanged" /> so realized containers update without a row rebuild.
+    /// </summary>
     public bool IsSelected
     {
         get => _isSelected;
         internal set
         {
-            if (_isSelected == value)
-            {
-                return;
-            }
+            if (_isSelected == value) return;
 
             _isSelected = value;
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsSelected)));
         }
     }
 
-    private bool _isSelected;
+    /// <inheritdoc />
+    public event PropertyChangedEventHandler? PropertyChanged;
 }
 
 /// <summary>A unified collapsed hunk placeholder row showing the "@@" header with expand affordances.</summary>
 public sealed class DiffUnifiedHunkRow : DiffUnifiedRow
 {
-    internal DiffUnifiedHunkRow(int hunkIndex, DiffLine hunk, bool expandEnabled, int composeLength,
-                                string hunkText, DiffBrushSet brushes)
+    internal DiffUnifiedHunkRow(int    hunkIndex, DiffLine     hunk, bool expandEnabled, int composeLength,
+                                string hunkText,  DiffBrushSet brushes)
     {
         HunkIndex = hunkIndex;
 
@@ -144,10 +155,10 @@ public sealed class DiffUnifiedHunkRow : DiffUnifiedRow
         var (up, down, all) = DiffHunkExpand.Buttons(expandEnabled && info != null, hunk.IsFirst == true,
                                                      hunk.IsLast == true, hiddenCount, composeLength);
 
-        IsExpandEnabled = expandEnabled && info != null;
-        CanExpandUp     = up;
-        CanExpandDown   = down;
-        CanExpandAll    = all;
+        IsExpandEnabled   = expandEnabled && info != null;
+        CanExpandUp       = up;
+        CanExpandDown     = down;
+        CanExpandAll      = all;
         HunkText          = hunkText;
         NumberBackground  = brushes.HunkNumber;
         ContentBackground = brushes.HunkContent;
@@ -155,8 +166,10 @@ public sealed class DiffUnifiedHunkRow : DiffUnifiedRow
         ExpandForeground  = brushes.NumberForeground;
     }
 
-    /// <summary>Gets the unified model index of the hunk — the key passed to
-    /// <see cref="global::Banned.CodeDiff.Services.DiffFile.OnUnifiedHunkExpand"/>.</summary>
+    /// <summary>
+    ///     Gets the unified model index of the hunk — the key passed to
+    ///     <see cref="global::Banned.CodeDiff.Services.DiffFile.OnUnifiedHunkExpand" />.
+    /// </summary>
     public int HunkIndex { get; }
 
     /// <summary>Gets whether the model allows expansion at all (not composed from diff-only text).</summary>

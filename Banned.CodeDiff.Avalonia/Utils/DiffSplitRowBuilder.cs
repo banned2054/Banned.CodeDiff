@@ -6,12 +6,12 @@ using Banned.CodeDiff.Services;
 namespace Banned.CodeDiff.Avalonia.Utils;
 
 /// <summary>
-/// Builds the flat row list rendered by <see cref="Views.DiffView"/> from a built
-/// <see cref="DiffFile"/> split model. Mirrors the upstream render loop: for each split row index,
-/// the collapsed hunk placeholder (when present and still hiding lines) is emitted above the
-/// content row, and hidden rows are skipped. The synthetic trailing hunk is keyed at
-/// <c>SplitLineLength</c> — one past the last content row — so the loop runs one extra index to
-/// render the bottom expand strip.
+///     Builds the flat row list rendered by <see cref="Views.DiffView" /> from a built
+///     <see cref="DiffFile" /> split model. Mirrors the upstream render loop: for each split row index,
+///     the collapsed hunk placeholder (when present and still hiding lines) is emitted above the
+///     content row, and hidden rows are skipped. The synthetic trailing hunk is keyed at
+///     <c>SplitLineLength</c> — one past the last content row — so the loop runs one extra index to
+///     render the bottom expand strip.
 /// </summary>
 internal static class DiffSplitRowBuilder
 {
@@ -33,34 +33,26 @@ internal static class DiffSplitRowBuilder
             var left  = file.GetSplitLeftLine(index);
             var right = file.GetSplitRightLine(index);
 
-            if (left?.IsHidden == true || right?.IsHidden == true)
-            {
-                continue;
-            }
+            if (left?.IsHidden == true || right?.IsHidden == true) continue;
 
-            if (left == null && right == null)
-            {
-                continue;
-            }
+            if (left == null && right == null) continue;
 
             rows.Add(new DiffSplitContentRow(index + 1,
-                                              CreateCell(file, left, SplitSide.Old, variant, brushes),
-                                              CreateCell(file, right, SplitSide.New, variant, brushes),
-                                              brushes.Splitter));
+                                             CreateCell(file, left, SplitSide.Old, variant, brushes),
+                                             CreateCell(file, right, SplitSide.New, variant, brushes),
+                                             brushes.Splitter));
         }
 
         return rows;
     }
 
-    private static DiffSplitCellModel CreateCell(DiffFile file, SplitLineItem? item, SplitSide side,
-                                                 ThemeVariant variant, DiffBrushSet brushes)
+    private static DiffSplitCellModel CreateCell(DiffFile     file,    SplitLineItem? item, SplitSide side,
+                                                 ThemeVariant variant, DiffBrushSet   brushes)
     {
         // Placeholder half-rows (the opposite side holds an add/delete) are bare SplitLineItem
         // instances with no line number; content rows always carry their DiffLine.
         if (item == null || (item.Diff == null && item.LineNumber == null))
-        {
             return new DiffSplitCellModel(null, string.Empty, DiffCellKind.Empty, [], null, brushes);
-        }
 
         var text = (item.Value ?? item.Diff?.Text ?? string.Empty).TrimEnd('\r', '\n');
 
@@ -77,16 +69,14 @@ internal static class DiffSplitRowBuilder
         // Raw gap lines revealed by expansion have no DiffLine — they render as plain rows from
         // the file content, colored with the expand palette (upstream getContentBG hasDiff=false).
         if (item.Diff is not { } diff)
-        {
-            return new DiffSplitCellModel(item.LineNumber?.ToString(), text, DiffCellKind.Expand,
-                                          [], syntaxRuns, brushes);
-        }
+            return new DiffSplitCellModel(item.LineNumber?.ToString(), text, DiffCellKind.Expand, [], syntaxRuns,
+                                          brushes);
 
         var kind = diff.Type switch
         {
             DiffLineType.Add    => DiffCellKind.Add,
             DiffLineType.Delete => DiffCellKind.Delete,
-            _                   => DiffCellKind.Context,
+            _                   => DiffCellKind.Context
         };
 
         return new DiffSplitCellModel(item.LineNumber?.ToString(), text, kind,

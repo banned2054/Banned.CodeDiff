@@ -1,13 +1,13 @@
 using Banned.CodeDiff.Services;
-using System.Text.Json.Nodes;
 using NUnit.Framework;
+using System.Text.Json.Nodes;
 
 namespace Banned.CodeDiff.Tests;
 
 /// <summary>
-/// Golden replay of the DiffFile pipeline: initRaw → buildSplitDiffLines →
-/// buildUnifiedDiffLines → expansion steps, against the original TS sources run on
-/// the repository's own demo data (ui/vue-example/src/data.ts).
+///     Golden replay of the DiffFile pipeline: initRaw → buildSplitDiffLines →
+///     buildUnifiedDiffLines → expansion steps, against the original TS sources run on
+///     the repository's own demo data (ui/vue-example/src/data.ts).
 /// </summary>
 public class DiffFileGoldenTests
 {
@@ -25,10 +25,7 @@ public class DiffFileGoldenTests
 
         for (var m = 0; m < models.Count; m++)
         {
-            if (m > 0)
-            {
-                ApplyStep(df, models[m]!["step"]!.AsObject());
-            }
+            if (m > 0) ApplyStep(df, models[m]!["step"]!.AsObject());
 
             var expected = models[m]!["model"]!.AsObject();
             var actual   = GoldenSupport.DumpModel(df);
@@ -92,40 +89,38 @@ public class DiffFileGoldenTests
             "all"      => HunkExpandDirection.All,
             "up-all"   => HunkExpandDirection.UpAll,
             "down-all" => HunkExpandDirection.DownAll,
-            var d      => throw new InvalidOperationException($"unknown dir {d}"),
+            var d      => throw new InvalidOperationException($"unknown dir {d}")
         };
     }
 }
 
 /// <summary>
-/// Mirrors the handcrafted cases from gen.ts. Demo-xxx cases load the repository's
-/// ui/vue-example/src/data.ts fixture (extracted verbatim into DemoData.cs).
+///     Mirrors the handcrafted cases from gen.ts. Demo-xxx cases load the repository's
+///     ui/vue-example/src/data.ts fixture (extracted verbatim into DemoData.cs).
 /// </summary>
 public static class DemoData
 {
-    public sealed record DemoCase(
-        string   OldFileName,
-        string   OldFileContent,
-        string   NewFileName,
-        string   NewFileContent,
-        string[] Hunks);
+    private static readonly DemoCase _expandCase = BuildExpandCase();
+
+    private static readonly DemoCase _singleCount = new("one.txt",
+                                                        "only line\n",
+                                                        "one.txt",
+                                                        "only line changed\n",
+                                                        [
+                                                            "--- a/one.txt\n+++ b/one.txt\n@@ -1 +1 @@\n-only line\n+only line changed\n"
+                                                        ]);
 
     public static DemoCase ByName(string name)
     {
-        if (name.StartsWith("demo-", StringComparison.Ordinal))
-        {
-            return DemoDataStore.Get(name["demo-".Length..]);
-        }
+        if (name.StartsWith("demo-", StringComparison.Ordinal)) return DemoDataStore.Get(name["demo-".Length..]);
 
         return name switch
         {
             "expand-split" or "expand-unified" => ExpandCase(),
             "single-count-omitted"             => SingleCountCase(),
-            _                                  => throw new InvalidOperationException($"unknown golden case {name}"),
+            _                                  => throw new InvalidOperationException($"unknown golden case {name}")
         };
     }
-
-    private static DemoCase _expandCase = BuildExpandCase();
 
     private static DemoCase ExpandCase()
     {
@@ -147,15 +142,9 @@ public static class DemoData
             newLines[i - 1] = MkLine(i, "old");
         }
 
-        for (var i = 5; i <= 8; i++)
-        {
-            newLines[i - 1] = MkLine(i, "new");
-        }
+        for (var i = 5; i <= 8; i++) newLines[i - 1] = MkLine(i, "new");
 
-        for (var i = 100; i <= 103; i++)
-        {
-            newLines[i - 1] = MkLine(i, "new2");
-        }
+        for (var i = 100; i <= 103; i++) newLines[i - 1] = MkLine(i, "new2");
 
         static string BuildHunk(string[] oldLines, string[] newLines, int oldStart, int oldEnd, int newStart)
         {
@@ -197,16 +186,15 @@ public static class DemoData
                            );
     }
 
-    private static readonly DemoCase _singleCount = new("one.txt",
-                                                        "only line\n",
-                                                        "one.txt",
-                                                        "only line changed\n",
-                                                        [
-                                                            "--- a/one.txt\n+++ b/one.txt\n@@ -1 +1 @@\n-only line\n+only line changed\n"
-                                                        ]);
-
     private static DemoCase SingleCountCase()
     {
         return _singleCount;
     }
+
+    public sealed record DemoCase(
+        string   OldFileName,
+        string   OldFileContent,
+        string   NewFileName,
+        string   NewFileContent,
+        string[] Hunks);
 }

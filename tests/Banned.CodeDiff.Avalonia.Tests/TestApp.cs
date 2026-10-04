@@ -2,15 +2,13 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Headless;
+using Banned.CodeDiff.Avalonia.Tests;
 using NUnit.Framework;
-using Avalonia.Markup.Xaml;
-using Avalonia.Markup.Xaml.Styling;
-using Avalonia.Styling;
 
-[assembly: AvaloniaTestApplication(typeof(Banned.CodeDiff.Avalonia.Tests.TestAppBuilder))]
+[assembly : AvaloniaTestApplication(typeof(TestAppBuilder))]
 
 // DiffParser.Shared and TemplateOptions are global mutable state; keep tests sequential.
-[assembly: Parallelizable(ParallelScope.None)]
+[assembly : Parallelizable(ParallelScope.None)]
 
 namespace Banned.CodeDiff.Avalonia.Tests;
 
@@ -26,10 +24,7 @@ public class TestApp : Application
 
     public override void OnFrameworkInitializationCompleted()
     {
-        if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
-        {
-            desktop.MainWindow = new Window();
-        }
+        if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop) desktop.MainWindow = new Window();
 
         base.OnFrameworkInitializationCompleted();
     }
@@ -37,6 +32,8 @@ public class TestApp : Application
 
 public static class TestAppBuilder
 {
-    public static AppBuilder BuildAvaloniaApp() =>
-        AppBuilder.Configure<TestApp>().UseHeadless(new AvaloniaHeadlessPlatformOptions());
+    public static AppBuilder BuildAvaloniaApp()
+    {
+        return AppBuilder.Configure<TestApp>().UseHeadless(new AvaloniaHeadlessPlatformOptions());
+    }
 }

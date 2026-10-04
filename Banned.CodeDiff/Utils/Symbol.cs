@@ -8,7 +8,7 @@ public enum NewLineSymbol
     LF      = 3,
     NEWLINE = 4,
     NORMAL  = 5,
-    NULL    = 6,
+    NULL    = 6
 }
 
 public static class Symbol
@@ -20,7 +20,7 @@ public static class Symbol
             NewLineSymbol.LF   => "␊",
             NewLineSymbol.CR   => "␍",
             NewLineSymbol.CRLF => "␍␊",
-            _                  => "",
+            _                  => ""
         };
     }
 }

@@ -1,22 +1,26 @@
 using Banned.CodeDiff.Models;
 using Banned.CodeDiff.Services;
-using System.Text.Json.Nodes;
 using NUnit.Framework;
+using System.Text.Json.Nodes;
 
 [assembly : Parallelizable(ParallelScope.None)]
 
 namespace Banned.CodeDiff.Tests;
 
 /// <summary>
-/// Golden JSON loading + JSON tree dumping/comparison.
-///
-/// The JS generator drops keys whose value is undefined (and NaN); the C# dumpers
-/// emit null for those. Null-valued properties are therefore pruned from both trees
-/// before comparison. Array elements are never pruned (missing model items are null).
+///     Golden JSON loading + JSON tree dumping/comparison.
+///     The JS generator drops keys whose value is undefined (and NaN); the C# dumpers
+///     emit null for those. Null-valued properties are therefore pruned from both trees
+///     before comparison. Array elements are never pruned (missing model items are null).
 /// </summary>
 public static class GoldenSupport
 {
     public static readonly string GoldenPath = LocateGolden();
+
+    private static JsonObject? _golden;
+
+    public static JsonObject Golden =>
+        _golden ??= JsonNode.Parse(File.ReadAllText(GoldenPath))!.AsObject();
 
     private static string LocateGolden()
     {
@@ -24,21 +28,13 @@ public static class GoldenSupport
         for (var i = 0; i < 8 && dir is not null; i++)
         {
             var candidate = Path.Combine(dir, "Golden", "golden.json");
-            if (File.Exists(candidate))
-            {
-                return candidate;
-            }
+            if (File.Exists(candidate)) return candidate;
 
             dir = Path.GetDirectoryName(dir.TrimEnd(Path.DirectorySeparatorChar));
         }
 
         throw new FileNotFoundException("golden.json not found");
     }
-
-    private static JsonObject? _golden;
-
-    public static JsonObject Golden =>
-        _golden ??= JsonNode.Parse(File.ReadAllText(GoldenPath))!.AsObject();
 
     // ---- prune ----
 
@@ -51,11 +47,8 @@ public static class GoldenSupport
                 var clean = new JsonObject();
                 foreach (var (k, v) in obj)
                 {
-                    var pv = PruneNulls(v?.DeepClone());
-                    if (pv is not null)
-                    {
-                        clean[k] = pv;
-                    }
+                    var pv                       = PruneNulls(v?.DeepClone());
+                    if (pv is not null) clean[k] = pv;
                 }
 
                 return clean;
@@ -63,10 +56,7 @@ public static class GoldenSupport
             case JsonArray arr :
             {
                 var clean = new JsonArray();
-                foreach (var v in arr)
-                {
-                    clean.Add(PruneNulls(v?.DeepClone()));
-                }
+                foreach (var v in arr) clean.Add(PruneNulls(v?.DeepClone()));
 
                 return clean;
             }
@@ -86,19 +76,13 @@ public static class GoldenSupport
 
     private static void Compare(JsonNode? a, JsonNode? b, string path, List<string> diffs, int maxDiffs)
     {
-        if (diffs.Count >= maxDiffs)
-        {
-            return;
-        }
+        if (diffs.Count >= maxDiffs) return;
 
-        if (a is null && b is null)
-        {
-            return;
-        }
+        if (a is null && b is null) return;
 
         if (a is null || b is null)
         {
-            diffs.Add($"{path}: expected {(a?.ToJsonString() ?? "missing")}, actual {(b?.ToJsonString() ?? "missing")}");
+            diffs.Add($"{path}: expected {a?.ToJsonString() ?? "missing"}, actual {b?.ToJsonString() ?? "missing"}");
             return;
         }
 
@@ -111,10 +95,7 @@ public static class GoldenSupport
                     ao.TryGetPropertyValue(key, out var av);
                     bo.TryGetPropertyValue(key, out var bv);
                     Compare(av?.DeepClone(), bv?.DeepClone(), path + "." + key, diffs, maxDiffs);
-                    if (diffs.Count >= maxDiffs)
-                    {
-                        return;
-                    }
+                    if (diffs.Count >= maxDiffs) return;
                 }
 
                 return;
@@ -130,10 +111,7 @@ public static class GoldenSupport
                 for (var i = 0; i < aa.Count; i++)
                 {
                     Compare(aa[i]?.DeepClone(), ab[i]?.DeepClone(), $"{path}[{i}]", diffs, maxDiffs);
-                    if (diffs.Count >= maxDiffs)
-                    {
-                        return;
-                    }
+                    if (diffs.Count >= maxDiffs) return;
                 }
 
                 return;
@@ -142,43 +120,33 @@ public static class GoldenSupport
 
         var as_ = a.ToJsonString();
         var bs  = b.ToJsonString();
-        if (as_ != bs)
-        {
-            diffs.Add($"{path}: expected {as_}, actual {bs}");
-        }
+        if (as_ != bs) diffs.Add($"{path}: expected {as_}, actual {bs}");
     }
 
     // ---- dumpers (mirror tests/js-harness/gen.ts) ----
 
     public static JsonObject? DumpLineRange(LineRange? r)
     {
-        if (r is null)
-        {
-            return null;
-        }
+        if (r is null) return null;
 
         return new JsonObject
         {
             ["range"] = new JsonObject
             {
                 ["location"] = r.Range.Location,
-                ["length"]   = r.Range.Length,
+                ["length"]   = r.Range.Length
             },
             ["hasLineChange"] = r.HasLineChange,
-            ["newLineSymbol"] = r.NewLineSymbol.HasValue ? (int)r.NewLineSymbol.Value : null,
+            ["newLineSymbol"] = r.NewLineSymbol.HasValue ? (int)r.NewLineSymbol.Value : null
         };
     }
 
     public static JsonObject? DumpDiffRange(DiffRange? r)
     {
-        if (r is null)
-        {
-            return null;
-        }
+        if (r is null) return null;
 
         var arr = new JsonArray();
         foreach (var i in r.Range)
-        {
             arr.Add(new JsonObject
             {
                 // JS dumps the fast-diff op code as its numeric value
@@ -186,24 +154,20 @@ public static class GoldenSupport
                 ["str"]        = i.Str,
                 ["startIndex"] = i.StartIndex,
                 ["endIndex"]   = i.EndIndex,
-                ["length"]     = i.Length,
+                ["length"]     = i.Length
             });
-        }
 
         return new JsonObject
         {
             ["range"]         = arr,
             ["hasLineChange"] = r.HasLineChange,
-            ["newLineSymbol"] = r.NewLineSymbol.HasValue ? (int)r.NewLineSymbol.Value : null,
+            ["newLineSymbol"] = r.NewLineSymbol.HasValue ? (int)r.NewLineSymbol.Value : null
         };
     }
 
     private static JsonObject? DumpHunkInfo(HunkInfo? h)
     {
-        if (h is null)
-        {
-            return null;
-        }
+        if (h is null) return null;
 
         return new JsonObject
         {
@@ -214,16 +178,13 @@ public static class GoldenSupport
             ["_oldStartIndex"] = h.OldStartIndexSnapshot,
             ["_oldLength"]     = h.OldLengthSnapshot,
             ["_newStartIndex"] = h.NewStartIndexSnapshot,
-            ["_newLength"]     = h.NewLengthSnapshot,
+            ["_newLength"]     = h.NewLengthSnapshot
         };
     }
 
     private static JsonObject? DumpHunkLineInfo(HunkLineInfo? h)
     {
-        if (h is null)
-        {
-            return null;
-        }
+        if (h is null) return null;
 
         return new JsonObject
         {
@@ -240,16 +201,13 @@ public static class GoldenSupport
             ["_oldStartIndex"]    = h.OldStartIndexSnapshot,
             ["_oldLength"]        = h.OldLengthSnapshot,
             ["_newStartIndex"]    = h.NewStartIndexSnapshot,
-            ["_newLength"]        = h.NewLengthSnapshot,
+            ["_newLength"]        = h.NewLengthSnapshot
         };
     }
 
     public static JsonObject? DumpDiffLine(DiffLine? l)
     {
-        if (l is null)
-        {
-            return null;
-        }
+        if (l is null) return null;
 
         return new JsonObject
         {
@@ -268,7 +226,7 @@ public static class GoldenSupport
             ["prevHunkLineIndex"]   = l.PrevHunkLine?.Index,
             ["hunkInfo"]            = DumpHunkInfo(l.HunkInfo),
             ["splitInfo"]           = DumpHunkLineInfo(l.SplitInfo),
-            ["unifiedInfo"]         = DumpHunkLineInfo(l.UnifiedInfo),
+            ["unifiedInfo"]         = DumpHunkLineInfo(l.UnifiedInfo)
         };
     }
 
@@ -278,10 +236,7 @@ public static class GoldenSupport
         foreach (var h in rd.Hunks)
         {
             var lines = new JsonArray();
-            foreach (var l in h.Lines)
-            {
-                lines.Add(DumpDiffLine(l));
-            }
+            foreach (var l in h.Lines) lines.Add(DumpDiffLine(l));
 
             hunks.Add(new JsonObject
             {
@@ -290,12 +245,12 @@ public static class GoldenSupport
                     ["oldStartLine"] = h.Header.OldStartLine,
                     ["oldLineCount"] = h.Header.OldLineCount,
                     ["newStartLine"] = h.Header.NewStartLine,
-                    ["newLineCount"] = h.Header.NewLineCount,
+                    ["newLineCount"] = h.Header.NewLineCount
                 },
                 ["unifiedDiffStart"] = h.UnifiedDiffStart,
                 ["unifiedDiffEnd"]   = h.UnifiedDiffEnd,
                 // JS DiffHunkExpansionType is a string enum ("None" | "Up" | ...)
-                ["expansionType"] = h.ExpansionType.ToString(), ["lines"] = lines,
+                ["expansionType"] = h.ExpansionType.ToString(), ["lines"] = lines
             });
         }
 
@@ -306,16 +261,13 @@ public static class GoldenSupport
             ["isBinary"]           = rd.IsBinary,
             ["maxLineNumber"]      = rd.MaxLineNumber,
             ["hasHiddenBidiChars"] = rd.HasHiddenBidiChars,
-            ["hunks"]              = hunks,
+            ["hunks"]              = hunks
         };
     }
 
     public static JsonObject? DumpSplitItem(SplitLineItem? it)
     {
-        if (it is null)
-        {
-            return null;
-        }
+        if (it is null) return null;
 
         return new JsonObject
         {
@@ -323,16 +275,13 @@ public static class GoldenSupport
             ["value"]      = it.Value,
             ["isHidden"]   = it.IsHidden,
             ["_isHidden"]  = it.IsHiddenSnapshot,
-            ["diff"]       = DumpDiffLine(it.Diff),
+            ["diff"]       = DumpDiffLine(it.Diff)
         };
     }
 
     public static JsonObject? DumpUnifiedItem(UnifiedLineItem? it)
     {
-        if (it is null)
-        {
-            return null;
-        }
+        if (it is null) return null;
 
         return new JsonObject
         {
@@ -341,7 +290,7 @@ public static class GoldenSupport
             ["value"]         = it.Value,
             ["isHidden"]      = it.IsHidden,
             ["_isHidden"]     = it.IsHiddenSnapshot,
-            ["diff"]          = DumpDiffLine(it.Diff),
+            ["diff"]          = DumpDiffLine(it.Diff)
         };
     }
 
@@ -362,45 +311,29 @@ public static class GoldenSupport
             splitRight.Add(DumpSplitItem(right));
             foreach (var it in new[] { left, right })
             {
-                if (it?.Diff?.OldLineNumber is { } ol)
-                {
-                    oldSeen[ol] = it.Diff;
-                }
+                if (it?.Diff?.OldLineNumber is { } ol) oldSeen[ol] = it.Diff;
 
-                if (it?.Diff?.NewLineNumber is { } nl)
-                {
-                    newSeen[nl] = it.Diff;
-                }
+                if (it?.Diff?.NewLineNumber is { } nl) newSeen[nl] = it.Diff;
             }
 
             var h = df.GetSplitHunkLine(i);
-            if (h is not null)
-            {
-                splitHunks.Add(new JsonObject { ["index"] = i, ["hunk"] = DumpDiffLine(h), });
-            }
+            if (h is not null) splitHunks.Add(new JsonObject { ["index"] = i, ["hunk"] = DumpDiffLine(h) });
         }
 
         for (var i = 0; i < df.UnifiedLineLength; i++)
         {
             unified.Add(DumpUnifiedItem(df.GetUnifiedLine(i)));
             var h = df.GetUnifiedHunkLine(i);
-            if (h is not null)
-            {
-                unifiedHunks.Add(new JsonObject { ["index"] = i, ["hunk"] = DumpDiffLine(h), });
-            }
+            if (h is not null) unifiedHunks.Add(new JsonObject { ["index"] = i, ["hunk"] = DumpDiffLine(h) });
         }
 
         var oldDiffLines = new JsonArray();
         var newDiffLines = new JsonArray();
         foreach (var (n, l) in oldSeen)
-        {
-            oldDiffLines.Add(new JsonObject { ["lineNumber"] = n, ["line"] = DumpDiffLine(l), });
-        }
+            oldDiffLines.Add(new JsonObject { ["lineNumber"] = n, ["line"] = DumpDiffLine(l) });
 
         foreach (var (n, l) in newSeen)
-        {
-            newDiffLines.Add(new JsonObject { ["lineNumber"] = n, ["line"] = DumpDiffLine(l), });
-        }
+            newDiffLines.Add(new JsonObject { ["lineNumber"] = n, ["line"] = DumpDiffLine(l) });
 
         return new JsonObject
         {
@@ -424,7 +357,7 @@ public static class GoldenSupport
             ["splitHunks"]           = splitHunks,
             ["unifiedHunks"]         = unifiedHunks,
             ["oldDiffLines"]         = oldDiffLines,
-            ["newDiffLines"]         = newDiffLines,
+            ["newDiffLines"]         = newDiffLines
         };
     }
 
@@ -432,10 +365,8 @@ public static class GoldenSupport
     {
         var arr = new JsonArray();
         foreach (var t in result)
-        {
             // JS dumps the fast-diff op code as its numeric value
-            arr.Add(new JsonObject { ["op"] = (int)t.Op, ["text"] = t.Text, });
-        }
+            arr.Add(new JsonObject { ["op"] = (int)t.Op, ["text"] = t.Text });
 
         return arr;
     }

@@ -3,8 +3,8 @@ using Banned.CodeDiff.Models;
 namespace Banned.CodeDiff.Avalonia.Models;
 
 /// <summary>
-/// Payload of <see cref="Views.DiffView.SelectionChanged"/> — the upstream manager's
-/// onSelectionChange(range, state) pair; the range is <c>null</c> when the selection was cleared.
+///     Payload of <see cref="Views.DiffView.SelectionChanged" /> — the upstream manager's
+///     onSelectionChange(range, state) pair; the range is <c>null</c> when the selection was cleared.
 /// </summary>
 public sealed class DiffSelectionChangedEventArgs : EventArgs
 {

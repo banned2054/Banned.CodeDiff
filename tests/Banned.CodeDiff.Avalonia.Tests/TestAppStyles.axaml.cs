@@ -5,7 +5,7 @@ namespace Banned.CodeDiff.Avalonia.Tests;
 
 // Compiled-XAML styles that include the control library theme exactly the way a consumer's
 // App.axaml does — this is the regression gate for theme discoverability.
-public partial class TestAppStyles : Styles
+public class TestAppStyles : Styles
 {
     public TestAppStyles()
     {

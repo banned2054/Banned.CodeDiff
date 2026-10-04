@@ -6,7 +6,7 @@ public enum DiffFileLineType
     Hunk    = 1,
     Content = 2,
     Widget  = 3,
-    Extend  = 4,
+    Extend  = 4
 }
 
 /// <summary>Port of diff-file-utils.ts DiffSplitContentLineItem.</summary>
