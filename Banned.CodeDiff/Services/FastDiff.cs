@@ -455,6 +455,18 @@ public static class FastDiff
         // Start by looking for a single character match and increase length until no
         // match is found.
         // Performance analysis: http://neil.fraser.name/news/2010/11/04/
+        // Invariant (non-local): at every loop top length <= textLength, which keeps both
+        // slices below in range. It holds through three links:
+        //   1. length starts at 1 and textLength >= 1 (the empty-text early-return above);
+        //   2. a pattern of length `length` found at `found` in text2 (same truncated
+        //      length) implies found + length <= textLength, so `length += found` keeps
+        //      the bound across the continue path;
+        //   3. `best = length; length++` never fires at length == textLength: that would
+        //      require the whole text1 to equal text2 (found == 0 with a full-length
+        //      pattern, or the last-textLength == first-textLength compare), which the
+        //      text1 == text2 quick check at the top of this method already ruled out.
+        // So after length++ the value stays <= textLength and the next loop-top slice
+        // never goes negative.
         var best   = 0;
         var length = 1;
         while (true)
@@ -770,7 +782,7 @@ public static class FastDiff
     }
 
     // JS: blanklineEndRegex_ = /\n\r?\n$/ ($ matches at the very end in JS).
-    private static bool MatchesBlankLineEnd(string s)
+    private static bool MatchesBlankLineEnd(SegmentView s)
     {
         var n = s.Length;
         if (n < 2 || s[n - 1] != '\n')
@@ -787,7 +799,7 @@ public static class FastDiff
     }
 
     // JS: blanklineStartRegex_ = /^\r?\n\r?\n/
-    private static bool MatchesBlankLineStart(string s)
+    private static bool MatchesBlankLineStart(SegmentView s)
     {
         var i = 0;
         if (i < s.Length && s[i] == '\r')
@@ -810,6 +822,28 @@ public static class FastDiff
     }
 
     /// <summary>
+    /// A read-only view over up to three contiguous string segments. diff_cleanupSemanticLossless
+    /// scores virtual concatenations (e.g. edit[i..]+equality2[..i]) that JS materializes per
+    /// shift step; the view defers that to the single slice at the winning offset. Indexing and
+    /// length follow the concatenation exactly; an empty segment (length 0) is never dereferenced.
+    /// </summary>
+    private readonly struct SegmentView(
+        string a, int aStart, int aLength,
+        string b, int bStart, int bLength,
+        string c, int cStart, int cLength
+    )
+    {
+        public int Length => aLength + bLength + cLength;
+
+        public char this[int index]
+            => index < aLength
+                ? a[aStart + index]
+                : index < aLength + bLength
+                    ? b[bStart + index - aLength]
+                    : c[cStart + index - aLength - bLength];
+    }
+
+    /// <summary>
     /// Look for single edits surrounded on both sides by equalities which can be
     /// shifted sideways to align the edit to a word boundary.
     /// e.g: The c&lt;ins&gt;at c&lt;/ins&gt;ame. -&gt; The &lt;ins&gt;cat &lt;/ins&gt;came.
@@ -818,7 +852,7 @@ public static class FastDiff
     {
         // Given two strings, compute a score representing whether the internal boundary
         // falls on logical boundaries. Scores range from 6 (best) to 0 (worst).
-        static int DiffCleanupSemanticScore(string one, string two)
+        static int DiffCleanupSemanticScore(SegmentView one, SegmentView two)
         {
             if (one.Length == 0 || two.Length == 0)
             {
@@ -893,23 +927,59 @@ public static class FastDiff
                 }
 
                 // Second, step character by character right, looking for the best fit.
-                var bestEquality1 = equality1;
-                var bestEdit = edit;
-                var bestEquality2 = equality2;
-                var bestScore = DiffCleanupSemanticScore(equality1, edit) + DiffCleanupSemanticScore(edit, equality2);
-                while (edit.Length > 0 && equality2.Length > 0 && edit[0] == equality2[0])
+                // JS rebuilds all three strings every step (equality1 += ..., edit = edit[1..] + ...,
+                // equality2 = equality2[1..]) — quadratic in the shift length. Here only the winning
+                // offset is tracked; the three strings at offset i are scored through SegmentView
+                // without concatenating and materialize once below. At offset i:
+                //   equality1 = equality1 + edit[..min(i,len)] + equality2[..max(0, i-len)],
+                //   edit      = edit[i..] + equality2[window..i] — its length never changes, so
+                //               once the shift exceeds the edit the suffix is a sliding window
+                //               over equality2 (max(0, i-len)..i), not a growing prefix,
+                //   equality2 = equality2[i..].
+                var bestOffset = 0;
+                var bestScore  = DiffCleanupSemanticScore(
+                                     new SegmentView(equality1, 0, equality1.Length, edit, 0, 0, equality2, 0, 0),
+                                     new SegmentView(edit, 0, edit.Length, equality2, 0, 0, string.Empty, 0, 0))
+                               + DiffCleanupSemanticScore(
+                                     new SegmentView(edit, 0, edit.Length, equality2, 0, 0, string.Empty, 0, 0),
+                                     new SegmentView(equality2, 0, equality2.Length, string.Empty, 0, 0, string.Empty, 0, 0));
+                if (edit.Length > 0)
                 {
-                    equality1 += edit[0];
-                    edit      =  edit[1..] + equality2[0];
-                    equality2 =  equality2[1..];
-                    var score = DiffCleanupSemanticScore(equality1, edit) + DiffCleanupSemanticScore(edit, equality2);
-                    // The >= encourages trailing rather than leading whitespace on edits.
-                    if (score < bestScore) continue;
-                    bestScore     = score;
-                    bestEquality1 = equality1;
-                    bestEdit      = edit;
-                    bestEquality2 = equality2;
+                    // The JS loop guards on edit.length because charAt("") is "" and never
+                    // matches a real char — keep that guard so an empty edit shifts nowhere.
+                    // equality2 shrinks to length - i, and the shifted edit's first char is
+                    // edit[i] while i < edit.Length, else the equality2 char entering the
+                    // window at i - edit.Length.
+                    var i = 0;
+                    while (i < equality2.Length &&
+                           (i < edit.Length ? edit[i] : equality2[i - edit.Length]) == equality2[i])
+                    {
+                        i++;
+                        var shiftedEdit = new SegmentView(
+                            edit, Math.Min(i, edit.Length), Math.Max(0, edit.Length - i),
+                            equality2, Math.Max(0, i - edit.Length), Math.Min(i, edit.Length),
+                            string.Empty, 0, 0);
+                        var score = DiffCleanupSemanticScore(
+                                        new SegmentView(
+                                            equality1, 0, equality1.Length,
+                                            edit, 0, Math.Min(i, edit.Length),
+                                            equality2, 0, Math.Max(0, i - edit.Length)),
+                                        shiftedEdit)
+                                  + DiffCleanupSemanticScore(
+                                        shiftedEdit,
+                                        new SegmentView(equality2, i, equality2.Length - i, string.Empty, 0, 0, string.Empty, 0, 0));
+                        // The >= encourages trailing rather than leading whitespace on edits.
+                        if (score < bestScore) continue;
+                        bestScore  = score;
+                        bestOffset = i;
+                    }
                 }
+
+                var editTaken     = Math.Min(bestOffset, edit.Length);
+                var bestEquality1 = equality1 + edit[..editTaken] + equality2[..(bestOffset - editTaken)];
+                var bestEdit      = JsSubstring(edit, bestOffset) +
+                                    equality2[Math.Max(0, bestOffset - edit.Length)..bestOffset];
+                var bestEquality2 = equality2[bestOffset..];
 
                 if (diffs[pointer - 1].Text != bestEquality1)
                 {
@@ -942,6 +1012,56 @@ public static class FastDiff
     }
 
     /// <summary>
+    /// The delete/insert texts accumulated between two equalities by DiffCleanupMerge.
+    /// JS builds them with `+=` per tuple, copying the growing string each time (quadratic
+    /// in the run length); segments defer the join to the one materialization per equality.
+    /// </summary>
+    private sealed class RunText
+    {
+        private readonly List<string> _parts = [];
+
+        public int Length { get; private set; }
+
+        public void Append(string text)
+        {
+            if (text.Length == 0)
+            {
+                return;
+            }
+
+            _parts.Add(text);
+            Length += text.Length;
+        }
+
+        public void Prepend(string text)
+        {
+            if (text.Length == 0)
+            {
+                return;
+            }
+
+            _parts.Insert(0, text);
+            Length += text.Length;
+        }
+
+        public void Clear()
+        {
+            _parts.Clear();
+            Length = 0;
+        }
+
+        public override string ToString()
+        {
+            return _parts.Count switch
+            {
+                0 => string.Empty,
+                1 => _parts[0],
+                _ => string.Concat(_parts),
+            };
+        }
+    }
+
+    /// <summary>
     /// Reorder and merge like edit sections. Merge equalities. Any edit section can
     /// move as long as it doesn't cross an equality.
     /// </summary>
@@ -953,8 +1073,8 @@ public static class FastDiff
             var pointer     = 0;
             var countDelete = 0;
             var countInsert = 0;
-            var textDelete  = "";
-            var textInsert  = "";
+            var deleteRun   = new RunText();
+            var insertRun   = new RunText();
             while (pointer < diffs.Count)
             {
                 if (pointer < diffs.Count - 1 && diffs[pointer].Text.Length == 0)
@@ -968,12 +1088,12 @@ public static class FastDiff
                 {
                     case DiffOp.Insert :
                         countInsert++;
-                        textInsert += diffs[pointer].Text;
+                        insertRun.Append(diffs[pointer].Text);
                         pointer++;
                         break;
                     case DiffOp.Delete :
                         countDelete++;
-                        textDelete += diffs[pointer].Text;
+                        deleteRun.Append(diffs[pointer].Text);
                         pointer++;
                         break;
                     // Equal
@@ -998,8 +1118,8 @@ public static class FastDiff
                                 var stray = diffs[previousEquality].Text[^1..];
                                 diffs[previousEquality].Text = diffs[previousEquality].Text[..^1];
 
-                                textDelete = stray + textDelete;
-                                textInsert = stray + textInsert;
+                                deleteRun.Prepend(stray);
+                                insertRun.Prepend(stray);
                                 if (diffs[previousEquality].Text.Length == 0)
                                 {
                                     // emptied out previous equality, so delete it and include previous delete/insert
@@ -1009,14 +1129,14 @@ public static class FastDiff
                                     if (k >= 0 && k < diffs.Count && diffs[k].Op == DiffOp.Insert)
                                     {
                                         countInsert++;
-                                        textInsert = diffs[k].Text + textInsert;
+                                        insertRun.Prepend(diffs[k].Text);
                                         k--;
                                     }
 
                                     if (k >= 0 && k < diffs.Count && diffs[k].Op == DiffOp.Delete)
                                     {
                                         countDelete++;
-                                        textDelete = diffs[k].Text + textDelete;
+                                        deleteRun.Prepend(diffs[k].Text);
                                         k--;
                                     }
 
@@ -1028,8 +1148,8 @@ public static class FastDiff
                             {
                                 var stray = diffs[pointer].Text[..1];
                                 diffs[pointer].Text =  diffs[pointer].Text[1..];
-                                textDelete          += stray;
-                                textInsert          += stray;
+                                deleteRun.Append(stray);
+                                insertRun.Append(stray);
                             }
                         }
 
@@ -1040,8 +1160,13 @@ public static class FastDiff
                             continue;
                         }
 
-                        if (textDelete.Length > 0 || textInsert.Length > 0)
+                        if (deleteRun.Length > 0 || insertRun.Length > 0)
                         {
+                            // JS accumulated these two with `+=` per tuple; the run's segments
+                            // join once, here at the equality boundary.
+                            var textDelete = deleteRun.ToString();
+                            var textInsert = insertRun.ToString();
+
                             // note that diff_commonPrefix and diff_commonSuffix are unicode-aware
                             if (textDelete.Length > 0 && textInsert.Length > 0)
                             {
@@ -1120,8 +1245,8 @@ public static class FastDiff
 
                         countInsert = 0;
                         countDelete = 0;
-                        textDelete  = "";
-                        textInsert  = "";
+                        deleteRun.Clear();
+                        insertRun.Clear();
                         break;
                     }
                 }
