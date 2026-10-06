@@ -33,6 +33,7 @@ public sealed class DiffUnifiedContentRow : DiffUnifiedRow, INotifyPropertyChang
         SyntaxRuns    = syntaxRuns;
         OldNumber     = oldLineNumber?.ToString();
         NewNumber     = newLineNumber?.ToString();
+        MergedNumber  = (newLineNumber ?? oldLineNumber)?.ToString();
         Text          = text;
         Kind          = kind;
         Sign = kind switch
@@ -89,6 +90,17 @@ public sealed class DiffUnifiedContentRow : DiffUnifiedRow, INotifyPropertyChang
 
     /// <summary>获取新文件行号文本;删除行为 <c>null</c>。<br />Gets the new file line number text, or <c>null</c> for deleted lines.</summary>
     public string? NewNumber { get; }
+
+    /// <summary>
+    ///     获取单列行号模式(<c>DiffView.UseSingleLineNumberColumn</c>)下显示的合并行号:
+    ///     新号优先——上下文/新增行显示新号,删除行(无新号)显示旧号。供主题内合并号文本
+    ///     绑定使用,非公开 API。<br />
+    ///     Gets the merged line number shown by the single-number-column mode
+    ///     (<c>DiffView.UseSingleLineNumberColumn</c>): the new number wins — context and added
+    ///     lines show the new number, deleted lines (no new number) fall back to the old one.
+    ///     Bound by the merged-number text in the theme; not a public API.
+    /// </summary>
+    internal string? MergedNumber { get; }
 
     /// <summary>获取去除尾部换行符后的行文本。<br />Gets the line text with the trailing newline removed.</summary>
     public string Text { get; }

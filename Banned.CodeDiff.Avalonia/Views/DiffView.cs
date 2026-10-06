@@ -64,6 +64,13 @@ public sealed class DiffView : TemplatedControl
     public static readonly StyledProperty<bool> WrapProperty =
         AvaloniaProperty.Register<DiffView, bool>(nameof(Wrap));
 
+    /// <summary>
+    ///     标识 <see cref="UseSingleLineNumberColumn" /> 依赖属性。<br />Identifies the
+    ///     <see cref="UseSingleLineNumberColumn" /> dependency property.
+    /// </summary>
+    public static readonly StyledProperty<bool> UseSingleLineNumberColumnProperty =
+        AvaloniaProperty.Register<DiffView, bool>(nameof(UseSingleLineNumberColumn));
+
     /// <summary>标识 <see cref="Highlighter" /> 依赖属性。<br />Identifies the <see cref="Highlighter" /> dependency property.</summary>
     public static readonly StyledProperty<IDiffHighlighter?> HighlighterProperty =
         AvaloniaProperty.Register<DiffView, IDiffHighlighter?>(nameof(Highlighter));
@@ -194,6 +201,23 @@ public sealed class DiffView : TemplatedControl
     {
         get => GetValue(WrapProperty);
         set => SetValue(WrapProperty, value);
+    }
+
+    /// <summary>
+    ///     获取或设置一个值,指示统一视图是否把旧/新双行号列合并为单列显示:删除行显示旧行号,
+    ///     上下文行、新增行与展开出的上下文行显示新行号。默认为 <c>false</c>(GitHub 式旧|新
+    ///     双列)。仅 <see cref="DiffViewMode.Unified" /> 生效,分栏模式不受影响;运行时切换通过
+    ///     样式选择器立即生效,不重建行。<br />
+    ///     Gets or sets whether the unified view merges the old/new line-number columns into one:
+    ///     deleted lines show the old number, while context, added, and revealed lines show the
+    ///     new number. Defaults to <c>false</c> (the GitHub-style old|new pair). Only effective in
+    ///     <see cref="DiffViewMode.Unified" /> — split view is unaffected; toggling at runtime
+    ///     applies immediately through style selectors without rebuilding rows.
+    /// </summary>
+    public bool UseSingleLineNumberColumn
+    {
+        get => GetValue(UseSingleLineNumberColumnProperty);
+        set => SetValue(UseSingleLineNumberColumnProperty, value);
     }
 
     /// <summary>

@@ -8,6 +8,20 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 格式和 [Semantic Versioning](https://semver.org/) 版本规范。
 
+## Unreleased
+
+### English
+
+#### ✨ Added
+
+* Added `DiffView.UseSingleLineNumberColumn` — merges the unified view's old/new line-number columns into one: deleted lines show the old number, context and added lines the new one. Split view is unaffected, and toggling at runtime applies immediately without rebuilding rows.
+
+### 简体中文
+
+#### ✨ 新增
+
+* 新增 `DiffView.UseSingleLineNumberColumn`：将统一视图的新旧两个行号列合并为一列——删除行显示旧行号，上下文行与新增行显示新行号。分栏模式不受影响，运行时切换立即生效、无需重建行。
+
 ## 🚀 Release v0.1.0 — Initial Release
 
 ### English

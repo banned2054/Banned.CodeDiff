@@ -18,6 +18,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     private bool      _isDark;
     private bool      _isFastDiff = true;
     private bool      _isSelectionEnabled;
+    private bool      _isSingleNumberColumn;
     private bool      _isSyntax = true;
     private bool      _isWrap;
     private string    _selectionStatus = "未选择";
@@ -155,6 +156,13 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     {
         get => _isWrap;
         set => Set(ref _isWrap, value);
+    }
+
+    /// <summary>Collapses the unified view's old/new number columns into one (off by default, like the control).</summary>
+    public bool IsSingleNumberColumn
+    {
+        get => _isSingleNumberColumn;
+        set => Set(ref _isSingleNumberColumn, value);
     }
 
     /// <summary>Status line for the latest completed selection and copy feedback (M6 copy feature).</summary>

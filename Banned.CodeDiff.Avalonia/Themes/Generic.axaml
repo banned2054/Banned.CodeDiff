@@ -187,7 +187,7 @@
                                             <Grid MinHeight="22"
                                                   ClipToBounds="True"
                                                   ColumnDefinitions="Auto,Auto,*">
-                                                <Border Classes="diff-line-num"
+                                                <Border Classes="diff-line-num diff-dual-num"
                                                         Width="{Binding $parent[v:DiffView].NumberColumnWidth}"
                                                         Background="{Binding NumberBackground}">
                                                     <Panel>
@@ -206,10 +206,20 @@
                                                         Width="{Binding $parent[v:DiffView].NumberColumnWidth}"
                                                         Background="{Binding NumberBackground}">
                                                     <Panel>
-                                                        <TextBlock Classes="diff-line-number"
+                                                        <TextBlock Classes="diff-line-number diff-dual-num"
                                                                    Margin="10,2"
                                                                    Foreground="{Binding NumberForeground}"
                                                                    Text="{Binding NewNumber}"
+                                                                   TextAlignment="Right"
+                                                                   VerticalAlignment="Center" />
+                                                        <!-- Single-number-column mode (the styles at the
+                                                             bottom collapse the dual texts above): shows
+                                                             the merged number — new wins, deleted lines
+                                                             fall back to the old one. -->
+                                                        <TextBlock Classes="diff-line-number diff-merged-num"
+                                                                   Margin="10,2"
+                                                                   Foreground="{Binding NumberForeground}"
+                                                                   Text="{Binding MergedNumber}"
                                                                    TextAlignment="Right"
                                                                    VerticalAlignment="Center" />
                                                         <Rectangle Fill="{Binding SelectionOverlay}"
@@ -290,6 +300,7 @@
                                                     </StackPanel>
                                                 </Border>
                                                 <Border Grid.Column="1"
+                                                        Classes="diff-dual-num"
                                                         Width="{Binding $parent[v:DiffView].NumberColumnWidth}"
                                                         Background="{Binding NumberBackground}" />
                                                 <Border Grid.Column="2"
@@ -334,6 +345,20 @@
     </Style>
     <Style Selector="v|DiffView[Wrap=True] TextBlock.diff-hunk-text">
         <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+
+    <!-- Single line-number column mode (UseSingleLineNumberColumn): the old-number cell and the
+         dual new-number text collapse so only the merged number text stays visible — the gutter
+         narrows to one column in content and hunk rows alike. Toggling the property restyles
+         realized containers immediately (no row rebuild), like the Wrap overrides above. -->
+    <Style Selector="v|DiffView[UseSingleLineNumberColumn=True] Border.diff-dual-num">
+        <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="v|DiffView[UseSingleLineNumberColumn=True] TextBlock.diff-dual-num">
+        <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="v|DiffView[UseSingleLineNumberColumn=False] TextBlock.diff-merged-num">
+        <Setter Property="IsVisible" Value="False" />
     </Style>
 
 </Styles>

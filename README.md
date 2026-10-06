@@ -90,6 +90,7 @@ Bind it to the Avalonia control:
 - Set `DiffView.IsSelectionEnabled` to enable line selection; use `SelectionCompleted` to read the result.
 - Use `CopySelectionAsync()`, `CopyOldFileAsync()`, or `CopyNewFileAsync()` to copy content. Bind keyboard shortcuts in the host application.
 - Set `DiffView.Wrap` to wrap long lines while preserving row virtualization.
+- Set `DiffView.UseSingleLineNumberColumn` to merge the unified view's old/new line-number columns into one: deleted lines show the old number, context and added lines the new one. Split view is unaffected.
 - Expand hunks with `OnSplitHunkExpand` or `OnUnifiedHunkExpand`. Expansion requires full old/new file contents.
 
 `DiffParser.Shared` and `TemplateOptions` hold global state. Avoid using them concurrently across threads.

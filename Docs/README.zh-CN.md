@@ -87,6 +87,7 @@ file.BuildSplitDiffLines();
 - 设置 `DiffView.IsSelectionEnabled` 开启行选择，通过 `SelectionCompleted` 读取结果。
 - 使用 `CopySelectionAsync()`、`CopyOldFileAsync()` 或 `CopyNewFileAsync()` 复制内容；快捷键由宿主应用绑定。
 - 设置 `DiffView.Wrap`，在保留行虚拟化的同时换行长文本。
+- 设置 `DiffView.UseSingleLineNumberColumn`，将统一视图的新旧两个行号列合并为一列：删除行显示旧行号，上下文行与新增行显示新行号。分栏模式不受影响。
 - 通过 `OnSplitHunkExpand` 或 `OnUnifiedHunkExpand` 展开 hunk；展开需要完整的新旧文件内容。
 
 `DiffParser.Shared` 和 `TemplateOptions` 持有全局状态，请勿跨线程并发使用。
