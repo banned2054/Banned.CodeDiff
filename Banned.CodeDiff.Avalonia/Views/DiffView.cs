@@ -71,6 +71,18 @@ public sealed class DiffView : TemplatedControl
     public static readonly StyledProperty<bool> UseSingleLineNumberColumnProperty =
         AvaloniaProperty.Register<DiffView, bool>(nameof(UseSingleLineNumberColumn));
 
+    /// <summary>标识 <see cref="FilePath" /> 依赖属性。<br />Identifies the <see cref="FilePath" /> dependency property.</summary>
+    public static readonly StyledProperty<string?> FilePathProperty =
+        AvaloniaProperty.Register<DiffView, string?>(nameof(FilePath));
+
+    /// <summary>标识 <see cref="Comments" /> 依赖属性。<br />Identifies the <see cref="Comments" /> dependency property.</summary>
+    public static readonly StyledProperty<IReadOnlyList<DiffComment>?> CommentsProperty =
+        AvaloniaProperty.Register<DiffView, IReadOnlyList<DiffComment>?>(nameof(Comments));
+
+    /// <summary>标识 <see cref="Palette" /> 依赖属性。<br />Identifies the <see cref="Palette" /> dependency property.</summary>
+    public static readonly StyledProperty<DiffPalette?> PaletteProperty =
+        AvaloniaProperty.Register<DiffView, DiffPalette?>(nameof(Palette));
+
     /// <summary>标识 <see cref="Highlighter" /> 依赖属性。<br />Identifies the <see cref="Highlighter" /> dependency property.</summary>
     public static readonly StyledProperty<IDiffHighlighter?> HighlighterProperty =
         AvaloniaProperty.Register<DiffView, IDiffHighlighter?>(nameof(Highlighter));
@@ -86,8 +98,8 @@ public sealed class DiffView : TemplatedControl
     public static readonly DirectProperty<DiffView, double> NumberColumnWidthProperty =
         AvaloniaProperty.RegisterDirect<DiffView, double>(nameof(NumberColumnWidth), o => o.NumberColumnWidth);
 
-    /// <summary>The three copy commands, kept for CanExecuteChanged invalidation.</summary>
-    private readonly List<DiffCopyCommand> _copyCommands;
+    /// <summary>The commands whose CanExecute follows the selection/model state.</summary>
+    private readonly List<IStateCommand> _commands;
 
     /// <summary>
     ///     Rows/cells currently flagged selected — cleared first on every visual pass
@@ -96,6 +108,11 @@ public sealed class DiffView : TemplatedControl
     private readonly List<DiffSplitCellModel> _selectedSplitCells = [];
 
     private readonly List<DiffUnifiedContentRow> _selectedUnifiedRows = [];
+
+    /// <summary>Cells currently flagged commented — the comment-anchor channel, independent of the selection.</summary>
+    private readonly List<DiffSplitCellModel> _commentedSplitCells = [];
+
+    private readonly List<DiffUnifiedContentRow> _commentedUnifiedRows = [];
 
     /// <summary>The multi-select state machine (upstream multiSelect/manager.ts).</summary>
     private readonly DiffSelection _selection = new();
@@ -137,7 +154,11 @@ public sealed class DiffView : TemplatedControl
         CopyOldFileCommand   = copyOldFile;
         CopyNewFileCommand   = copyNewFile;
 
-        _copyCommands = [copySelection, copyOldFile, copyNewFile];
+        var beginComment = new DiffBeginCommentCommand(this);
+
+        BeginCommentCommand = beginComment;
+
+        _commands = [copySelection, copyOldFile, copyNewFile, beginComment];
 
         // Brushes are baked into the rows; switch palette by rebuilding on theme changes.
         ActualThemeVariantChanged += (_, _) => RebuildRows();
@@ -235,10 +256,59 @@ public sealed class DiffView : TemplatedControl
     }
 
     /// <summary>
-    ///     获取当前渲染的扁平行列表(内容行与 hunk 占位行)。<br />Gets the flat row list currently rendered (content rows and hunk
-    ///     placeholders).
+    ///     获取当前渲染的扁平行列表(内容行、hunk 占位行与评论卡片行)。<br />Gets the flat row list currently rendered (content rows, hunk
+    ///     placeholders, and comment card rows).
     /// </summary>
     public IReadOnlyList<DiffRow> Rows => _rows;
+
+    /// <summary>
+    ///     获取或设置评论锚点携带的文件身份(如仓库相对路径);由宿主提供,经
+    ///     <see cref="GetCommentAnchor" /> 流入锚点,视图自身不解析文件名。评论呈现按该身份
+    ///     过滤——只有 <see cref="DiffCommentAnchor.FilePath" /> 与之一致的评论会渲染,切换
+    ///     文件不会把评论串到其他文件的同号行上。默认为 <c>null</c>。<br />
+    ///     Gets or sets the file identity carried by comment anchors (e.g. a repo-relative path);
+    ///     supplied by the host and flowed into <see cref="GetCommentAnchor" /> — the view never
+    ///     parses file names itself. Comment rendering filters on it: only comments whose
+    ///     <see cref="DiffCommentAnchor.FilePath" /> matches render, so switching files never leaks
+    ///     comments onto same-numbered lines of another file. Defaults to <c>null</c>.
+    /// </summary>
+    public string? FilePath
+    {
+        get => GetValue(FilePathProperty);
+        set => SetValue(FilePathProperty, value);
+    }
+
+    /// <summary>
+    ///     获取或设置宿主提供的行内评论;每个锚点渲染一张卡片(位于其范围内最后一个可见行
+    ///     之后),锚点行获得与多选状态独立的持久高亮。评论按文件身份隔离——仅
+    ///     <see cref="DiffCommentAnchor.FilePath" /> 与 <see cref="FilePath" /> 一致的评论参与
+    ///     渲染。集合内容变化不会自动刷新——重新赋值该属性(换成新集合实例)后视图重建行。
+    ///     默认为 <c>null</c>(无评论)。<br />
+    ///     Gets or sets the host-provided inline comments; each anchor renders one card (after the
+    ///     last visible line of its range) and its lines get a persistent highlight independent of
+    ///     the multi-select state. Comments are file-scoped — only those whose
+    ///     <see cref="DiffCommentAnchor.FilePath" /> matches <see cref="FilePath" /> render.
+    ///     Mutating the collection in place does not refresh — reassign the property (a new
+    ///     collection instance) and the view rebuilds its rows. Defaults to <c>null</c>
+    ///     (no comments).
+    /// </summary>
+    public IReadOnlyList<DiffComment>? Comments
+    {
+        get => GetValue(CommentsProperty);
+        set => SetValue(CommentsProperty, value);
+    }
+
+    /// <summary>
+    ///     获取或设置统一的语义配色覆盖(<see cref="DiffPalette" />);<c>null</c> 保持内置
+    ///     上游配色。赋值即重建行。<br />
+    ///     Gets or sets the unified semantic color overrides (<see cref="DiffPalette" />);
+    ///     <c>null</c> keeps the built-in upstream colors. Assigning rebuilds the rows.
+    /// </summary>
+    public DiffPalette? Palette
+    {
+        get => GetValue(PaletteProperty);
+        set => SetValue(PaletteProperty, value);
+    }
 
     /// <summary>获取按当前行与字号解析出的行号列宽度。<br />Gets the resolved line-number column width for the current rows and font size.</summary>
     public double NumberColumnWidth => _numberColumnWidth;
@@ -296,6 +366,20 @@ public sealed class DiffView : TemplatedControl
     public ICommand CopyNewFileCommand { get; }
 
     /// <summary>
+    ///     获取「添加评论」入口命令——显式触发评论流程的唯一通道:CanExecute 跟随当前选区
+    ///     (与复制命令同条件),执行时经 <see cref="GetCommentAnchor" /> 推导锚点并引发
+    ///     <see cref="CommentRequested" />;评论编辑器由宿主提供。普通选区完成本身不会引发
+    ///     事件。宿主可把任意按钮绑定到该命令。<br />
+    ///     Gets the "add comment" entry command — the single explicit channel into the comment
+    ///     flow: CanExecute follows the current selection (same conditions as the copy commands),
+    ///     and executing derives the anchor through <see cref="GetCommentAnchor" /> and raises
+    ///     <see cref="CommentRequested" />; the comment editor itself is host business. Completing
+    ///     an ordinary selection never raises the event by itself. Hosts bind any button of theirs
+    ///     to this command.
+    /// </summary>
+    public ICommand BeginCommentCommand { get; }
+
+    /// <summary>
     ///     在选区拖拽移动过程中以及选区被清空时发生——对应上游管理器的 onSelectionChange。
     ///     清空时区间为 <c>null</c>。<br />
     ///     Occurs while a selection drag moves and when the selection is cleared — the upstream
@@ -311,6 +395,17 @@ public sealed class DiffView : TemplatedControl
     ///     when the release happened without a range.
     /// </summary>
     public event EventHandler<DiffSelectionCompletedEventArgs>? SelectionCompleted;
+
+    /// <summary>
+    ///     在宿主通过 <see cref="BeginCommentCommand" /> 显式发起评论时发生,携带从当前选区
+    ///     推导的行范围锚点(含 <see cref="FilePath" />);评论的编辑、提交与持久化由宿主
+    ///     负责。<br />
+    ///     Occurs when the host explicitly initiates a comment through
+    ///     <see cref="BeginCommentCommand" />, carrying the line-range anchor derived from the
+    ///     current selection (including <see cref="FilePath" />); editing, submitting, and
+    ///     persisting the comment are the host's responsibility.
+    /// </summary>
+    public event EventHandler<DiffCommentRequestedEventArgs>? CommentRequested;
 
     /// <summary>
     ///     获取当前选区结果(规范化区间加行数据)——拖拽过程中反映实时区间;释放之后持续
@@ -329,6 +424,26 @@ public sealed class DiffView : TemplatedControl
     public MultiSelectState GetSelectionState()
     {
         return _selection.GetState();
+    }
+
+    /// <summary>
+    ///     从当前选区推导行范围评论锚点:侧别与起止行号来自选区(归一化区间;删除行自然锚定
+    ///     旧侧、新增行锚定新侧、上下文行保留所选侧),文件身份取 <see cref="FilePath" />。
+    ///     没有选区或模型时返回 <c>null</c>。<br />
+    ///     Derives a line-range comment anchor from the current selection: the side and start/end
+    ///     numbers come from the (normalized) selection range — deleted lines naturally anchor the
+    ///     old side, added lines the new one, context lines keep the selected side — and the file
+    ///     identity comes from <see cref="FilePath" />. Returns <c>null</c> without a selection or
+    ///     model.
+    /// </summary>
+    public DiffCommentAnchor? GetCommentAnchor()
+    {
+        var result = GetSelectionResult();
+
+        if (result == null) return null;
+
+        return new DiffCommentAnchor(FilePath, result.Range.Side, result.Range.StartLineNumber,
+                                     result.Range.EndLineNumber);
     }
 
     /// <summary>
@@ -458,12 +573,13 @@ public sealed class DiffView : TemplatedControl
     }
 
     /// <summary>
-    ///     Invalidates the copy commands after a selection or model change (the file
-    ///     commands track the model, the selection command tracks the current selection result).
+    ///     Invalidates the state-driven commands after a selection or model change (the file
+    ///     commands track the model, the selection command and the comment command track the
+    ///     current selection result).
     /// </summary>
-    private void RaiseCopyCommandsCanExecuteChanged()
+    private void RaiseCommandsCanExecuteChanged()
     {
-        foreach (var command in _copyCommands) command.RaiseCanExecuteChanged();
+        foreach (var command in _commands) command.RaiseCanExecuteChanged();
     }
 
     /// <inheritdoc />
@@ -504,6 +620,13 @@ public sealed class DiffView : TemplatedControl
             // selection; here the pointer routing is simply gated by the flag as well.
             ClearSelection();
         }
+        else if (change.Property == CommentsProperty || change.Property == PaletteProperty ||
+                 change.Property == FilePathProperty)
+        {
+            // Comment cards and palette brushes are baked into the rows, and comments are scoped
+            // to the file identity — all three rebuild.
+            RebuildRows();
+        }
         else if (change.Property == FontSizeProperty)
         {
             UpdateNumberColumnWidth();
@@ -537,6 +660,8 @@ public sealed class DiffView : TemplatedControl
                     DiffViewMode.Unified => BuildUnified(file),
                     _                    => BuildSplit(file)
                 };
+
+                rows = InsertCommentRows(rows);
             }
 
             SetAndRaise(RowsProperty, ref _rows, rows);
@@ -549,9 +674,13 @@ public sealed class DiffView : TemplatedControl
             // and revealed lines pick the highlight up after an expand.
             ApplySelectionVisual();
 
+            // The comment-anchor channel re-locates by line numbers on every rebuild — view-mode
+            // switches and hunk expands/collapses included — and never touches the selection flags.
+            ApplyCommentVisual();
+
             // Expands/collapses flip IsHide on selection members; the model change also covers
             // the file commands' availability.
-            RaiseCopyCommandsCanExecuteChanged();
+            RaiseCommandsCanExecuteChanged();
         }
         finally
         {
@@ -562,13 +691,13 @@ public sealed class DiffView : TemplatedControl
     private IReadOnlyList<DiffRow> BuildSplit(DiffFile file)
     {
         file.BuildSplitDiffLines();
-        return DiffSplitRowBuilder.Build(file, ActualThemeVariant);
+        return DiffSplitRowBuilder.Build(file, ActualThemeVariant, Palette);
     }
 
     private IReadOnlyList<DiffRow> BuildUnified(DiffFile file)
     {
         file.BuildUnifiedDiffLines();
-        return DiffUnifiedRowBuilder.Build(file, ActualThemeVariant);
+        return DiffUnifiedRowBuilder.Build(file, ActualThemeVariant, Palette);
     }
 
     private void UpdateNumberColumnWidth()
@@ -710,7 +839,7 @@ public sealed class DiffView : TemplatedControl
 
         ApplySelectionVisual();
 
-        RaiseCopyCommandsCanExecuteChanged();
+        RaiseCommandsCanExecuteChanged();
 
         SelectionChanged?.Invoke(this, new DiffSelectionChangedEventArgs(range, state));
     }
@@ -738,7 +867,7 @@ public sealed class DiffView : TemplatedControl
 
         ApplySelectionVisual();
 
-        RaiseCopyCommandsCanExecuteChanged();
+        RaiseCommandsCanExecuteChanged();
 
         SelectionCompleted?.Invoke(this, new DiffSelectionCompletedEventArgs(result));
     }
@@ -772,17 +901,69 @@ public sealed class DiffView : TemplatedControl
 
         var normalizedRanges = allRanges.Select(MultiSelectData.NormalizeRange).ToList();
 
-        if (ViewMode == DiffViewMode.Unified)
-            ApplyUnifiedSelection(normalizedRanges);
-        else
-            ApplySplitSelection(file, normalizedRanges);
+        // Context lines flag both sides (upstream addClassForSplitRange); changes flag only the
+        // range's side.
+        ApplySplitRanges(file, normalizedRanges, true, SelectCell);
+        ApplyUnifiedRanges(normalizedRanges, row =>
+        {
+            row.IsSelected = true;
+            _selectedUnifiedRows.Add(row);
+        });
     }
 
     /// <summary>
-    ///     Port of visual.ts addClassForSplitRange: selected lines flag their row's cells —
-    ///     context lines flag both sides, everything else only the range's side.
+    ///     The comment-anchor channel of the visual pass — structurally the same range-matching as
+    ///     the selection above, but a separate flag (<see cref="DiffSplitCellModel.IsCommented" /> /
+    ///     <see cref="DiffUnifiedContentRow.IsCommented" />) with its own tracking lists, so a new
+    ///     drag replacing the selection never clears the comment highlight. Context lines keep the
+    ///     anchor's side only (the split card sits on that side).
     /// </summary>
-    private void ApplySplitSelection(DiffFile file, List<MultiSelectRange> allRanges)
+    private void ApplyCommentVisual()
+    {
+        foreach (var cell in _commentedSplitCells) cell.IsCommented = false;
+
+        _commentedSplitCells.Clear();
+
+        foreach (var row in _commentedUnifiedRows) row.IsCommented = false;
+
+        _commentedUnifiedRows.Clear();
+
+        var comments = Comments;
+        var file     = DiffFile;
+
+        if (comments == null || comments.Count == 0 || file == null) return;
+
+        // Same file-scoping as the card placement: highlights follow only the comments of the
+        // file the view currently shows.
+        var filePath = FilePath;
+
+        var ranges = comments.Where(comment => comment.Anchor.FilePath == filePath)
+                             .Select(comment =>
+                                  MultiSelectData.NormalizeRange(new MultiSelectRange(comment.Anchor.Side,
+                                                                                      comment.Anchor.StartLineNumber,
+                                                                                      comment.Anchor.EndLineNumber)))
+                             .ToList();
+
+        ApplySplitRanges(file, ranges, false, cell =>
+        {
+            cell.IsCommented = true;
+            _commentedSplitCells.Add(cell);
+        });
+        ApplyUnifiedRanges(ranges, row =>
+        {
+            row.IsCommented = true;
+            _commentedUnifiedRows.Add(row);
+        });
+    }
+
+    /// <summary>
+    ///     Port of visual.ts addClassForSplitRange: matched lines flag their row's cells — with
+    ///     <paramref name="contextFlagsBothSides" />, context lines flag both sides (selection
+    ///     semantics); otherwise only the range's side (comment semantics — the card sits on that
+    ///     side).
+    /// </summary>
+    private void ApplySplitRanges(DiffFile file, List<MultiSelectRange> allRanges, bool contextFlagsBothSides,
+                                  Action<DiffSplitCellModel> apply)
     {
         // One pass over the rows instead of a scan per selected line; LineIndex is unique (one
         // content row per split index), so FirstOrDefault == the map hit, misses == the scan's null.
@@ -803,38 +984,150 @@ public sealed class DiffView : TemplatedControl
             {
                 if (!_splitRowsByLineIndex.TryGetValue(item.Index, out var row)) continue;
 
-                if (item.IsContext)
+                if (contextFlagsBothSides && item.IsContext)
                 {
-                    SelectCell(row.Left);
-                    SelectCell(row.Right);
+                    apply(row.Left);
+                    apply(row.Right);
                 }
                 else
                 {
-                    SelectCell(range.Side == SplitSide.Old ? row.Left : row.Right);
+                    apply(range.Side == SplitSide.Old ? row.Left : row.Right);
                 }
             }
         }
     }
 
     /// <summary>
-    ///     Port of visual.ts updateSelectionVisual_Unified's matching loop: a row is
-    ///     selected when its old (or new) number falls inside an old-side (or new-side) range.
+    ///     Port of visual.ts updateSelectionVisual_Unified's matching loop: a row matches when its
+    ///     old (or new) number falls inside an old-side (or new-side) range.
     /// </summary>
-    private void ApplyUnifiedSelection(List<MultiSelectRange> allRanges)
+    private void ApplyUnifiedRanges(List<MultiSelectRange> allRanges, Action<DiffUnifiedContentRow> apply)
     {
         foreach (var row in _rows.OfType<DiffUnifiedContentRow>())
         {
-            var selected =
+            var matched =
                 allRanges.Any(range =>
                                   (range.Side == SplitSide.Old         && row.OldLineNumber is { } rowLineOld &&
                                    rowLineOld >= range.StartLineNumber && rowLineOld <= range.EndLineNumber) ||
                                   (range.Side == SplitSide.New         && row.NewLineNumber is { } rowLineNew &&
                                    rowLineNew >= range.StartLineNumber && rowLineNew <= range.EndLineNumber));
 
-            if (!selected) continue;
-            row.IsSelected = true;
-            _selectedUnifiedRows.Add(row);
+            if (matched) apply(row);
         }
+    }
+
+    /// <summary>
+    ///     Inserts one comment card row per anchor right after the last visible line of its range —
+    ///     the Avalonia equivalent of the upstream comment widget mounting under a line. Anchors are
+    ///     stable (side + line numbers), so view-mode switches and hunk expands/collapses re-derive
+    ///     the position on every rebuild; an anchor with no visible line renders no card until an
+    ///     expansion reveals its lines. Comments are file-scoped: only anchors whose
+    ///     <see cref="DiffCommentAnchor.FilePath" /> matches <see cref="FilePath" /> render, so
+    ///     comments never leak onto same-numbered lines of another file.
+    /// </summary>
+    private IReadOnlyList<DiffRow> InsertCommentRows(IReadOnlyList<DiffRow> rows)
+    {
+        var comments = Comments;
+
+        if (comments == null || comments.Count == 0) return rows;
+
+        var filePath = FilePath;
+
+        var fileComments = comments.Where(comment => comment.Anchor.FilePath == filePath).ToList();
+
+        if (fileComments.Count == 0) return rows;
+
+        // One card per anchor, groups kept in first-seen order; anchors normalize their ends so a
+        // reversed host range still positions deterministically.
+        var byAnchor = new Dictionary<DiffCommentAnchor, List<DiffComment>>();
+        var order    = new List<DiffCommentAnchor>();
+
+        foreach (var comment in fileComments)
+        {
+            var anchor = comment.Anchor.Normalize();
+
+            if (!byAnchor.TryGetValue(anchor, out var group))
+            {
+                group = [];
+                byAnchor[anchor] = group;
+                order.Add(anchor);
+            }
+
+            group.Add(comment);
+        }
+
+        // Flat row index each anchor's card goes after — the last row inside the anchor's range.
+        var insertAfter = new Dictionary<int, List<DiffCommentAnchor>>();
+
+        foreach (var anchor in order)
+        {
+            var last = LastRowIndexOfAnchor(rows, anchor);
+
+            if (last < 0) continue;
+
+            if (!insertAfter.TryGetValue(last, out var anchors))
+            {
+                anchors      = [];
+                insertAfter[last] = anchors;
+            }
+
+            anchors.Add(anchor);
+        }
+
+        if (insertAfter.Count == 0) return rows;
+
+        var brushes = DiffBrushes.Get(ActualThemeVariant, Palette);
+        var result  = new List<DiffRow>(rows.Count + insertAfter.Count);
+
+        for (var index = 0; index < rows.Count; index++)
+        {
+            result.Add(rows[index]);
+
+            if (insertAfter.TryGetValue(index, out var anchors))
+                foreach (var anchor in anchors)
+                    result.Add(CreateCommentRow(anchor, byAnchor[anchor], brushes));
+        }
+
+        return result;
+    }
+
+    private static int LastRowIndexOfAnchor(IReadOnlyList<DiffRow> rows, DiffCommentAnchor anchor)
+    {
+        var last = -1;
+
+        for (var index = 0; index < rows.Count; index++)
+        {
+            var row = rows[index];
+
+            if (row is DiffSplitContentRow split)
+            {
+                var number = anchor.Side == SplitSide.Old ? split.Left.Number : split.Right.Number;
+
+                if (Matches(number)) last = index;
+            }
+            else if (row is DiffUnifiedContentRow unified)
+            {
+                var number = anchor.Side == SplitSide.Old ? unified.OldLineNumber : unified.NewLineNumber;
+
+                if (number is int value && value >= anchor.StartLineNumber && value <= anchor.EndLineNumber)
+                    last = index;
+            }
+        }
+
+        return last;
+
+        bool Matches(string? number)
+        {
+            return number != null && int.TryParse(number, out var value) &&
+                   value >= anchor.StartLineNumber && value <= anchor.EndLineNumber;
+        }
+    }
+
+    private DiffCommentRow CreateCommentRow(DiffCommentAnchor anchor, List<DiffComment> comments, DiffBrushSet brushes)
+    {
+        if (ViewMode == DiffViewMode.Unified) return new DiffUnifiedCommentRow(anchor, comments, brushes);
+
+        return new DiffSplitCommentRow(anchor, comments, anchor.Side, brushes);
     }
 
     private void SelectCell(DiffSplitCellModel cell)
@@ -1033,6 +1326,49 @@ public sealed class DiffView : TemplatedControl
     }
 
     /// <summary>
+    ///     State-driven commands implement this so the owner can batch-invalidate their
+    ///     CanExecute after a selection or model change.
+    /// </summary>
+    private interface IStateCommand : ICommand
+    {
+        void RaiseCanExecuteChanged();
+    }
+
+    /// <summary>
+    ///     Relays the explicit "add comment" entry: availability follows the current selection
+    ///     (same conditions as copy), execution derives the anchor from the selection and surfaces
+    ///     it through <see cref="DiffView.CommentRequested" /> — the comment editor itself stays
+    ///     host business. Completing an ordinary selection never raises the event on its own.
+    /// </summary>
+    private sealed class DiffBeginCommentCommand(DiffView owner) : IStateCommand
+    {
+        private EventHandler? _canExecuteChanged;
+
+        public event EventHandler? CanExecuteChanged
+        {
+            add => _canExecuteChanged += value;
+            remove => _canExecuteChanged -= value;
+        }
+
+        public bool CanExecute(object? parameter)
+        {
+            return owner.DiffFile != null && owner._selection.GetState().CurrentRange != null;
+        }
+
+        public void Execute(object? parameter)
+        {
+            var anchor = owner.GetCommentAnchor();
+
+            if (anchor != null) owner.CommentRequested?.Invoke(owner, new DiffCommentRequestedEventArgs(anchor));
+        }
+
+        public void RaiseCanExecuteChanged()
+        {
+            _canExecuteChanged?.Invoke(owner, EventArgs.Empty);
+        }
+    }
+
+    /// <summary>
     ///     Relays one of the view's copy operations. Unlike <see cref="HunkExpandCommand" />, whose
     ///     availability is static per row, copy availability follows the selection and the model, so
     ///     the owner raises <see cref="RaiseCanExecuteChanged" /> when those change.
@@ -1040,7 +1376,7 @@ public sealed class DiffView : TemplatedControl
     private sealed class DiffCopyCommand(
         DiffView             owner,
         Func<DiffView, bool> canExecute,
-        Func<DiffView, Task> executeAsync) : ICommand
+        Func<DiffView, Task> executeAsync) : IStateCommand
     {
         private EventHandler? _canExecuteChanged;
 

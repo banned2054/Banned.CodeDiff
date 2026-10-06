@@ -23,6 +23,8 @@ public sealed class DiffUnifiedContentRow : DiffUnifiedRow, INotifyPropertyChang
 {
     private bool _isSelected;
 
+    private bool _isCommented;
+
     internal DiffUnifiedContentRow(int? oldLineNumber, int? newLineNumber, string text, DiffCellKind kind,
                                    IReadOnlyList<DiffHighlight> highlights,
                                    IReadOnlyList<DiffSyntaxRun>? syntaxRuns, DiffBrushSet brushes)
@@ -67,6 +69,7 @@ public sealed class DiffUnifiedContentRow : DiffUnifiedRow, INotifyPropertyChang
         NumberForeground   = brushes.NumberForeground;
         SelectionOverlay   = brushes.MultiSelectOverlay;
         SelectionEdgeStrip = brushes.MultiSelectBorder;
+        CommentOverlay     = brushes.CommentOverlay;
     }
 
     /// <summary>
@@ -153,6 +156,13 @@ public sealed class DiffUnifiedContentRow : DiffUnifiedRow, INotifyPropertyChang
     public IBrush SelectionEdgeStrip { get; }
 
     /// <summary>
+    ///     获取评论锚点行的持久高亮画刷(浅色 #fff8c5/深色 #d29922 的半透明覆盖)。<br />
+    ///     Gets the persistent highlight brush of commented lines (#fff8c5 light / #d29922 dark,
+    ///     semi-transparent overlays).
+    /// </summary>
+    public IBrush CommentOverlay { get; }
+
+    /// <summary>
     ///     获取或设置该行是否被某个多选范围覆盖;通过 <see cref="PropertyChanged" />
     ///     引发,使已具体化的行容器无需重建行即可更新。<br />
     ///     Gets or sets whether this row is covered by a multi-select range; raised through
@@ -167,6 +177,25 @@ public sealed class DiffUnifiedContentRow : DiffUnifiedRow, INotifyPropertyChang
 
             _isSelected = value;
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsSelected)));
+        }
+    }
+
+    /// <summary>
+    ///     获取或设置该行是否落在某个评论锚点的行范围之内(与多选状态独立——新的拖选
+    ///     不清除该标志);通过 <see cref="PropertyChanged" /> 引发。<br />
+    ///     Gets or sets whether this row falls inside a comment anchor's line range (independent
+    ///     of the multi-select state — a new drag never clears it); raised through
+    ///     <see cref="PropertyChanged" />.
+    /// </summary>
+    public bool IsCommented
+    {
+        get => _isCommented;
+        internal set
+        {
+            if (_isCommented == value) return;
+
+            _isCommented = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsCommented)));
         }
     }
 

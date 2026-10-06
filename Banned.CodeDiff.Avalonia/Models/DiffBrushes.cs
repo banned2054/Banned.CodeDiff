@@ -26,7 +26,10 @@ internal sealed record DiffBrushSet(
     IBrush DeleteContentHighlight,
     IBrush Splitter,
     IBrush MultiSelectOverlay,
-    IBrush MultiSelectBorder);
+    IBrush MultiSelectBorder,
+    IBrush CommentOverlay,
+    IBrush CommentCardBackground,
+    IBrush CommentCardBorder);
 
 /// <summary>Light/dark brush sets for the diff view (upstream <c>--diff-*--</c> variables).</summary>
 internal static class DiffBrushes
@@ -70,6 +73,16 @@ internal static class DiffBrushes
     private static readonly IBrush MultiSelectOverlay = WithOpacity(Parse("#f0c000"), 0.15);
     private static readonly IBrush MultiSelectBorder  = Parse("#2588fa");
 
+    // Comment presentation (native M7 feature — no upstream variable): the anchored-line
+    // overlay tints commented lines (GitHub's highlighted-line yellow), the card uses the
+    // subtle canvas/border pair.
+    private static readonly IBrush CommentOverlayLight          = WithOpacity(Parse("#fff8c5"), 0.55);
+    private static readonly IBrush CommentCardBackgroundLight   = Parse("#f6f8fa");
+    private static readonly IBrush CommentCardBorderLight       = Parse("#d1d9e0");
+    private static readonly IBrush CommentOverlayDark           = WithOpacity(Parse("#d29922"), 0.28);
+    private static readonly IBrush CommentCardBackgroundDark    = Parse("#151b23");
+    private static readonly IBrush CommentCardBorderDark        = Parse("#3d444d");
+
     private static readonly DiffBrushSet LightSet = new(NumberForegroundLight, AddNumberLight, AddContentLight,
                                                         DeleteNumberLight, DeleteContentLight,
                                                         ContextNumberLight, ContextContentLight,
@@ -77,7 +90,9 @@ internal static class DiffBrushes
                                                         EmptyContentLight, HunkNumberLight,
                                                         HunkContentLight, HunkContentLight, HunkForegroundLight,
                                                         AddHighlightLight, DeleteHighlightLight,
-                                                        SplitterLight, MultiSelectOverlay, MultiSelectBorder);
+                                                        SplitterLight, MultiSelectOverlay, MultiSelectBorder,
+                                                        CommentOverlayLight, CommentCardBackgroundLight,
+                                                        CommentCardBorderLight);
 
     private static readonly DiffBrushSet DarkSet = new(NumberForegroundDark, AddNumberDark, AddContentDark,
                                                        DeleteNumberDark, DeleteContentDark,
@@ -86,11 +101,40 @@ internal static class DiffBrushes
                                                        EmptyContentDark, HunkNumberDark,
                                                        HunkContentDark, HunkContentDark, HunkForegroundDark,
                                                        AddHighlightDark, DeleteHighlightDark,
-                                                       SplitterDark, MultiSelectOverlay, MultiSelectBorder);
+                                                       SplitterDark, MultiSelectOverlay, MultiSelectBorder,
+                                                       CommentOverlayDark, CommentCardBackgroundDark,
+                                                       CommentCardBorderDark);
 
     public static DiffBrushSet Get(ThemeVariant variant)
     {
-        return variant == ThemeVariant.Dark ? DarkSet : LightSet;
+        return Get(variant, null);
+    }
+
+    /// <summary>
+    ///     Resolves the brush set for a variant, applying the host's <see cref="DiffPalette" />
+    ///     overrides on top of the built-in values (<c>null</c> slots keep the built-ins).
+    /// </summary>
+    public static DiffBrushSet Get(ThemeVariant variant, DiffPalette? palette)
+    {
+        var baseSet = variant == ThemeVariant.Dark ? DarkSet : LightSet;
+        var colors  = palette?.GetColors(variant);
+
+        if (colors == null) return baseSet;
+
+        return baseSet with
+        {
+            AddNumber             = colors.AddLineBackground ?? baseSet.AddNumber,
+            AddContent            = colors.AddLineBackground ?? baseSet.AddContent,
+            DeleteNumber          = colors.DeleteLineBackground ?? baseSet.DeleteNumber,
+            DeleteContent         = colors.DeleteLineBackground ?? baseSet.DeleteContent,
+            ContextNumber         = colors.ContextBackground ?? baseSet.ContextNumber,
+            ContextContent        = colors.ContextBackground ?? baseSet.ContextContent,
+            MultiSelectOverlay    = colors.SelectionHighlight ?? baseSet.MultiSelectOverlay,
+            MultiSelectBorder     = colors.SelectionEdge ?? baseSet.MultiSelectBorder,
+            CommentOverlay        = colors.CommentLineHighlight ?? baseSet.CommentOverlay,
+            CommentCardBackground = colors.CommentCardBackground ?? baseSet.CommentCardBackground,
+            CommentCardBorder     = colors.CommentCardBorder ?? baseSet.CommentCardBorder
+        };
     }
 
     private static IBrush Parse(string hex)

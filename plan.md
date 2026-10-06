@@ -19,7 +19,7 @@
 | M4 | hunk 展开/收起 UI + 虚拟化 | ✅ 已完成 |
 | M5 | 语法高亮 | ✅ 已完成 |
 | M6 | 打磨 | ✅ 已完成 |
-| M7 | 行范围评论与主题定制入口 | ⏭ 下一优先级（规划中） |
+| M7 | 行范围评论与主题定制入口 | ✅ 已完成（2026-10-06） |
 
 每个里程碑保持可构建、可测试、可演示；完成一个更新一次本文件状态与 `Docs/CHANGELOG.md`。
 
@@ -33,8 +33,9 @@
 - `Banned.CodeDiff.Avalonia` 已就位：`DiffView` 控件（split/unified 视图、词级高亮、
   语法高亮、hunk 展开/收起 + 虚拟化、明暗主题、行选择、复制、长行 wrap）与配套 Demo，
   详见第 4~8 节执行结果。
-- 下一优先级为 M7：复用现有行范围选择，补齐宿主可接入的行内评论呈现，并提供简洁的主题配色覆盖入口；
-  任意字符范围选择暂不纳入本阶段。
+- M7 已完成（2026-10-06）：行范围评论（锚点事件 + 评论卡片 + 持久高亮）与统一语义配色
+  入口 `DiffView.Palette`，见第 11 节执行结果。后续可评估项：任意字符/子串选择
+  （`DiffSegmentText` 自绘文本选择）。
 
 ## 4. M2 最小可看
 
@@ -324,7 +325,7 @@
 - **版本记录**：首发版本为 `0.1.0`；发布时从 `Unreleased` 整理首发用户可见的变更记录。
 - README/文档中的 GitHub 链接按 `banned2054/Banned.CodeDiff` 预填，待确认。
 
-## 11. M7 行范围评论与主题定制入口（下一优先级，规划中）
+## 11. M7 行范围评论与主题定制入口（已完成，2026-10-06）
 
 **目标**：让宿主应用能对任意可见 diff 行或连续行范围发起评论，并在 diff 中显示行内评论内容；
 同时提供少量、稳定、便于 XAML 使用的配色定制入口。
@@ -348,11 +349,63 @@
 
 **验收**：
 
-- 单行点击与连续多行拖选均能产生正确的旧/新侧锚点；选区可见高亮，评论入口由用户显式触发。
-- 评论卡片能显示在锚定范围附近；新增、删除、上下文行均可评论，split/unified 切换后锚点不漂移。
-- 已创建评论的锚点高亮不受后续普通选区替换影响；折叠/展开 hunk 后按行号恢复可见位置。
-- 宿主可以通过统一配色入口覆盖主要语义颜色；默认主题外观保持现有值。
-- Demo 展示完整的客户端评论接入；核心库 diff 解析与原始行号语义保持不变。
+- [x] 单行点击与连续多行拖选均能产生正确的旧/新侧锚点；选区可见高亮，评论入口由用户显式触发。
+- [x] 评论卡片能显示在锚定范围附近；新增、删除、上下文行均可评论，split/unified 切换后锚点不漂移。
+- [x] 已创建评论的锚点高亮不受后续普通选区替换影响；折叠/展开 hunk 后按行号恢复可见位置。
+- [x] 宿主可以通过统一配色入口覆盖主要语义颜色；默认主题外观保持现有值。
+- [x] Demo 展示完整的客户端评论接入；核心库 diff 解析与原始行号语义保持不变。
+
+**执行结果（2026-10-06）**：
+
+- **评论锚点与显式入口**：新增 `Models/DiffCommentAnchor`（文件身份 + `SplitSide` + 1 基含端点
+  起止行号，`Normalize()` 容错反向区间）、`Models/DiffComment`（锚点 + 作者 + 正文）与
+  `Models/DiffCommentRequestedEventArgs`。`DiffView` 新增 `FilePath`（宿主提供的文件身份，
+  控件自身不解析文件名）、`GetCommentAnchor()`（从当前选区推导锚点——选区归一化区间的侧别
+  与行号，统一视图侧别沿用上游“新号优先”规则）与显式入口 `BeginCommentCommand`
+  （CanExecute 跟随选区，与复制命令同一失效通道；Execute 推导锚点并引发 `CommentRequested`）。
+  普通选区完成不会自动触发评论流；指针管线零改动，与复制/选区操作天然无冲突。
+- **评论卡片行**：新增 `Models/DiffCommentRow`（抽象，携锚点、评论列表、卡片画刷）及
+  `DiffSplitCommentRow`（internal `CardColumn` 1/4 供主题 `Grid.Column` 绑定，卡片落在锚点侧
+  内容列，另一侧留空——两个空星号列仍平分剩余空间，卡片与上方内容列对齐）与
+  `DiffUnifiedCommentRow`（卡片横跨内容列）。`RebuildRows` 末尾经 `InsertCommentRows` 把每个
+  锚点的卡片插到其范围内最后一个可见行之后（同一锚点多条评论聚合一卡；全部行被折叠时不出卡，
+  展开揭示后随重建自动重现）。锚点按行号稳定定位：视图模式切换与 hunk 展开/收起均由重建
+  重推位置，无需宿主干预。
+- **持久高亮**：`DiffSplitCellModel`/`DiffUnifiedContentRow` 增加 `IsCommented`（INPC）与
+  `CommentOverlay` 画刷，模板在选区覆盖层之下叠加评论覆盖层。`ApplyCommentVisual` 与选区
+  视觉同构但走独立标志位与独立追踪列表——新拖选替换选区不清除评论标记；评论语义只标锚点
+  侧（split 配对行的另一侧不标，与选区“上下文双侧高亮”不同）。
+- **统一配色入口**：评估结论——选 `DiffPalette` 属性而非 XAML 资源键：行画刷在构建期烘进
+  行模型，palette 变更直接走既有重建管线（每控件实例生效），变体处理显式（资源键方案需在静态
+  `DiffBrushes` 里做运行时资源探测，且资源变更不触发重建，语义含糊）。`Models/DiffPalette`
+  （`Light`/`Dark` 两套 `DiffPaletteColors`）8 个槽位：AddLineBackground/DeleteLineBackground/
+  ContextBackground（设置时同时覆盖该类行的行号格与内容格）、SelectionHighlight/SelectionEdge、
+  CommentLineHighlight/CommentCardBackground/CommentCardBorder；`null` 槽位保留内置上游值，
+  词级高亮/hunk/展开行等衍生色不纳入。`DiffBrushSet` 增三个评论画刷位（内置值：浅色
+  #fff8c5@55% 覆盖层 + #f6f8fa/#d1d9e0 卡片，深色 #d29922@28% + #151b23/#3d444d），
+  `DiffBrushes.Get(variant, palette)` 以 record `with` 覆盖。
+- **Demo**：工具栏「添加评论」按钮直绑 `#DiffView.BeginCommentCommand`；code-behind 桥接
+  `CommentRequested` → VM 打开编辑面板（标题显示侧别与行号区间）；提交把 `DiffComment` 加入
+  宿主持有的列表并重新赋值 `Comments`（集合原地变更不刷新——视图按属性变更重建，README 已
+  注明该契约）；另有取消与「清除全部评论」。VM 暴露 `CurrentFilePath` 绑定 `DiffView.FilePath`。
+- **测试**：新增 `DiffCommentTests`（13 个：锚点推导/命令与事件/卡片位置与侧别列/持久高亮
+  存活于新选区/模式切换重定位/折叠不显卡展开恢复/集合变更/模板实化）与 `DiffPaletteTests`
+  （4 个：默认值不变/增删上下文覆盖/选区与评论槽位/深色变体）。测试数据延续语义反转防护：
+  断言新侧锚点不标配对行的删除格（选区式双侧高亮会在此翻车）。基线：624 核心 + 90 headless
+  全绿，Debug/Release 0 警告 0 错误。
+- **文件身份隔离(用户评审反馈修复)**:评论渲染按 `Anchor.FilePath == DiffView.FilePath`
+  过滤——`InsertCommentRows` 与 `ApplyCommentVisual` 同口径,`FilePath` 属性变更亦触发重建,
+  切换文件不会把评论串到其他文件的同号行上(`Comments_FilePathMismatch_DoNotRender` 钉住:
+  同侧同号不同文件的两条评论只有当前文件的一条渲染,切换身份后另一条接管)。
+- **Demo 命令状态修复(用户评审反馈)**:`OnCommentRequested` 打开编辑器后未引发
+  `RaiseCanExecuteChanged`,首次打开时提交/取消按钮停留在禁用态;取消/提交后也同源地缺通知
+  (提交后编辑面板不关闭)。统一收敛为 `ClosePendingComment` /
+  `RaiseCommentCommandsCanExecuteChanged`,并在 `DiffFile` 切换时作废过期的评论请求。
+- **排坑记录**：`GetLayoutManager` 扩展位于 `Avalonia.VisualTree` 命名空间（Avalonia 12），
+  测试文件缺 `using Avalonia.VisualTree;` 时报 CS1061；且在 `Banned.CodeDiff.Avalonia.*`
+  命名空间内，代码中的裸标识符 `Avalonia` 优先解析为 `Banned.CodeDiff.Avalonia`（库命名
+  空间遮蔽框架命名空间），全限定 `Avalonia.Styling.X` 会翻车，`using Avalonia.Styling;` 则
+  正常——两类场景行为不一致，新测试文件建议照抄既有测试的 using 集合。
 
 ---
 

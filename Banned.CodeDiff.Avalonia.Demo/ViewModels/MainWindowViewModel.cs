@@ -13,6 +13,11 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
 {
     private readonly RelayCommand _copySelectionCommand;
 
+    /// <summary>The host-owned comment store; the view re-renders whenever <see cref="Comments" /> is re-raised.</summary>
+    private readonly List<DiffComment> _comments = [];
+
+    private DiffCommentAnchor? _pendingAnchor;
+
     private DiffFile? _diffFile;
     private string    _diffText = SampleDiff.ProgramCs;
     private bool      _isDark;
@@ -21,6 +26,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     private bool      _isSingleNumberColumn;
     private bool      _isSyntax = true;
     private bool      _isWrap;
+    private string    _commentDraft = "";
+    private string    _currentFilePath = "Program.cs";
     private string    _selectionStatus = "未选择";
 
     /// <summary>Visible (non-hidden) lines of the latest completed selection — the copyable count.</summary>
@@ -42,8 +49,11 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         CollapseAllCommand      = new RelayCommand(CollapseAll);
         _copySelectionCommand = new RelayCommand(() => CopySelectionRequested?.Invoke(),
                                                  () => _selectionVisibleLines > 0);
-        CopyOldFileCommand = new RelayCommand(() => CopyOldFileRequested?.Invoke());
-        CopyNewFileCommand = new RelayCommand(() => CopyNewFileRequested?.Invoke());
+        CopyOldFileCommand    = new RelayCommand(() => CopyOldFileRequested?.Invoke());
+        CopyNewFileCommand    = new RelayCommand(() => CopyNewFileRequested?.Invoke());
+        SubmitCommentCommand  = new RelayCommand(SubmitComment, () => _pendingAnchor != null);
+        CancelCommentCommand  = new RelayCommand(CancelComment, () => _pendingAnchor != null);
+        ClearCommentsCommand  = new RelayCommand(ClearComments, () => _comments.Count > 0);
         Render();
     }
 
@@ -69,6 +79,18 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
 
     /// <summary>Copies the whole new-side file — bridged to <c>DiffView.CopyNewFileAsync</c>.</summary>
     public ICommand CopyNewFileCommand { get; }
+
+    /// <summary>
+    ///     Submits the draft onto the pending comment anchor — the host-side comment flow
+    ///     (draft/submit/persistence) that M7 keeps out of the control.
+    /// </summary>
+    public ICommand SubmitCommentCommand { get; }
+
+    /// <summary>Drops the pending comment request without submitting.</summary>
+    public ICommand CancelCommentCommand { get; }
+
+    /// <summary>Clears every comment — the host owns the store, so it simply empties it.</summary>
+    public ICommand ClearCommentsCommand { get; }
 
     public bool IsSyntax
     {
@@ -104,6 +126,9 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             if (_diffFile != null)
                 // Expansion mutates the model in place; refresh stats and button states.
                 _diffFile.Updated += OnFileUpdated;
+
+            // A pending comment request anchors to the previous file's selection — void it.
+            ClosePendingComment();
 
             OnPropertyChanged(nameof(Stats));
             OnPropertyChanged(nameof(CanExpandHunks));
@@ -172,6 +197,39 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         private set => Set(ref _selectionStatus, value);
     }
 
+    /// <summary>
+    ///     File identity fed into <c>DiffView.FilePath</c> so comment anchors carry it (M7). The
+    ///     control never parses file names — the host supplies this.
+    /// </summary>
+    public string CurrentFilePath
+    {
+        get => _currentFilePath;
+        private set => Set(ref _currentFilePath, value);
+    }
+
+    /// <summary>
+    ///     The comment list handed to <c>DiffView.Comments</c>. Returns a fresh array every call so
+    ///     each change notification pushes a new instance (the control rebuilds on property change,
+    ///     not on in-place collection mutation).
+    /// </summary>
+    public IReadOnlyList<DiffComment> Comments => _comments.ToArray();
+
+    /// <summary>Whether a comment request is awaiting the editor (the anchor row of the flow).</summary>
+    public bool IsCommentEditorOpen => _pendingAnchor != null;
+
+    /// <summary>Editor header describing the pending anchor, e.g. 「评论 new 2-4」.</summary>
+    public string CommentEditorTitle =>
+        _pendingAnchor is { } anchor
+            ? $"评论 {SideName(anchor.Side)} {anchor.StartLineNumber}-{anchor.EndLineNumber}(@{anchor.FilePath})"
+            : "";
+
+    /// <summary>The draft text bound to the editor input.</summary>
+    public string CommentDraft
+    {
+        get => _commentDraft;
+        set => Set(ref _commentDraft, value);
+    }
+
     public ThemeVariant Theme => IsDark ? ThemeVariant.Dark : ThemeVariant.Light;
 
     public string Stats
@@ -238,6 +296,78 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         SelectionStatus = "已复制新文件内容";
     }
 
+    /// <summary>
+    ///     Called from the view's <c>DiffView.CommentRequested</c> handler — opens the comment
+    ///     editor for the anchor derived from the selection. The submit/cancel commands gate on
+    ///     the pending anchor, so their CanExecute is re-raised here.
+    /// </summary>
+    public void OnCommentRequested(DiffCommentAnchor anchor)
+    {
+        _pendingAnchor = anchor;
+        OnPropertyChanged(nameof(IsCommentEditorOpen));
+        OnPropertyChanged(nameof(CommentEditorTitle));
+        RaiseCommentCommandsCanExecuteChanged();
+        SelectionStatus = "请输入评论内容";
+    }
+
+    private void SubmitComment()
+    {
+        if (_pendingAnchor is not { } anchor) return;
+
+        var content = _commentDraft.Trim();
+
+        if (content.Length == 0) return;
+
+        _comments.Add(new DiffComment(anchor, null, content));
+        CommentDraft = "";
+        OnCommentSetChanged();
+        ClosePendingComment();
+        SelectionStatus = $"已添加评论({SideName(anchor.Side)} {anchor.StartLineNumber}-" +
+                          $"{anchor.EndLineNumber}),共 {_comments.Count} 条";
+    }
+
+    private void CancelComment()
+    {
+        ClosePendingComment();
+        SelectionStatus = "已取消评论";
+    }
+
+    /// <summary>Closes the editor and re-raises the gated commands (they gate on the pending anchor).</summary>
+    private void ClosePendingComment()
+    {
+        if (_pendingAnchor == null) return;
+
+        _pendingAnchor = null;
+        OnPropertyChanged(nameof(IsCommentEditorOpen));
+        OnPropertyChanged(nameof(CommentEditorTitle));
+        RaiseCommentCommandsCanExecuteChanged();
+    }
+
+    private void ClearComments()
+    {
+        _comments.Clear();
+        OnCommentSetChanged();
+        SelectionStatus = "已清除全部评论";
+    }
+
+    private void RaiseCommentCommandsCanExecuteChanged()
+    {
+        ((RelayCommand)SubmitCommentCommand).RaiseCanExecuteChanged();
+        ((RelayCommand)CancelCommentCommand).RaiseCanExecuteChanged();
+        ((RelayCommand)ClearCommentsCommand).RaiseCanExecuteChanged();
+    }
+
+    private void OnCommentSetChanged()
+    {
+        OnPropertyChanged(nameof(Comments));
+        RaiseCommentCommandsCanExecuteChanged();
+    }
+
+    private static string SideName(SplitSide side)
+    {
+        return side == SplitSide.Old ? "old" : "new";
+    }
+
     private void LoadSample()
     {
         DiffText = SampleDiff.ProgramCs;
@@ -248,7 +378,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     {
         var (oldContent, newContent, diffText) = ExpandableSample.Create();
 
-        DiffText = diffText;
+        DiffText        = diffText;
+        CurrentFilePath = "Sample.cs";
 
         // Real file contents (not paste-only) keep the expand state machine enabled.
         var file = new DiffFile("Sample.cs", oldContent, "Sample.cs", newContent, [diffText]);
@@ -275,9 +406,9 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     {
         var (fileName, oldContent, newContent, diffText) = sample;
 
-        _syntaxFile = fileName;
-
-        DiffText = diffText;
+        _syntaxFile     = fileName;
+        DiffText        = diffText;
+        CurrentFilePath = fileName;
 
         // Real contents keep expansion enabled and give the syntax engine full files.
         var file = new DiffFile(fileName, oldContent, fileName, newContent, [diffText]);
@@ -321,6 +452,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         file.Init();
         file.BuildSplitDiffLines();
         file.BuildUnifiedDiffLines();
+        CurrentFilePath = file.OldFileName is { Length: > 0 } name ? name : file.NewFileName;
         DiffFile = file;
     }
 

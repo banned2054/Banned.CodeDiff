@@ -17,7 +17,7 @@
         <vm:MainWindowViewModel />
     </Design.DataContext>
 
-    <Grid RowDefinitions="Auto,Auto,*,Auto" Margin="8">
+    <Grid RowDefinitions="Auto,Auto,*,Auto,Auto" Margin="8">
         <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8">
             <Button Command="{Binding RenderCommand}" Content="渲染 diff" />
             <Button Command="{Binding LoadSampleCommand}" Content="载入示例" />
@@ -34,6 +34,9 @@
             <Button Command="{Binding CopySelectionCommand}" Content="复制选中行" />
             <Button Command="{Binding CopyOldFileCommand}" Content="复制旧文件" />
             <Button Command="{Binding CopyNewFileCommand}" Content="复制新文件" />
+            <!-- The comment entry: bound straight to the control's explicit command — it is
+                 enabled whenever a selection exists and raises DiffView.CommentRequested. -->
+            <Button Command="{Binding #DiffView.BeginCommentCommand}" Content="添加评论" />
             <ToggleButton Content="深色主题" IsChecked="{Binding IsDark}" />
         </StackPanel>
 
@@ -50,7 +53,9 @@
                 BorderBrush="Gray"
                 BorderThickness="1">
             <views:DiffView x:Name="DiffView"
+                            Comments="{Binding Comments}"
                             DiffFile="{Binding DiffFile}"
+                            FilePath="{Binding CurrentFilePath}"
                             IsSelectionEnabled="{Binding IsSelectionEnabled}"
                             SyntaxHighlight="{Binding IsSyntax}"
                             UseSingleLineNumberColumn="{Binding IsSingleNumberColumn}"
@@ -58,8 +63,23 @@
                             Wrap="{Binding IsWrap}" />
         </Border>
 
-        <TextBlock Grid.Row="3" Margin="0,8,0,0" Text="{Binding Stats}" />
-        <TextBlock Grid.Row="3"
+        <!-- Host-side comment editor: DiffView.CommentRequested (via code-behind) opens it, the
+             host submits onto the anchor and hands the list back through DiffView.Comments. -->
+        <StackPanel Grid.Row="3"
+                    Orientation="Horizontal"
+                    Spacing="8"
+                    IsVisible="{Binding IsCommentEditorOpen}">
+            <TextBlock VerticalAlignment="Center" Text="{Binding CommentEditorTitle}" />
+            <TextBox Width="420"
+                     Text="{Binding CommentDraft}"
+                     PlaceholderText="输入评论内容,提交后显示在锚定行下方" />
+            <Button Command="{Binding SubmitCommentCommand}" Content="提交评论" />
+            <Button Command="{Binding CancelCommentCommand}" Content="取消" />
+            <Button Command="{Binding ClearCommentsCommand}" Content="清除全部评论" />
+        </StackPanel>
+
+        <TextBlock Grid.Row="4" Margin="0,8,0,0" Text="{Binding Stats}" />
+        <TextBlock Grid.Row="4"
                    Margin="0,8,0,0"
                    HorizontalAlignment="Right"
                    Text="{Binding SelectionStatus}" />

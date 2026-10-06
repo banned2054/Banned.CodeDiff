@@ -25,10 +25,13 @@ internal static class DiffUnifiedRowBuilder
     /// </summary>
     /// <param name="file">已构建统一模型的 diff 文件。The diff file with its unified model built.</param>
     /// <param name="variant">当前主题变体,决定画刷集。The theme variant selecting the brush set.</param>
+    /// <param name="palette">
+    ///     宿主的语义配色覆盖;可为 <c>null</c>。<br />The host's semantic color overrides; may be <c>null</c>.
+    /// </param>
     /// <returns>统一行列表(含 hunk 占位行)。<br />The unified rows (including hunk placeholder rows).</returns>
-    public static IReadOnlyList<DiffRow> Build(DiffFile file, ThemeVariant variant)
+    public static IReadOnlyList<DiffRow> Build(DiffFile file, ThemeVariant variant, DiffPalette? palette = null)
     {
-        var brushes = DiffBrushes.Get(variant);
+        var brushes = DiffBrushes.Get(variant, palette);
         var rows    = new List<DiffRow>(file.UnifiedLineLength);
 
         for (var index = 0; index <= file.UnifiedLineLength; index++)

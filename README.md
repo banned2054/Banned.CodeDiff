@@ -6,6 +6,8 @@ English | [**简体中文**](https://github.com/banned2054/Banned.CodeDiff/blob/
 
 An Avalonia diff viewer for unified diff text. It renders split or unified views with line and word
 highlights, expandable hunks, syntax highlighting, line selection, copy, and long-line wrapping.
+Hosts can attach inline comments to line ranges and override the main semantic colors through a
+single palette entry.
 
 The first package version is `0.1.0`; both packages target .NET 10.0. The built-in visual style
 currently follows GitHub diff conventions and includes light and dark palettes. Additional styles
@@ -21,6 +23,10 @@ See [NOTICE](./NOTICE) for upstream acknowledgements.
 - Calculate character-level changes for paired added and removed lines.
 - Render virtualized diffs with hunk expansion, syntax highlighting, and light/dark palettes.
 - Select lines, copy selected or complete file contents, and wrap long lines.
+- Attach inline comments to line ranges: the view renders comment cards and persistent anchor
+  highlights while the host owns drafting, submitting, and persistence.
+- Override the main semantic colors (line kinds, selection, comment cards) per theme variant
+  through `DiffView.Palette`.
 - Use the core parser and models without Avalonia, or provide a custom `IDiffHighlighter`.
 
 ## Installation
@@ -91,6 +97,14 @@ Bind it to the Avalonia control:
 - Use `CopySelectionAsync()`, `CopyOldFileAsync()`, or `CopyNewFileAsync()` to copy content. Bind keyboard shortcuts in the host application.
 - Set `DiffView.Wrap` to wrap long lines while preserving row virtualization.
 - Set `DiffView.UseSingleLineNumberColumn` to merge the unified view's old/new line-number columns into one: deleted lines show the old number, context and added lines the new one. Split view is unaffected.
+- Attach inline comments to line ranges (M7):
+  1. Enable line selection and set `DiffView.FilePath` so anchors carry the file identity.
+  2. After a selection, bind a host button to `DiffView.BeginCommentCommand` and handle `CommentRequested` — it delivers the anchor (side + start/end line numbers + file path) derived from the selection.
+  3. Render the comment editor in the host, then hand the comment list back through `DiffView.Comments`. Each anchor renders one card below the last visible line of its range, and its lines keep a persistent highlight that survives new selections, view-mode switches, and hunk expansions. Comments are file-scoped: only those whose `Anchor.FilePath` matches `DiffView.FilePath` render, so switching files never leaks comments onto same-numbered lines. Reassign `Comments` (a new collection instance) after the comment set changes; drafting, submitting, replying, deleting, and persistence stay in the host.
+- Override the main semantic colors with `DiffView.Palette` (`Light`/`Dark` slots for added,
+  deleted, and context line backgrounds, the selection overlay and edge strip, and the comment
+  highlight and card colors). `null` slots keep the built-in upstream colors; the default
+  appearance is unchanged.
 - Expand hunks with `OnSplitHunkExpand` or `OnUnifiedHunkExpand`. Expansion requires full old/new file contents.
 
 `DiffParser.Shared` and `TemplateOptions` hold global state. Avoid using them concurrently across threads.

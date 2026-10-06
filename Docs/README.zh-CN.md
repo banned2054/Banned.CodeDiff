@@ -5,7 +5,8 @@
 [![NuGet](https://img.shields.io/nuget/v/Banned.CodeDiff.Avalonia.svg)](https://www.nuget.org/packages/Banned.CodeDiff.Avalonia) [![下载量](https://img.shields.io/nuget/dt/Banned.CodeDiff.Avalonia.svg)](https://www.nuget.org/packages/Banned.CodeDiff.Avalonia) [![许可证](https://img.shields.io/badge/license-Apache_2.0-green)](https://github.com/banned2054/Banned.CodeDiff/blob/master/LICENSE)
 
 面向 Avalonia 的 unified diff 查看控件库，可渲染 split 或 unified 视图，支持行级和词级高亮、
-hunk 展开、语法高亮、行选择、复制与长行换行。
+hunk 展开、语法高亮、行选择、复制与长行换行。宿主可以对行范围发起行内评论，并通过统一的
+配色入口覆盖主要语义颜色。
 
 首发包版本为 `0.1.0`，两个包均面向 .NET 10.0。当前内置视觉风格遵循 GitHub diff 习惯，
 并提供明暗配色；后续版本可以扩展其他视觉风格。核心包不依赖 UI，也可供其他 .NET 应用使用。
@@ -19,6 +20,8 @@ hunk 展开、语法高亮、行选择、复制与长行换行。
 - 计算新增行与删除行之间的字符级差异。
 - 虚拟化渲染 diff，支持 hunk 展开、语法高亮和明暗配色。
 - 选择行、复制选区或完整文件内容，并按视图宽度换行。
+- 对行范围发起行内评论：视图渲染评论卡片与锚点持久高亮，草稿、提交与持久化由宿主负责。
+- 通过 `DiffView.Palette` 按明暗主题覆盖主要语义颜色（增删行、上下文行、选区与评论卡片）。
 - 核心解析与数据模型可脱离 Avalonia 使用，也可注入自定义 `IDiffHighlighter`。
 
 ## 安装
@@ -88,6 +91,12 @@ file.BuildSplitDiffLines();
 - 使用 `CopySelectionAsync()`、`CopyOldFileAsync()` 或 `CopyNewFileAsync()` 复制内容；快捷键由宿主应用绑定。
 - 设置 `DiffView.Wrap`，在保留行虚拟化的同时换行长文本。
 - 设置 `DiffView.UseSingleLineNumberColumn`，将统一视图的新旧两个行号列合并为一列：删除行显示旧行号，上下文行与新增行显示新行号。分栏模式不受影响。
+- 对行范围发起行内评论（M7）：
+  1. 开启行选择并设置 `DiffView.FilePath`，让评论锚点携带文件身份。
+  2. 选区完成后，把宿主按钮绑定到 `DiffView.BeginCommentCommand`，并订阅 `CommentRequested`——事件携带由当前选区推导的锚点（侧别 + 起止行号 + 文件路径）。
+  3. 由宿主呈现评论编辑器，再把评论列表经 `DiffView.Comments` 交回视图。每个锚点在锚定范围最后一个可见行下方渲染一张卡片，锚点行带持久高亮，不受后续选区替换影响，视图模式切换与 hunk 展开后按行号重新对位。评论按文件身份隔离——仅 `Anchor.FilePath` 与 `DiffView.FilePath` 一致的评论参与渲染，切换文件不会把评论串到同号行上。评论集合变化后重新赋值 `Comments`（换成新集合实例）即可刷新；草稿、提交、回复、删除与持久化由宿主负责。
+- 通过 `DiffView.Palette` 覆盖主要语义颜色（`Light`/`Dark` 两套槽位：增删行与上下文行背景、
+  选区覆盖层与边条、评论高亮与评论卡片颜色）。槽位为 `null` 时保留内置上游配色，默认外观不变。
 - 通过 `OnSplitHunkExpand` 或 `OnUnifiedHunkExpand` 展开 hunk；展开需要完整的新旧文件内容。
 
 `DiffParser.Shared` 和 `TemplateOptions` 持有全局状态，请勿跨线程并发使用。

@@ -43,10 +43,15 @@
                                                                    Text="{Binding Left.Number}"
                                                                    TextAlignment="Right"
                                                                    VerticalAlignment="Center" />
-                                                        <!-- multi-select overlay + edge strip (upstream _com.css
-                                                             .diff-multi-select-active ::after/::before; the strip is the
-                                                             number cell's right edge — upstream overhangs 2px into the
-                                                             content cell, kept inside here) -->
+                                                        <!-- Comment-anchor highlight (persistent, independent
+                                                             of the selection channel) then multi-select
+                                                             overlay + edge strip (upstream _com.css
+                                                             .diff-multi-select-active ::after/::before; the
+                                                             strip is the number cell's right edge — upstream
+                                                             overhangs 2px into the content cell, kept inside
+                                                             here) -->
+                                                        <Rectangle Fill="{Binding Left.CommentOverlay}"
+                                                                   IsVisible="{Binding Left.IsCommented}" />
                                                         <Rectangle Fill="{Binding Left.SelectionOverlay}"
                                                                    IsVisible="{Binding Left.IsSelected}" />
                                                         <Rectangle Width="4"
@@ -75,6 +80,8 @@
                                                                                SyntaxRuns="{Binding Left.SyntaxRuns}"
                                                                                Wrap="{Binding $parent[v:DiffView].Wrap}" />
                                                         </Grid>
+                                                        <Rectangle Fill="{Binding Left.CommentOverlay}"
+                                                                   IsVisible="{Binding Left.IsCommented}" />
                                                         <Rectangle Fill="{Binding Left.SelectionOverlay}"
                                                                    IsVisible="{Binding Left.IsSelected}" />
                                                     </Panel>
@@ -92,6 +99,8 @@
                                                                    Text="{Binding Right.Number}"
                                                                    TextAlignment="Right"
                                                                    VerticalAlignment="Center" />
+                                                        <Rectangle Fill="{Binding Right.CommentOverlay}"
+                                                                   IsVisible="{Binding Right.IsCommented}" />
                                                         <Rectangle Fill="{Binding Right.SelectionOverlay}"
                                                                    IsVisible="{Binding Right.IsSelected}" />
                                                         <Rectangle Width="4"
@@ -118,6 +127,8 @@
                                                                                SyntaxRuns="{Binding Right.SyntaxRuns}"
                                                                                Wrap="{Binding $parent[v:DiffView].Wrap}" />
                                                         </Grid>
+                                                        <Rectangle Fill="{Binding Right.CommentOverlay}"
+                                                                   IsVisible="{Binding Right.IsCommented}" />
                                                         <Rectangle Fill="{Binding Right.SelectionOverlay}"
                                                                    IsVisible="{Binding Right.IsSelected}" />
                                                     </Panel>
@@ -197,6 +208,8 @@
                                                                    Text="{Binding OldNumber}"
                                                                    TextAlignment="Right"
                                                                    VerticalAlignment="Center" />
+                                                        <Rectangle Fill="{Binding CommentOverlay}"
+                                                                   IsVisible="{Binding IsCommented}" />
                                                         <Rectangle Fill="{Binding SelectionOverlay}"
                                                                    IsVisible="{Binding IsSelected}" />
                                                     </Panel>
@@ -222,6 +235,8 @@
                                                                    Text="{Binding MergedNumber}"
                                                                    TextAlignment="Right"
                                                                    VerticalAlignment="Center" />
+                                                        <Rectangle Fill="{Binding CommentOverlay}"
+                                                                   IsVisible="{Binding IsCommented}" />
                                                         <Rectangle Fill="{Binding SelectionOverlay}"
                                                                    IsVisible="{Binding IsSelected}" />
                                                         <!-- The upstream strip sits on the joint .diff-line-num
@@ -251,6 +266,8 @@
                                                                                SyntaxRuns="{Binding SyntaxRuns}"
                                                                                Wrap="{Binding $parent[v:DiffView].Wrap}" />
                                                         </Grid>
+                                                        <Rectangle Fill="{Binding CommentOverlay}"
+                                                                   IsVisible="{Binding IsCommented}" />
                                                         <Rectangle Fill="{Binding SelectionOverlay}"
                                                                    IsVisible="{Binding IsSelected}" />
                                                     </Panel>
@@ -310,6 +327,75 @@
                                                                Foreground="{Binding HunkForeground}"
                                                                Text="{Binding HunkText}"
                                                                VerticalAlignment="Center" />
+                                                </Border>
+                                            </Grid>
+                                        </DataTemplate>
+                                        <DataTemplate x:DataType="m:DiffSplitCommentRow">
+                                            <!-- Comment card (M7): the two number-gutter borders keep the
+                                                 columns aligned with the rows above; the card lands in
+                                                 the anchored side's content column (CardColumn 1 or 4) —
+                                                 the empty star columns still share space equally, so the
+                                                 card's column matches the content column above. -->
+                                            <Grid ColumnDefinitions="Auto,*,1,Auto,*">
+                                                <Border Width="{Binding $parent[v:DiffView].NumberColumnWidth}" />
+                                                <Border Width="{Binding $parent[v:DiffView].NumberColumnWidth}"
+                                                        Grid.Column="3" />
+                                                <Border Classes="diff-comment-card"
+                                                        Grid.Column="{Binding CardColumn}"
+                                                        Margin="8,4,8,6"
+                                                        Padding="10,8"
+                                                        Background="{Binding CardBackground}"
+                                                        BorderBrush="{Binding CardBorder}"
+                                                        BorderThickness="1"
+                                                        CornerRadius="6">
+                                                    <ItemsControl ItemsSource="{Binding Comments}">
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate x:DataType="m:DiffComment">
+                                                                <StackPanel Classes="diff-comment" Spacing="2">
+                                                                    <TextBlock Classes="diff-comment-author"
+                                                                               FontSize="12"
+                                                                               FontWeight="SemiBold"
+                                                                               IsVisible="{Binding !!Author}"
+                                                                               Text="{Binding Author}" />
+                                                                    <TextBlock Classes="diff-comment-body"
+                                                                               Text="{Binding Content}"
+                                                                               TextWrapping="Wrap" />
+                                                                </StackPanel>
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
+                                                </Border>
+                                            </Grid>
+                                        </DataTemplate>
+                                        <DataTemplate x:DataType="m:DiffUnifiedCommentRow">
+                                            <Grid ColumnDefinitions="Auto,Auto,*">
+                                                <Border Width="{Binding $parent[v:DiffView].NumberColumnWidth}" />
+                                                <Border Width="{Binding $parent[v:DiffView].NumberColumnWidth}"
+                                                        Grid.Column="1" />
+                                                <Border Grid.Column="2"
+                                                        Classes="diff-comment-card"
+                                                        Margin="8,4,8,6"
+                                                        Padding="10,8"
+                                                        Background="{Binding CardBackground}"
+                                                        BorderBrush="{Binding CardBorder}"
+                                                        BorderThickness="1"
+                                                        CornerRadius="6">
+                                                    <ItemsControl ItemsSource="{Binding Comments}">
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate x:DataType="m:DiffComment">
+                                                                <StackPanel Classes="diff-comment" Spacing="2">
+                                                                    <TextBlock Classes="diff-comment-author"
+                                                                               FontSize="12"
+                                                                               FontWeight="SemiBold"
+                                                                               IsVisible="{Binding !!Author}"
+                                                                               Text="{Binding Author}" />
+                                                                    <TextBlock Classes="diff-comment-body"
+                                                                               Text="{Binding Content}"
+                                                                               TextWrapping="Wrap" />
+                                                                </StackPanel>
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
                                                 </Border>
                                             </Grid>
                                         </DataTemplate>

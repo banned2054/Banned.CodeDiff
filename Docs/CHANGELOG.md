@@ -15,12 +15,16 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 #### ✨ Added
 
 * Added `DiffView.UseSingleLineNumberColumn` — merges the unified view's old/new line-number columns into one: deleted lines show the old number, context and added lines the new one. Split view is unaffected, and toggling at runtime applies immediately without rebuilding rows.
+* Added line-range comments (M7): `DiffView.FilePath` carries the host-provided file identity, `GetCommentAnchor()` derives an anchor (side + start/end line numbers + file path) from the current selection, the explicit `BeginCommentCommand` raises `CommentRequested`, and `DiffView.Comments` renders one card per anchor below the last visible line of its range with a persistent anchor highlight. Comment anchors are independent of the selection state — they survive new selections, view-mode switches, and hunk expansions, and hidden anchors re-appear when an expansion reveals their lines. Comments are file-scoped: only those whose `Anchor.FilePath` matches `DiffView.FilePath` render, so switching files never leaks comments onto same-numbered lines of another file. Drafting, submitting, replying, deleting, and persisting comments stay in the host; reassigning `Comments` refreshes the presentation.
+* Added `DiffView.Palette` — a unified semantic color entry (`Light`/`Dark` slots for added/deleted/context line backgrounds, the selection overlay and edge strip, and the comment highlight plus comment card background/border). `null` slots keep the built-in upstream colors, so the default appearance is unchanged; each slot drives the number and content cells of its line kind.
 
 ### 简体中文
 
 #### ✨ 新增
 
 * 新增 `DiffView.UseSingleLineNumberColumn`：将统一视图的新旧两个行号列合并为一列——删除行显示旧行号，上下文行与新增行显示新行号。分栏模式不受影响，运行时切换立即生效、无需重建行。
+* 新增行范围评论（M7）：`DiffView.FilePath` 携带宿主提供的文件身份，`GetCommentAnchor()` 从当前选区推导锚点（侧别 + 起止行号 + 文件路径），显式的 `BeginCommentCommand` 引发 `CommentRequested`，`DiffView.Comments` 按锚点在锚定范围最后一个可见行下方渲染评论卡片，并带锚点持久高亮。评论锚点与选区状态相互独立——后续选区替换、视图模式切换与 hunk 展开都不会清除，隐藏行全部折叠时不渲染卡片、展开后按行号恢复。评论按文件身份隔离——仅 `Anchor.FilePath` 与 `DiffView.FilePath` 一致的评论参与渲染，切换文件不会把评论串到其他文件的同号行上。草稿、提交、回复、删除与持久化由宿主负责；重新赋值 `Comments` 即刷新呈现。
+* 新增 `DiffView.Palette`——统一的语义配色入口（`Light`/`Dark` 两套槽位：增删行与上下文行背景、选区覆盖层与边条、评论高亮与评论卡片背景/边框）。槽位为 `null` 时保留内置上游配色，默认外观不变；每个槽位同时作用于该类行的行号格与内容格。
 
 ## 🚀 Release v0.1.0 — Initial Release
 
