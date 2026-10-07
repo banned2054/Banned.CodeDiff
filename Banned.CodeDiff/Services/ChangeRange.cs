@@ -122,7 +122,6 @@ public static class ChangeRange
         return n <= 0 ? "" : s.Length <= n ? s : s[^n..];
     }
 
-    // TODO maybe could use the original content line.  fixed
     /// <summary>获取两个字符串相互之间的变更范围。<br />Get the changed ranges in the strings, relative to each other.</summary>
     /// <param name="addition">新增行。The added line.</param>
     /// <param name="deletion">删除行。The deleted line.</param>
@@ -234,8 +233,7 @@ public static class ChangeRange
 
         var hasLineChange = false;
 
-        // One pass over the opcodes instead of two Where passes; the a/b offsets and the
-        // hasLineChange short-circuit (aRange.Any(equal && non-blank)) evolve independently.
+        // a/b 偏移与 HasLineChange 各自独立累计。
         foreach (var item in diffRange)
         {
             if (item.Op != DiffOp.Delete)

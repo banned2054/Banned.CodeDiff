@@ -8,22 +8,8 @@ using Banned.CodeDiff.Models;
 namespace Banned.CodeDiff.Avalonia.Services;
 
 /// <summary>
-///     multiSelect/dom.ts 的移植——从指针命中目标解析出行号、侧别与行号单元格,是 dom.ts
-///     DOM 契约在 Avalonia 视觉树上的等价物。JS 版查询 DOM 属性与类名(<c>data-line-num</c>、
-///     <c>[data-side]</c>、<c>.diff-line-*</c>);本移植沿相同类名遍历 Avalonia 视觉树(类名由
-///     Themes/Generic.axaml 的行模板携带),并从行模型读取行号(渲染的行号与模型行号一致——
-///     上游是从 DOM 读回行号),由 <see cref="Views.DiffView" /> 在指针事件处理中调用。
-///     dom.ts 中未移植:<c>normalizeRange</c>(纯逻辑,位于核心库 Utils/MultiSelectData.cs);
-///     <c>.diff-add-widget-wrapper</c> 分支(本移植不渲染添加评论的"+"按钮)。<br />
-///     Port of packages/core/src/multiSelect/dom.ts — resolves the line number, side, and line-number
-///     cell from a pointer target. The JS version queries DOM attributes and classes
-///     (<c>data-line-num</c>, <c>[data-side]</c>, <c>.diff-line-*</c>); this port walks the Avalonia
-///     visual tree over the same class names, carried by the row templates in Themes/Generic.axaml,
-///     and reads the numbers from the row models (the rendered numbers equal the model numbers —
-///     upstream reads them back off the DOM).
-///     Not ported from dom.ts: <c>normalizeRange</c> (pure logic, lives in the core
-///     Utils/MultiSelectData.cs); the <c>.diff-add-widget-wrapper</c> branch (this port renders no
-///     add-comment "+" button).
+///     从 Avalonia 视觉树解析行号与侧别,移植自 multiSelect/dom.ts。<br />
+///     Resolves line numbers and sides from the Avalonia visual tree, ported from multiSelect/dom.ts.
 /// </summary>
 internal static class DiffSelectionDom
 {
@@ -34,11 +20,8 @@ internal static class DiffSelectionDom
     private const string OldContentClass = "diff-line-old-content";
 
     /// <summary>
-    ///     getLineNumberFromElement_Split 的移植:返回持有单元格中渲染的行号;该侧为空或文本
-    ///     不是纯整数时为 <c>null</c>——JS 的守卫 <c>lineAttr !== line.toString()</c> 原样保留。<br />
-    ///     Port of getLineNumberFromElement_Split: the number rendered in the holder cell, or
-    ///     <c>null</c> when the side is empty or the text is not a plain integer — the JS guard
-    ///     <c>lineAttr !== line.toString()</c> is kept verbatim.
+    ///     返回分栏行号;空侧或非整数文本返回 <c>null</c>。<br />
+    ///     Returns the split line number, or null for an empty side or non-integer text.
     /// </summary>
     public static int? GetLineNumberFromElement_Split(Control? holder)
     {
@@ -52,10 +35,8 @@ internal static class DiffSelectionDom
     }
 
     /// <summary>
-    ///     getSideFromElement_Split 的移植:持有单元格所属的侧别(JS 读取 <c>data-side</c>
-    ///     属性;此处侧别编码在持有单元格的类名中)。<br />
-    ///     Port of getSideFromElement_Split: the side of the holder cell (JS reads the
-    ///     <c>data-side</c> attribute; here the side is encoded in the holder's cell class).
+    ///     返回分栏行号格的侧别。<br />
+    ///     Returns the side of a split line-number cell.
     /// </summary>
     public static SplitSide? GetSideFromElement_Split(Control? holder)
     {
@@ -69,11 +50,8 @@ internal static class DiffSelectionDom
     }
 
     /// <summary>
-    ///     getLineNumbersFromElement_Unified 的移植:命中行号单元格所在行的两个行号;目标不在
-    ///     行号单元格内时为 <c>null</c>(上游 <c>closest(".diff-line-num")</c>)。<br />
-    ///     Port of getLineNumbersFromElement_Unified: both numbers of the row whose number cell was
-    ///     hit, or <c>null</c> when the target is not inside a number cell (upstream
-    ///     <c>closest(".diff-line-num")</c>).
+    ///     返回命中行号格所在行的旧/新行号;未命中行号格时为 <c>null</c>。<br />
+    ///     Returns both numbers of the row containing the hit number cell; null outside number cells.
     /// </summary>
     public static (int? Old, int? New)? GetLineNumbersFromElement_Unified(Visual? el)
     {
@@ -89,13 +67,8 @@ internal static class DiffSelectionDom
     }
 
     /// <summary>
-    ///     getNumberHolderElement_Split 的移植:分栏目标的行号单元格。拖拽进行中(上游
-    ///     <c>inMouseDown == false</c>)时,内容单元格会解析到同一行中其侧别的行号单元格——
-    ///     悬停内容即可延伸选区;按下时只有行号单元格本身才算命中。<br />
-    ///     Port of getNumberHolderElement_Split: the line-number cell for a split target. While a
-    ///     drag is in progress (<c>inMouseDown == false</c> upstream), content cells resolve to their
-    ///     side's number cell in the same row — hovering the content extends the selection; on press
-    ///     only a number cell itself qualifies.
+    ///     按下仅命中行号格;拖选时内容格也可解析到同侧行号格。<br />
+    ///     Press accepts only number cells; drag also resolves content cells to their side's number cell.
     /// </summary>
     public static Control? GetNumberHolderElement_Split(Visual? el, bool inMouseDown)
     {

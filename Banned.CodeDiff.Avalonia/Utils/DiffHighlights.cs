@@ -5,14 +5,8 @@ using Banned.CodeDiff.Services;
 namespace Banned.CodeDiff.Avalonia.Utils;
 
 /// <summary>
-///     从 <see cref="DiffLine" /> 提取词级高亮范围,对应上游的 template 逻辑:优先使用
-///     fast-diff 文本段(<c>diffChanges</c>),不可用时回退到单一的相对变更范围
-///     (<c>changes</c>);只保留与单元格类别匹配的文本段——新增行取 insert 段,删除行取
-///     delete 段。<br />
-///     Extracts word-level highlight ranges from a <see cref="DiffLine" />, mirroring the upstream
-///     template logic: fast-diff segments (<c>diffChanges</c>) are preferred when available, falling
-///     back to the single relative-changes range (<c>changes</c>). Only the segments matching the
-///     cell kind are kept — insert segments on added lines, delete segments on deleted lines.
+///     提取新增/删除行的词级高亮:优先 fast-diff 文本段,否则使用相对变更范围。<br />
+///     Extracts added/deleted word highlights, preferring fast-diff segments and falling back to relative change ranges.
 /// </summary>
 internal static class DiffHighlights
 {

@@ -1,7 +1,6 @@
 namespace Banned.CodeDiff.Models;
 
-// Port of packages/utils/src/highlightAST.ts (types only; processAST belongs to
-// the lowlight/highlighter milestone, not the core/parse port).
+// Port of packages/utils/src/highlightAST.ts (types).
 
 /// <summary>
 ///     JS 类型 SyntaxNode.properties(className + 自由扩展字段)的移植,模板构建器只消费

@@ -4,18 +4,8 @@ using Avalonia.Styling;
 namespace Banned.CodeDiff.Avalonia.Models;
 
 /// <summary>
-///     统一的语义配色定制入口:宿主在 <see cref="Views.DiffView.Palette" /> 上提供明/暗
-///     两套覆盖色,槽位为 <c>null</c> 时保留内置值(即上游 <c>--diff-*--</c> 变量),默认
-///     外观因此不变。每个槽位设置后同时作用于该类行的行号格与内容格(如
-///     <see cref="DiffPaletteColors.AddLineBackground" /> 同时覆盖新增行的行号格与内容格)。
-///     更换 <see cref="Views.DiffView.Palette" /> 会重建行模型,行直接引用画刷实例。<br />
-///     The unified semantic color entry point: the host supplies light/dark override sets on
-///     <see cref="Views.DiffView.Palette" />, and a <c>null</c> slot keeps the built-in value (the
-///     upstream <c>--diff-*--</c> variables), so the default appearance stays untouched. Once set,
-///     each slot drives both the number and content cells of its line kind (e.g.
-///     <see cref="DiffPaletteColors.AddLineBackground" /> covers the added lines' number and
-///     content cells alike). Replacing <see cref="Views.DiffView.Palette" /> rebuilds the rows,
-///     which reference the brush instances directly.
+///     宿主明暗 Diff 配色覆盖;空槽位继承预设。重新赋值 <see cref="Views.DiffView.Palette" /> 刷新行。<br />
+///     Host light/dark diff overrides; null slots inherit presets. Reassign <see cref="Views.DiffView.Palette" /> to refresh rows.
 /// </summary>
 public sealed class DiffPalette
 {
@@ -32,11 +22,8 @@ public sealed class DiffPalette
 }
 
 /// <summary>
-///     <see cref="DiffPalette" /> 在单个主题变体上的语义配色槽位;<c>null</c> 保留内置值。
-///     词级高亮、hunk 头与展开行等衍生色不在定制范围内,保持内置值。<br />
-///     The semantic color slots of <see cref="DiffPalette" /> for one theme variant; <c>null</c>
-///     keeps the built-in value. Derived colors such as word-level highlights, hunk headers, and
-///     expand rows stay outside the customization scope and keep their built-in values.
+///     单个主题变体的覆盖槽位;细粒度值优先于行级值,空值继承预设。<br />
+///     Overrides for one theme variant; fine-grained values beat line-level values and null inherits presets.
 /// </summary>
 public sealed class DiffPaletteColors
 {

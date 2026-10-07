@@ -5,26 +5,8 @@ using Banned.CodeDiff.Utils;
 namespace Banned.CodeDiff.Avalonia.Services;
 
 /// <summary>
-///     multiSelect/manager.ts 的移植——多选状态机。JS 版在容器上绑定鼠标事件并内联解析
-///     DOM 契约;此处由持有它的 <see cref="Views.DiffView" /> 先经 <see cref="DiffSelectionDom" />
-///     解析 DOM 契约,再把指针输入翻译为对它的调用,因此本类只承载纯状态。
-///     与 JS 原版的差异(有意为之,见 Docs/CHANGELOG.md):
-///     - 未移植 <c>scopeToHunk</c> 钩子(上游默认即恒等函数);
-///     - diffFile 订阅外围 16 ms 的 <c>debounceUpdateVirtual</c> 是一种 DOM 批处理优化——
-///     改由所有者在事件中同步重算选区视觉;
-///     - <c>updateContainer</c>/<c>updateDiffFile</c>/<c>updateOptions</c>/<c>destroy</c> 归结为
-///     所有者对该功能的启用门控:本对象的生命周期与视图多选功能的启用期严格一致。<br />
-///     Port of packages/core/src/multiSelect/manager.ts — the multi-select state machine. The JS class
-///     binds container-level mouse events and resolves the DOM contract inline; here the owning
-///     <see cref="Views.DiffView" /> translates pointer input into these calls after resolving the
-///     DOM contract through <see cref="DiffSelectionDom" />, so this class is pure state.
-///     Deviations from the JS original (intentional, see Docs/CHANGELOG.md):
-///     - the <c>scopeToHunk</c> hook is not ported (the upstream default is the identity function);
-///     - the 16 ms <c>debounceUpdateVirtual</c> around the diffFile subscribe is a DOM batching
-///     optimization — the owner recomputes the selection visual synchronously instead;
-///     - <c>updateContainer</c>/<c>updateDiffFile</c>/<c>updateOptions</c>/<c>destroy</c> collapse to
-///     the owner gating the feature: this object lives exactly as long as the view's selection
-///     feature is enabled.
+///     多选状态机,移植自 multiSelect/manager.ts;指针命中与视觉更新由 <see cref="Views.DiffView" /> 负责。<br />
+///     Selection state machine ported from multiSelect/manager.ts; <see cref="Views.DiffView" /> handles pointer targets and visual updates.
 /// </summary>
 internal sealed class DiffSelection
 {
@@ -67,19 +49,15 @@ internal sealed class DiffSelection
 
         var range = new MultiSelectRange(side, lineNumber, lineNumber);
 
-        // JS applies options.scopeToHunk here — not ported (identity upstream).
         _state = _state with { CurrentRange = range };
 
-        // JS: #updateVisual(); onSelectionChange(range, { ...state }) — the owner applies the
-        // visual through the event.
+        // 视觉更新由所有者处理。
         SelectionChanged?.Invoke(range, _state);
     }
 
     /// <summary>
-    ///     #handleMouseDown_Unified 的移植,不含 DOM 解析:行号优先取新行号,缺省时取旧行号;
-    ///     侧别随存在的那一个行号而定。<br />
-    ///     Port of #handleMouseDown_Unified minus the DOM resolution: the line number is the
-    ///     new number when present, else the old one; the side follows which number exists.
+    ///     统一视图按下时优先使用新行号,不存在时使用旧行号。<br />
+    ///     Unified press prefers the new line number, falling back to the old number.
     /// </summary>
     public void HandlePointerPressed_Unified((int? Old, int? New) lineNumbers)
     {
@@ -117,11 +95,8 @@ internal sealed class DiffSelection
     }
 
     /// <summary>
-    ///     #handleMouseOver_Unified 的移植,不含 DOM 解析:跟踪的是起始侧的行号——起始侧
-    ///     没有行号的行(上游 <c>undefined</c>)不延伸范围。<br />
-    ///     Port of #handleMouseOver_Unified minus the DOM resolution: the tracked line number
-    ///     is the one on the start side — rows without a number there (upstream <c>undefined</c>) do
-    ///     not extend the range.
+    ///     统一视图拖选沿起始侧延伸;该侧无行号时忽略。<br />
+    ///     Unified drag follows the starting side; rows without a number on that side are ignored.
     /// </summary>
     public void HandlePointerMoved_Unified((int? Old, int? New) lineNumbers)
     {
@@ -189,18 +164,13 @@ internal sealed class DiffSelection
     }
 
     /// <summary>
-    ///     clearSelection 的移植——重置状态并通知。JS 原版会保留 #preselectedLines(承载评论
-    ///     锚点的通道);本移植经由同一通道持久化已完成的选区,因此所有者视图会将其一并清除
-    ///     (见 DiffView.ClearSelection)。<br />
-    ///     Port of clearSelection — resets the state and notifies. The JS original keeps
-    ///     #preselectedLines (the comment-anchored channel); this port persists completed selections
-    ///     through that same channel, so the owning view clears it as well (see DiffView.ClearSelection).
+    ///     重置交互状态并通知;预选行由所有者另行清除。<br />
+    ///     Resets interaction state and notifies; the owner clears preselected lines separately.
     /// </summary>
     public void ClearSelection()
     {
         ResetState();
 
-        // JS: #updateVisual(); onSelectionChange(null, { ...state })
         SelectionChanged?.Invoke(null, _state);
     }
 

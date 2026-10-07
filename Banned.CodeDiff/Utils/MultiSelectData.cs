@@ -4,28 +4,14 @@ using Banned.CodeDiff.Services;
 namespace Banned.CodeDiff.Utils;
 
 /// <summary>
-///     packages/core/src/multiSelect/data.ts 的移植,外加 multiSelect/dom.ts 的纯辅助方法
-///     <c>normalizeRange</c>(dom.ts 其余部分是 DOM 契约,由 Avalonia 层重新实现,见
-///     Banned.CodeDiff.Avalonia/Services/DiffSelectionDom.cs),以及 multiSelect/visual.ts
-///     的纯辅助方法 <c>changePreselectedLinesToLineRange</c>;全部为无状态纯函数。
-///     data.ts 中未移植:<c>extendDataToPreselectedLines</c>(评论流 extendData 适配,
-///     本移植决定不做)。<br />
-///     Port of packages/core/src/multiSelect/data.ts, plus the pure <c>normalizeRange</c> helper from
-///     multiSelect/dom.ts (the rest of dom.ts is a DOM contract that the Avalonia layer reimplements,
-///     see Banned.CodeDiff.Avalonia/Services/DiffSelectionDom.cs) and the pure
-///     <c>changePreselectedLinesToLineRange</c> helper from multiSelect/visual.ts.
-///     Not ported from data.ts: <c>extendDataToPreselectedLines</c> (comment-flow extendData adapter,
-///     decided against for this port).
+///     多选范围与行数据辅助方法,移植自 multiSelect/data.ts、dom.ts 和 visual.ts。<br />
+///     Selection range and line helpers ported from multiSelect/data.ts, dom.ts and visual.ts.
 /// </summary>
 public static class MultiSelectData
 {
     /// <summary>
-    ///     dom.ts normalizeRange 的移植(泛型 <c>T extends { startLineNumber; endLineNumber }</c>
-    ///     具体化为 <see cref="MultiSelectRange" />,即其唯一用法)。
-    ///     JS:<c>{ ...range, startLineNumber: min, endLineNumber: max }</c>。<br />
-    ///     Port of dom.ts normalizeRange (the generic <c>T extends { startLineNumber; endLineNumber }</c>
-    ///     is concretized to <see cref="MultiSelectRange" />, its only use).
-    ///     JS: <c>{ ...range, startLineNumber: min, endLineNumber: max }</c>.
+    ///     返回起止行号按升序排列的选区副本。<br />
+    ///     Returns a range copy with ascending start and end line numbers.
     /// </summary>
     /// <param name="range">待规范化的选区。The range to normalize.</param>
     /// <returns>起止已交换为 min/max 的选区副本。The range copy with start/end swapped to min/max.</returns>
@@ -114,12 +100,8 @@ public static class MultiSelectData
     }
 
     /// <summary>
-    ///     visual.ts changePreselectedLinesToLineRange 的移植:把每一侧的预选行号合并为一个
-    ///     min/max 大区间——上游已知语义(散列的行列表会高亮 min 到 max 之间的所有行)。
-    ///     顺序保持:先新侧区间,后旧侧。<br />
-    ///     Port of visual.ts changePreselectedLinesToLineRange: merges each side's preselected line
-    ///     numbers into one big min/max range — the upstream-known semantics (a scattered list
-    ///     highlights everything between min and max). Order kept: the new-side range first, then old.
+    ///     将每侧预选行号合并为 min/max 区间,包含中间所有行;新侧在前。<br />
+    ///     Merges each side into an inclusive min/max range, including intervening lines; new side first.
     /// </summary>
     /// <param name="line">两侧的预选行号集合。The preselected line numbers per side.</param>
     /// <returns>新侧/旧侧的 min/max 区间(可能为空列表)。The new/old min-max ranges (possibly empty).</returns>
@@ -135,19 +117,8 @@ public static class MultiSelectData
     }
 
     /// <summary>
-    ///     原生新增(上游无对应物——git-diff-view 没有复制功能):把选区结果展平为可放入
-    ///     剪贴板的纯文本。被折叠 hunk 遮住(即 <see cref="SelectedLine.IsHide" />)的行会被
-    ///     跳过——复制内容与视图所见一致——且每个值像渲染层显示前那样去掉结尾换行
-    ///     (<c>null</c> 值复制为空行)。其余行以纯 <c>\n</c> 连接(与 diff 文本一致,而非
-    ///     <c>Environment.NewLine</c>)。<c>null</c> 结果或不含任何可见行时返回空字符串。<br />
-    ///     Native port addition (no upstream counterpart — git-diff-view has no copy feature):
-    ///     flattens a selection result into clipboard-ready plain text. Lines currently hidden behind
-    ///     a collapsed hunk (<see cref="SelectedLine.IsHide" />) are skipped — the copy matches what
-    ///     the view shows — and each value is stripped of its trailing newline exactly like the render
-    ///     layer does before display (a <c>null</c> value copies as an empty line). The remaining
-    ///     lines join with a plain <c>\n</c> (like the diff text itself, not
-    ///     <c>Environment.NewLine</c>). A <c>null</c> result or one without any visible line yields
-    ///     the empty string.
+    ///     复制可见选区文本:去除行尾换行,以 <c>\n</c> 连接;<c>null</c> 行值为空行。<br />
+    ///     Copies visible selected text, trimming trailing newlines and joining with <c>\n</c>; null line values become empty lines.
     /// </summary>
     /// <param name="result">多选结果,可为 <c>null</c>。The multi-select result; may be <c>null</c>.</param>
     /// <returns>

@@ -1,14 +1,8 @@
 namespace Banned.CodeDiff.Models;
 
 /// <summary>
-///     DiffHighlighter 接口形态的移植(packages/lowlight/src/index.ts —— 核心库面向该接口编程,
-///     上游由 lowlight/shiki/lezer 实现)。<see cref="Type" /> 将 JS 字符串枚举
-///     (<c>"class"</c> / <c>"style"</c>)移植为 <see cref="HighlighterType" />。<br />
-///     Port of the <c>DiffHighlighter</c> interface shape
-///     (packages/lowlight/src/index.ts — the interface the core package programs
-///     against; lowlight/shiki/lezer implement it upstream).
-///     <see cref="Type" /> ports the JS string enum (<c>"class"</c> / <c>"style"</c>)
-///     as <see cref="HighlighterType" />.
+///     语法高亮器契约,移植自 packages/lowlight/src/index.ts。<br />
+///     Syntax highlighting contract ported from packages/lowlight/src/index.ts.
 /// </summary>
 public interface IDiffHighlighter
 {
@@ -31,11 +25,8 @@ public interface IDiffHighlighter
     IReadOnlyList<IgnorePattern> IgnoreSyntaxHighlightList { get; }
 
     /// <summary>
-    ///     对整个文件分词,产出类 hast 的语法树(root <see cref="SyntaxNode" />,其子节点为逐 token 的
-    ///     包装元素);文件命中忽略规则或高亮失败时返回 <c>null</c>。<br />
-    ///     JS: getAST(raw, fileName, lang, theme) — tokenizes the full file into a
-    ///     hast-like tree (root SyntaxNode whose children are per-token wrapper elements).
-    ///     Returns <c>null</c> when highlighting must be skipped (ignored file, failure).
+    ///     将完整文件分词为 hast 风格语法树;需跳过高亮时返回 <c>null</c>。<br />
+    ///     Tokenizes a full file into a hast-style tree; returns null when highlighting is skipped.
     /// </summary>
     /// <param name="raw">文件原文。<br />The full raw file content.</param>
     /// <param name="fileName">

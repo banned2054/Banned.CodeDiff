@@ -26,8 +26,7 @@ internal sealed class TextMateResources : IRegistryOptions
 
     private readonly Dictionary<string, IRawGrammar> _grammars = new();
 
-    // lang id / alias ("csharp", "cs", "c#", ...) → scope name; first registration
-    // wins, matching the shiki bundle's unambiguous language table.
+    // 语言别名首次注册生效,与 shiki 一致。
     private readonly Dictionary<string, string> _langToScope = new();
 
     private readonly Dictionary<string, ScopeThemeMatcher> _themes = new();
@@ -42,8 +41,7 @@ internal sealed class TextMateResources : IRegistryOptions
     {
         var assembly = typeof(TextMateResources).Assembly;
 
-        // Every embedded grammar registers, including dependency grammars pulled
-        // in by the shiki bundles (e.g. vue needs html-derivative, vue-directives).
+        // 同时注册依赖语法,如 Vue 所需的 HTML。
         foreach (var resourceName in assembly.GetManifestResourceNames()
                                              .Where(n => n.StartsWith(GrammarResourcePrefix, StringComparison.Ordinal))
                                              .OrderBy(n => n, StringComparer.Ordinal))

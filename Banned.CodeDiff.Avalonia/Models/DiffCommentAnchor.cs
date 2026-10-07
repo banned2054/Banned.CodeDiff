@@ -3,16 +3,8 @@ using Banned.CodeDiff.Models;
 namespace Banned.CodeDiff.Avalonia.Models;
 
 /// <summary>
-///     行范围评论的锚点——评论在 diff 中定位所需的最小信息:文件身份、侧别与起止行号。
-///     删除行锚定旧侧,新增行锚定新侧,上下文行保留发起选区时的侧别;行号为 1 基且起止
-///     都含端点(与 <see cref="MultiSelectRange" /> 一致)。视图按锚点稳定定位,视图模式
-///     切换与 hunk 展开/收起后按行号重新对位。<br />
-///     The anchor of a line-range comment — the minimal information a comment needs to locate
-///     itself in a diff: file identity, side, and the start/end line numbers. Deleted lines anchor
-///     the old side, added lines the new one, context lines keep the side the selection was made
-///     on; numbers are 1-based with both ends inclusive (like <see cref="MultiSelectRange" />).
-///     The view relocates comments by their stable anchors across view-mode switches and hunk
-///     expands/collapses.
+///     评论的文件、侧别与 1 基闭区间锚点;删除用旧侧,新增用新侧,上下文保留所选侧。<br />
+///     Comment anchor with file, side and inclusive 1-based range; deletions use the old side, additions the new side, context keeps the selected side.
 /// </summary>
 /// <param name="FilePath">
 ///     文件身份,由宿主提供(如仓库相对路径);未知时为 <c>null</c>。<br />

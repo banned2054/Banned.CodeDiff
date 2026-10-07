@@ -1,13 +1,8 @@
 namespace Banned.CodeDiff.Models;
 
 /// <summary>
-///     diff-file.ts 类型 HunkInfo 的移植。解析合法的 hunk 头("@@ -(\d+)(?:,(\d+))? +... @@")
-///     中起始索引总是存在;计数可能被省略("@@ -1 +1 @@"),在 JS 中即 Number(undefined) = NaN,
-///     此处用 null 表示。<br />
-///     Port of diff-file.ts type HunkInfo. Start indexes are always present in a
-///     parser-valid hunk header ("@@ -(\d+)(?:,(\d+))? +... @@"); the counts may be
-///     omitted ("@@ -1 +1 @@"), which is Number(undefined) = NaN in JS — represented
-///     here as null.
+///     hunk 头信息,移植自 diff-file.ts;省略的行数以 <c>null</c> 表示 JS 的 NaN。<br />
+///     Hunk header data ported from diff-file.ts; omitted counts use null to represent JS NaN.
 /// </summary>
 public sealed class HunkInfo
 {
@@ -15,8 +10,8 @@ public sealed class HunkInfo
     public int OldStartIndex { get; set; }
 
     /// <summary>
-    ///     旧侧行数;hunk 头省略计数时为 <c>null</c>(JS Number(undefined) = NaN)。<br />Old-side line count; <c>null</c> when the hunk
-    ///     header omits it (JS Number(undefined) = NaN).
+    ///     旧侧行数;hunk 头省略计数时为 <c>null</c>。<br />
+    ///     Old-side line count; null when omitted from the hunk header.
     /// </summary>
     public int? OldLength { get; set; }
 
@@ -24,8 +19,8 @@ public sealed class HunkInfo
     public int NewStartIndex { get; set; }
 
     /// <summary>
-    ///     新侧行数;hunk 头省略计数时为 <c>null</c>(JS Number(undefined) = NaN)。<br />New-side line count; <c>null</c> when the hunk
-    ///     header omits it (JS Number(undefined) = NaN).
+    ///     新侧行数;hunk 头省略计数时为 <c>null</c>。<br />
+    ///     New-side line count; null when omitted from the hunk header.
     /// </summary>
     public int? NewLength { get; set; }
 

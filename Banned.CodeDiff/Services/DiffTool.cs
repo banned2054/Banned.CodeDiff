@@ -3,8 +3,8 @@ using Banned.CodeDiff.Models;
 namespace Banned.CodeDiff.Services;
 
 /// <summary>
-///     packages/core/src/parse/template.ts 全局开关的移植（模板本体在 M2 阶段构建）。<br />Port of packages/core/src/parse/template.ts
-///     global switches (template bodies are M2).
+///     template.ts 的全局开关;不构建 HTML 模板。<br />
+///     Global switches ported from template.ts; HTML templates are not built.
 /// </summary>
 /// <remarks>
 ///     这里的开关是进程级全局状态（与 JS 原版一致），禁止并发读写。<br />
@@ -105,14 +105,8 @@ public static class DiffTool
                 ? double.PositiveInfinity
                 : hunkHeader.OldStartLine - previousHunk.Header.OldStartLine - previousHunk.Header.OldLineCount;
 
-        // In order to simplify the whole logic around expansion, only the hunk at the
-        // top can be expanded up exclusively, and only the hunk at the bottom (the
-        // dummy one, see getTextDiffWithBottomDummyHunk) can be expanded down
-        // exclusively.
-        // The rest of the hunks can be expanded both ways, except those which are too
-        // short and therefore the direction of expansion doesn't matter.
+        // 首 hunk 仅向上展开,末尾占位 hunk 仅向下展开;中间 hunk 视空间允许双向或合并。
         if (hunkIndex == 0)
-            // The top hunk can only be expanded if there is content above it
             return hunkHeader is { OldStartLine: > 1, NewStartLine: > 1 }
                 ? DiffHunkExpansionType.Up
                 : DiffHunkExpansionType.None;
@@ -147,7 +141,7 @@ public static class DiffTool
     public static string GetLang(string fileName)
     {
         var dotIndex = fileName.LastIndexOf('.');
-        // JS: fileName.slice(dotIndex + 1) — slice(0) when no dot, i.e. the whole name
+        // 无扩展名时按 JS slice(0) 使用整个文件名。
         return dotIndex >= 0 ? fileName[(dotIndex + 1)..] : fileName;
     }
 
@@ -190,8 +184,7 @@ public static class DiffTool
             var deletion = deletions[i];
             if (addition.Changes == null || deletion.Changes == null)
             {
-                // use the original text content to computed diff range
-                // fix: get diff with ignoreWhiteSpace config
+                // 使用原文计算范围,保留被忽略的空白字符位置。
                 var _addition = addition.Clone(JsOr(getAdditionRaw(addition.NewLineNumber ?? 0), addition.Text));
                 var _deletion = deletion.Clone(JsOr(getDeletionRaw(deletion.OldLineNumber ?? 0), deletion.Text));
                 var (addRange, delRange) = ChangeRange.RelativeChanges(_addition, _deletion);
@@ -202,7 +195,6 @@ public static class DiffTool
             var buildTemplate = TemplateOptions.EnableBuildTemplate;
             if (!TemplateOptions.EnableFastDiffTemplate)
             {
-                // M2: getPlainDiffTemplate / getSyntaxDiffTemplate calls happen here
                 _ = buildTemplate;
             }
             else
@@ -214,7 +206,6 @@ public static class DiffTool
                 deletion.DiffChanges         = delRange;
                 addition.InternalDiffChanges = delRange;
                 deletion.InternalDiffChanges = addRange;
-                // M2: getPlainDiffTemplateByFastDiff / getSyntaxDiffTemplateByFastDiff calls happen here
             }
         }
     }

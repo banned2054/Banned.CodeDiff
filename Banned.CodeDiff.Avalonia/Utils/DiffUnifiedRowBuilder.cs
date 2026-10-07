@@ -6,16 +6,8 @@ using Banned.CodeDiff.Services;
 namespace Banned.CodeDiff.Avalonia.Utils;
 
 /// <summary>
-///     从已构建的 <see cref="DiffFile" /> 统一模型为 <see cref="Views.DiffView" /> 的统一模式生成
-///     扁平行列表。与分栏构建器相同:对每个统一行索引,折叠的 hunk 占位行(存在且仍在隐藏行
-///     时)先于内容行输出,隐藏行被跳过。合成的末尾 hunk 以 <c>UnifiedLineLength</c>(最后一行
-///     内容行之后的位置)为键,循环因此多跑一个索引,以渲染底部的展开条。<br />
-///     Builds the flat row list for <see cref="Views.DiffView" /> in unified mode from a built
-///     <see cref="DiffFile" /> unified model. Mirrors the split builder: for each unified row index,
-///     the collapsed hunk placeholder (when present and still hiding lines) is emitted above the
-///     content row, and hidden rows are skipped. The synthetic trailing hunk is keyed at
-///     <c>UnifiedLineLength</c> — one past the last content row — so the loop runs one extra index to
-///     render the bottom expand strip.
+///     构建统一呈现行:跳过隐藏行,保留折叠 hunk 与末尾展开条。<br />
+///     Builds unified presentation rows, skipping hidden lines while retaining collapsed hunks and the trailing expansion strip.
 /// </summary>
 internal static class DiffUnifiedRowBuilder
 {

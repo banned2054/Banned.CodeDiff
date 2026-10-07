@@ -11,12 +11,8 @@ namespace Banned.CodeDiff.Utils;
 public static class EscapeHtml
 {
     /// <summary>
-    ///     把 <c>&amp;</c>、<c>&lt;</c>、<c>&gt;</c>、<c>"</c>、<c>'</c> 转义为对应 HTML 实体
-    ///     (&amp;amp;、&amp;lt;、&amp;gt;、&amp;quot;、&amp;#39;);不含特殊字符时原样返回,
-    ///     <c>null</c> 视为空字符串。<br />
-    ///     Escapes <c>&amp;</c>, <c>&lt;</c>, <c>&gt;</c>, <c>"</c> and <c>'</c> into their HTML
-    ///     entities (&amp;amp;, &amp;lt;, &amp;gt;, &amp;quot;, &amp;#39;); returns the input
-    ///     unchanged when it contains none of them, treating <c>null</c> as an empty string.
+    ///     转义 HTML 特殊字符 <c>&amp;&lt;&gt;"'</c>;<c>null</c> 视为空字符串。<br />
+    ///     Escapes HTML characters <c>&amp;&lt;&gt;"'</c>; treats null as an empty string.
     /// </summary>
     /// <param name="input">待转义文本,可为 <c>null</c>。The text to escape; may be <c>null</c>.</param>
     /// <returns>转义后的文本。The escaped text.</returns>

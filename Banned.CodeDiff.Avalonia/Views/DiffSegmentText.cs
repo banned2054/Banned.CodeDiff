@@ -8,26 +8,8 @@ using Banned.CodeDiff.Avalonia.Models;
 namespace Banned.CodeDiff.Avalonia.Views;
 
 /// <summary>
-///     渲染一行 diff:语法着色的文本段,加上绘制在变更区间背后的词级高亮矩形。Avalonia
-///     的文本 run 不提供逐 run 背景,因此高亮采用自绘:整行先用 <see cref="TextLayout" />
-///     排版一次,再用 <see cref="TextLayout.HitTestTextPosition" /> 把每个区间的边界解析为
-///     x/y 坐标。语法着色把每个 <see cref="DiffSyntaxRun" /> 画成一份独立的小布局,定位到
-///     整行布局为该 run 起点报告的坐标处(等宽的 diff 文本保证各文本段保持对齐)。
-///     <see cref="Wrap" /> 关闭时,布局是一行、按完整文本宽度度量(对应上游
-///     white-space: pre);开启时布局在度量宽度处自动换行(对应上游 diffViewWrap:
-///     pre-wrap),跨越换行处的区间或 run 会逐文本行绘制,如同浏览器的行内盒子跨行拆分。<br />
-///     Renders one diff line: syntax-colored text segments plus word-level highlight
-///     rectangles behind the changed ranges. Avalonia text runs expose no per-run
-///     background, so the highlight is custom-drawn: the whole line is laid out once
-///     with <see cref="TextLayout" /> and <see cref="TextLayout.HitTestTextPosition" />
-///     resolves each range boundary to x/y coordinates. Syntax coloring draws each
-///     <see cref="DiffSyntaxRun" /> as its own small layout, positioned at the
-///     coordinates the whole-line layout reports for the run start (monospaced diff
-///     text keeps segments aligned). With <see cref="Wrap" /> off the layout is one
-///     line measuring the full text width (upstream white-space: pre); with it on the
-///     layout wraps at the measured width (upstream diffViewWrap: pre-wrap), and a
-///     range or run crossing a line break is drawn per text line, like browser inline
-///     boxes fragmenting across lines.
+///     渲染 diff 行的语法颜色与词级高亮,支持自动换行。<br />
+///     Renders syntax colors and word-level highlights for a diff line, with optional wrapping.
 /// </summary>
 public sealed class DiffSegmentText : Control
 {
@@ -86,12 +68,8 @@ public sealed class DiffSegmentText : Control
     }
 
     /// <summary>
-    ///     获取或设置一个值,指示文本是否在度量宽度处自动换行、控件高度随多个文本行增长
-    ///     (对应上游 diffViewWrap),而不是渲染一行完整宽度的文本。放不下的单词会在行边缘
-    ///     断开。<br />
-    ///     Gets or sets a value indicating whether the text wraps at the measured width,
-    ///     growing the control height over several text lines (upstream diffViewWrap), instead of
-    ///     rendering one full-width line. Words break at line edges when they do not fit.
+    ///     是否按可用宽度换行并增加高度;过长单词在行边缘断开。<br />
+    ///     Whether text wraps to the available width and grows in height; long words break at line edges.
     /// </summary>
     public bool Wrap
     {
@@ -162,10 +140,7 @@ public sealed class DiffSegmentText : Control
     internal TextLayout? CurrentLayout { get; private set; }
 
     /// <summary>
-    ///     Computes the highlight rectangles for the given ranges within a text layout.
-    ///     A range crossing a line break (wrapped layout) fragments into one rectangle per text
-    ///     line — the first runs to its line's end, middle lines cover their full width, and the
-    ///     last starts at the line's left edge, like a browser inline box background.
+    ///     计算词级高亮矩形;跨行区间按文本行拆分。
     /// </summary>
     internal static IEnumerable<Rect> ComputeHighlightRects(
         TextLayout layout, int textLength, IReadOnlyList<DiffHighlight> highlights)
@@ -233,8 +208,6 @@ public sealed class DiffSegmentText : Control
     {
         var layout = GetLayout(availableSize.Width);
 
-        // Hand-rolled Select/Prepend/Max: same result (0 for an empty line list), no enumerator
-        // and closure allocations on this per-row hot path.
         var width = 0.0;
 
         foreach (var line in layout.TextLines)
@@ -301,12 +274,7 @@ public sealed class DiffSegmentText : Control
     }
 
     /// <summary>
-    ///     Builds one small layout per syntax segment, offset to the coordinates the whole-line
-    ///     layout reports for the segment start. Gaps between runs (plain segments) fall back to the
-    ///     whole-line layout's default foreground, so they are drawn as part of the nearest
-    ///     default-colored run — plain text is prepended to the first run's start and appended
-    ///     after the last run's end via the fallback layout pass. A segment crossing a line break
-    ///     (wrapped layout) is split per text line and each piece placed at its own coordinates.
+    ///     按文本行生成着色布局,空隙使用默认前景色。
     /// </summary>
     internal IReadOnlyList<(TextLayout Layout, double X, double Y)>? GetSyntaxLayouts(TextLayout layout)
     {
@@ -322,7 +290,6 @@ public sealed class DiffSegmentText : Control
 
         var layouts = new List<(TextLayout, double, double)>(runs.Count + 2);
 
-        // Plain text before the first colored run.
         if (runs[0].Start > 0) AddSegmentLayouts(layouts, layout, typeface, text, 0, runs[0].Start, FontSize, plain);
 
         var previousEnd = 0;
@@ -332,7 +299,6 @@ public sealed class DiffSegmentText : Control
             var start = Math.Clamp(run.Start, 0, text.Length);
             var end   = Math.Clamp(run.Start + run.Length, start, text.Length);
 
-            // A gap between runs renders with the default foreground.
             if (start > previousEnd)
                 AddSegmentLayouts(layouts, layout, typeface, text, previousEnd, start, FontSize, plain);
 
@@ -341,7 +307,6 @@ public sealed class DiffSegmentText : Control
             previousEnd = Math.Max(previousEnd, end);
         }
 
-        // Plain text after the last colored run.
         if (previousEnd < text.Length)
             AddSegmentLayouts(layouts, layout, typeface, text, previousEnd, text.Length, FontSize, plain);
 
@@ -351,9 +316,7 @@ public sealed class DiffSegmentText : Control
     }
 
     /// <summary>
-    ///     Adds the layouts for one foreground segment between <paramref name="start" /> and
-    ///     <paramref name="end" />: the whole-line layout reports where each piece begins, so a
-    ///     nowrap layout yields a single piece while a wrapped one yields one per text line.
+    ///     将一个前景色区间按文本行拆分,并定位到整行布局的坐标。
     /// </summary>
     private static void AddSegmentLayouts(List<(TextLayout Layout, double X, double Y)> layouts,
                                           TextLayout layout, Typeface typeface, string text, int start, int end,
@@ -381,7 +344,7 @@ public sealed class DiffSegmentText : Control
             }
             else
             {
-                // A zero-length line cannot advance the position by itself.
+                // 空文本行不能推进位置。
                 position++;
             }
         }
@@ -392,8 +355,7 @@ public sealed class DiffSegmentText : Control
     {
         base.OnPropertyChanged(change);
 
-        // The cached layouts depend on text, font, foreground, wrap mode, and the run structure;
-        // highlight ranges and brushes only affect rendering.
+        // 高亮范围和画刷仅影响绘制,无需重建文本布局。
         if (change.Property != TextProperty       &&
             change.Property != FontFamilyProperty &&
             change.Property != FontSizeProperty   &&

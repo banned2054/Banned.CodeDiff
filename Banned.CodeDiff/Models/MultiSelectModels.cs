@@ -2,11 +2,6 @@ namespace Banned.CodeDiff.Models;
 
 // Port of packages/core/src/multiSelect/types.ts.
 //
-// Deviations from the JS original (intentional):
-// - The JS side type is the string union "old" | "new" (MultiSelectSide); the C# port reuses the
-//   SplitSide enum already used by the rest of the core (data.ts converts between the two anyway).
-// - The JS LineRange interface is renamed to MultiSelectRange: "LineRange" is already taken by the
-//   change-range.ts port in ChangeRangeModels.cs.
 
 /// <summary>types.ts 接口 LineRange 的移植(已改名,见文件头注释)。<br />Port of types.ts interface LineRange (renamed, see file header).</summary>
 /// <param name="Side">选区所在侧(旧侧/新侧)。<br />The side of the range (old / new).</param>
@@ -15,10 +10,8 @@ namespace Banned.CodeDiff.Models;
 public sealed record MultiSelectRange(SplitSide Side, int StartLineNumber, int EndLineNumber);
 
 /// <summary>
-///     types.ts 接口 SelectedLine 的移植。JS 的可选字段在此成为普通成员:数据层
-///     (multiSelect/data.ts)总是赋值,实践中不会出现 `undefined`。<br />
-///     Port of types.ts interface SelectedLine. The JS optional fields become plain members: the data
-///     layer (multiSelect/data.ts) always assigns them, so `undefined` never occurs in practice.
+///     多选中的一行,由数据层填充。<br />
+///     One selected line, populated by the data layer.
 /// </summary>
 /// <param name="Index">
 ///     该行在所在侧分栏/统一模型中的位置(1 基)(JS 原版为 <c>getSplitLineIndexByLineNumber + 1</c>)。<br />
@@ -57,10 +50,8 @@ public sealed record SelectedLine(
 public sealed record MultiSelectResult(MultiSelectRange Range, IReadOnlyList<SelectedLine> Lines);
 
 /// <summary>
-///     types.ts 接口 MultiSelectState 的移植——内联的 <c>{ lineNumber, side } | null</c>
-///     startInfo 形态改为 <see cref="MultiSelectStartInfo" />。<br />
-///     Port of types.ts interface MultiSelectState — the inline
-///     <c>{ lineNumber, side } | null</c> startInfo shape becomes <see cref="MultiSelectStartInfo" />.
+///     多选交互状态。<br />
+///     Selection interaction state.
 /// </summary>
 /// <param name="IsSelecting">是否正在进行选择。<br />Whether a selection is in progress.</param>
 /// <param name="StartInfo">选区起点;<c>null</c> 表示尚未开始。<br />The selection start; <c>null</c> when not started.</param>
@@ -83,10 +74,8 @@ public sealed record MultiSelectState(bool IsSelecting, MultiSelectStartInfo? St
 public sealed record MultiSelectStartInfo(int LineNumber, SplitSide Side);
 
 /// <summary>
-///     types.ts / manager.ts 预选行形态 <c>{ old?: number[]; new?: number[] }</c> 的移植
-///     (setPreselectedLines 参数,visual.ts PreselectedLineType)。<br />
-///     Port of types.ts / manager.ts preselected-lines shape <c>{ old?: number[]; new?: number[] }</c>
-///     (setPreselectedLines parameter, visual.ts PreselectedLineType).
+///     两侧的预选行号集合。<br />
+///     Preselected line numbers for both sides.
 /// </summary>
 /// <param name="Old">
 ///     旧侧的预选行号列表(1 基);<c>null</c> 或空表示无。<br />Preselected old-side line numbers (1-based); <c>null</c> or

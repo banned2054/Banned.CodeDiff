@@ -11,13 +11,8 @@ namespace Banned.CodeDiff.Avalonia.Models;
 public abstract class DiffUnifiedRow : DiffRow;
 
 /// <summary>
-///     统一内容行:一条 diff 行,带旧/新双行号。<br />
-///     携带多选高亮状态(<see cref="IsSelected" />),选区拖动过程中已具体化的行容器
-///     原地更新 — 等价于上游 <c>.diff-multi-select-active</c> CSS 类的切换。<br />
-///     A unified content row: one diff line with dual (old/new) line numbers.
-///     Carries the multi-select highlight state (<see cref="IsSelected" />) so realized row
-///     containers update in place while a selection drag moves — the Avalonia equivalent of the
-///     upstream <c>.diff-multi-select-active</c> CSS class toggling.
+///     带旧/新行号、配色及高亮状态的统一内容行。<br />
+///     Unified content row with old/new numbers, colors and highlight state.
 /// </summary>
 public sealed class DiffUnifiedContentRow : DiffUnifiedRow, INotifyPropertyChanged
 {
@@ -55,8 +50,7 @@ public sealed class DiffUnifiedContentRow : DiffUnifiedRow, INotifyPropertyChang
         {
             DiffCellKind.Add    => brushes.AddContent,
             DiffCellKind.Delete => brushes.DeleteContent,
-            // Raw revealed rows use --diff-expand-content--; the number cell keeps the plain
-            // number value (--diff-expand-lineNumber-- is numerically identical upstream).
+            // 展开行仅内容背景有别,行号沿用普通配色。
             DiffCellKind.Expand => brushes.ExpandContent,
             _                   => brushes.ContextContent
         };
@@ -101,13 +95,8 @@ public sealed class DiffUnifiedContentRow : DiffUnifiedRow, INotifyPropertyChang
     public string? NewNumber { get; }
 
     /// <summary>
-    ///     获取单列行号模式(<c>DiffView.UseSingleLineNumberColumn</c>)下显示的合并行号:
-    ///     新号优先——上下文/新增行显示新号,删除行(无新号)显示旧号。供主题内合并号文本
-    ///     绑定使用,非公开 API。<br />
-    ///     Gets the merged line number shown by the single-number-column mode
-    ///     (<c>DiffView.UseSingleLineNumberColumn</c>): the new number wins — context and added
-    ///     lines show the new number, deleted lines (no new number) fall back to the old one.
-    ///     Bound by the merged-number text in the theme; not a public API.
+    ///     合并行号:新号优先,删除行回退旧号。<br />
+    ///     Merged line number: prefers the new number, falling back to the old number for deletions.
     /// </summary>
     internal string? MergedNumber { get; }
 
@@ -189,11 +178,8 @@ public sealed class DiffUnifiedContentRow : DiffUnifiedRow, INotifyPropertyChang
     }
 
     /// <summary>
-    ///     获取或设置该行是否落在某个评论锚点的行范围之内(与多选状态独立——新的拖选
-    ///     不清除该标志);通过 <see cref="PropertyChanged" /> 引发。<br />
-    ///     Gets or sets whether this row falls inside a comment anchor's line range (independent
-    ///     of the multi-select state — a new drag never clears it); raised through
-    ///     <see cref="PropertyChanged" />.
+    ///     是否位于评论范围内;独立于多选,变化时引发 <see cref="PropertyChanged" />。<br />
+    ///     Whether the row lies in a comment range; independent of selection and raises <see cref="PropertyChanged" /> on changes.
     /// </summary>
     public bool IsCommented
     {

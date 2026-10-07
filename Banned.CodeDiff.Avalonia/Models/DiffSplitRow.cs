@@ -35,13 +35,8 @@ public enum DiffCellKind
 public abstract class DiffSplitRow : DiffRow;
 
 /// <summary>
-///     分栏内容行的单侧:行号、文本及解析出的画刷。<br />
-///     携带多选高亮状态(<see cref="IsSelected" />),选区拖动过程中已具体化的行容器
-///     原地更新 — 等价于上游 <c>.diff-multi-select-active</c> CSS 类的切换。<br />
-///     One side of a split content row: line number, text, and resolved brushes.
-///     Carries the multi-select highlight state (<see cref="IsSelected" />) so realized row
-///     containers update in place while a selection drag moves — the Avalonia equivalent of the
-///     upstream <c>.diff-multi-select-active</c> CSS class toggling.
+///     分栏行的单侧内容,含行号、配色及高亮状态。<br />
+///     One side of a split row, with line number, colors and highlight state.
 /// </summary>
 public sealed class DiffSplitCellModel : INotifyPropertyChanged
 {
@@ -70,7 +65,7 @@ public sealed class DiffSplitCellModel : INotifyPropertyChanged
             DiffCellKind.Add     => (brushes.AddNumber, brushes.AddContent),
             DiffCellKind.Delete  => (brushes.DeleteNumber, brushes.DeleteContent),
             DiffCellKind.Context => (brushes.ContextNumber, brushes.ContextContent),
-            // --diff-expand-lineNumber-- shares the plain number value; only the content differs.
+            // 展开行仅内容背景有别,行号沿用普通配色。
             DiffCellKind.Expand => (brushes.ContextNumber, brushes.ExpandContent),
             _                   => (brushes.EmptyNumber, brushes.EmptyContent)
         };
@@ -178,11 +173,8 @@ public sealed class DiffSplitCellModel : INotifyPropertyChanged
     }
 
     /// <summary>
-    ///     获取或设置该单元格是否落在某个评论锚点的行范围之内(与多选状态独立——新的拖选
-    ///     不清除该标志);通过 <see cref="PropertyChanged" /> 引发。<br />
-    ///     Gets or sets whether this cell falls inside a comment anchor's line range (independent
-    ///     of the multi-select state — a new drag never clears it); raised through
-    ///     <see cref="PropertyChanged" />.
+    ///     是否位于评论范围内;独立于多选,变化时引发 <see cref="PropertyChanged" />。<br />
+    ///     Whether the cell lies in a comment range; independent of selection and raises <see cref="PropertyChanged" /> on changes.
     /// </summary>
     public bool IsCommented
     {
@@ -212,11 +204,8 @@ public sealed class DiffSplitContentRow : DiffSplitRow
     }
 
     /// <summary>
-    ///     获取该行在分栏模型中的索引(从 1 开始)— 即上游的 <c>data-line</c> 特性;
-    ///     多选视觉处理(multiSelect/visual.ts)用它匹配选中的行。<br />
-    ///     Gets the 1-based split model index of this row — the upstream <c>data-line</c>
-    ///     attribute; the multi-select visual pass (multiSelect/visual.ts) matches selected lines
-    ///     against it.
+    ///     该行在分栏模型中的 1 基索引,用于选区匹配。<br />
+    ///     The row's 1-based split-model index, used for selection matching.
     /// </summary>
     public int LineIndex { get; }
 

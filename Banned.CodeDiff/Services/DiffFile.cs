@@ -4,28 +4,14 @@ using System.Text;
 namespace Banned.CodeDiff.Services;
 
 /// <summary>
-///     diff 视图的核心中枢类型：持有一对旧/新文件与一组统一 diff 文本，负责解析 diff、
-///     组合原始内容，并产出分栏（split）/ 统一（unified）两种行模型供渲染层消费。<br />
-///     典型生命周期：构造（文件内容与 diff 文本至少提供其一）→ <see cref="InitRaw" /> 或
-///     <see cref="Init" /> → <see cref="BuildSplitDiffLines" /> / <see cref="BuildUnifiedDiffLines" />
-///     → 行查询与展开折叠；模型变化通过 <see cref="Updated" /> 事件通知，各阶段方法均幂等。<br />
-///     packages/core/src/diff-file.ts 的移植——M1（纯逻辑）子集加上语法状态（M5）：
-///     原始文件组合、diff 解析与词级范围、带展开/折叠的分栏/统一行模型，以及 initSyntax。
-///     未移植（web 专用）：bundle 序列化（getBundle / mergeBundle / _getFullBundle）、
-///     克隆实例同步与 DOM id（subscribe 保留为简单事件）。<br />
-///     Port of packages/core/src/diff-file.ts — the M1 (pure logic) subset plus the
-///     syntax state (M5): raw file composition, diff parsing + word-level ranges,
-///     the split/unified line models with expand/collapse, and initSyntax.
-///     Not ported (web-specific):
-///     - bundle serialization (getBundle / mergeBundle / _getFullBundle)
-///     - cloned-instance sync and DOM ids (subscribe stays as a simple event)
+///     diff 文件模型,移植自 packages/core/src/diff-file.ts。初始化后构建 split/unified 行模型,通过 <see cref="Updated" /> 通知变化;各阶段幂等。<br />
+///     Diff model ported from packages/core/src/diff-file.ts. Initialize, then build split/unified rows; stages are idempotent and changes raise <see cref="Updated" />.
 /// </summary>
 public sealed class DiffFile
 {
     /// <summary>JS module-level composeLen.</summary>
     private static int _composeLen = 40;
 
-    // JS: set by _mergeFullBundle (bundle serialization is M2 scope)
     private readonly bool _composeByRange = false;
 
     private readonly List<SplitLineItem> _splitLeftLines  = [];
@@ -55,12 +41,7 @@ public sealed class DiffFile
     private Dictionary<int, SyntaxLine>? _oldFileSyntaxLines;
     private Dictionary<int, DiffLine>?   _splitHunksLines;
 
-    // Line-number → list-index maps for the O(1) *ByLineNumber lookups. The lists are only
-    // appended inside their (idempotent, guarded) Build methods and expansions merely flip
-    // IsHidden / rewrite SplitInfo / UnifiedInfo, so the non-null line numbers — strictly
-    // increasing as each append increments its counter — never change once built. The maps are
-    // therefore built once at the end of the Build methods and stay valid for the instance
-    // lifetime. Placeholder half-rows carry a null line number and never match a query.
+    // 行号在构建后不再变化,展开仅改变可见性,索引可持续复用;空侧不入索引。
     private Dictionary<int, int>?      _splitLeftLineNumberIndex;
     private Dictionary<int, int>?      _splitRightLineNumberIndex;
     private Dictionary<int, DiffLine>? _unifiedHunksLines;
@@ -99,7 +80,6 @@ public sealed class DiffFile
 
         DiffList = diffListDedup;
 
-        // JS: getLang(_oldFileLang || _oldFileName || _newFileLang || _newFileName) || "txt"
         var oldLangSource = FirstNonEmpty(oldFileLang, oldFileName, newFileLang, newFileName);
         var newLangSource = FirstNonEmpty(newFileLang, newFileName, oldFileLang, oldFileName);
         OldFileLang = oldLangSource.Length > 0 ? DiffTool.GetLang(oldLangSource) : "txt";
@@ -354,9 +334,7 @@ public sealed class DiffFile
 
         var tmp = new List<DiffLine>();
 
-        // Reused across hunks (Clear keeps capacity) — getDiffRange only reads the lists
-        // by index while it runs and never retains them, so clearing at each group
-        // boundary matches the original per-hunk fresh lists exactly.
+        // GetDiffRange 不保留列表引用,每组清空后可复用。
         var additions = new List<DiffLine>();
 
         var deletions = new List<DiffLine>();
@@ -408,7 +386,6 @@ public sealed class DiffFile
             {
                 case DiffLineType.Hunk :
                 {
-                    // JS: typedI.text.split("@@")?.[1].split(" ").filter(Boolean)
                     var segs        = i.Text.Split("@@");
                     var numInfoSeg  = segs.Length > 1 ? segs[1] : null;
                     var numParts    = (numInfoSeg ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries);
@@ -416,8 +393,7 @@ public sealed class DiffFile
                     var newNumInfo  = numParts.Length > 1 ? numParts[1] : "";
                     var oldNumParts = oldNumInfo.Split(',');
                     var newNumParts = newNumInfo.Split(',');
-                    // The "?? 0" fallbacks are unreachable: the parser's DiffHeaderRegex
-                    // guarantees the first (start index) capture groups are pure digits.
+                    // 解析器保证起始索引为数字,这里的 ?? 0 不会生效。
                     var oldStartIndex = -JsNumber(oldNumParts[0]) ?? 0;
                     var oldLength     = oldNumParts.Length > 1 ? JsNumber(oldNumParts[1]) : null;
                     var newStartIndex = JsNumber(newNumParts[0]) ?? 0;
@@ -483,7 +459,6 @@ public sealed class DiffFile
 
         var newFilePlaceholderLines = new Dictionary<int, bool>();
 
-        // all of the file content not exist, try to use diff result to compose
         if (string.IsNullOrEmpty(OldFileContent) && string.IsNullOrEmpty(NewFileContent))
         {
             var newLineNumber    = 1;
@@ -503,7 +478,6 @@ public sealed class DiffFile
                 }
                 else
                 {
-                    // empty line for placeholder
                     oldContent.Append('\n');
                     oldFilePlaceholderLines[oldIndex] = true;
                 }
@@ -514,7 +488,6 @@ public sealed class DiffFile
                 }
                 else
                 {
-                    // empty line for placeholder
                     newContent.Append('\n');
                     newFilePlaceholderLines[newIndex] = true;
                 }
@@ -528,7 +501,6 @@ public sealed class DiffFile
             var newFileContent = newContent.ToString();
 
             if (!hasSymbolChanged && oldFileContent == newFileContent)
-                // JS warns in dev mode; invalid diff string
                 return;
 
             OldFileContent           = oldFileContent;
@@ -537,7 +509,6 @@ public sealed class DiffFile
             _newFileResult           = new SourceFile(NewFileContent, NewFileLang, NewFileName);
             _oldFilePlaceholderLines = oldFilePlaceholderLines;
             _newFilePlaceholderLines = newFilePlaceholderLines;
-            // all of the file just compose by diff, so we can not do the expand action
             IsPureDiffRender = true;
         }
         else if (_oldFileResult != null)
@@ -692,8 +663,6 @@ public sealed class DiffFile
 
     private void DoSyntax(IDiffHighlighter? registerHighlighter)
     {
-        // JS: the composeByMerge-without-full-merge bail-out is not ported
-        // (bundle serialization is not ported).
 
         ComposeSyntax(registerHighlighter);
 
@@ -900,7 +869,6 @@ public sealed class DiffFile
             _splitHunksLines[len] =   linePrevHunk;
         }
 
-        // have last hunk
         if (hideStart != null)
         {
             var lastDiff = new DiffLine("", DiffLineType.Hunk, null, null, null)
@@ -913,7 +881,6 @@ public sealed class DiffFile
                     StartHiddenIndexSnapshot = hideStart.Value,
                     EndHiddenIndexSnapshot   = _splitRightLines.Count,
 
-                    // just for placeholder
                     PlainText     = "",
                     OldStartIndex = 0,
                     NewStartIndex = 0,
@@ -1082,7 +1049,6 @@ public sealed class DiffFile
             _unifiedHunksLines[len] =   linePrevHunk;
         }
 
-        // have last hunk
         if (hideStart != null)
         {
             var lastDiff = new DiffLine("", DiffLineType.Hunk, null, null, null)
@@ -1095,7 +1061,6 @@ public sealed class DiffFile
                     StartHiddenIndexSnapshot = hideStart.Value,
                     EndHiddenIndexSnapshot   = _unifiedLines.Count,
 
-                    // just for placeholder
                     PlainText     = "",
                     OldStartIndex = 0,
                     NewStartIndex = 0,
@@ -1344,7 +1309,6 @@ public sealed class DiffFile
             case HunkExpandDirection.Up :
             {
                 if (current.IsLast == true)
-                    // JS: console.error "[@git-diff-view/core] The last hunk cannot expand up!"
                     return;
 
                 UnhideSplitRange(info.EndHiddenIndex - _composeLen, info.EndHiddenIndex);

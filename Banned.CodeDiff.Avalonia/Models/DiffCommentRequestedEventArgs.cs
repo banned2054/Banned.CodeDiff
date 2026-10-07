@@ -1,12 +1,8 @@
 namespace Banned.CodeDiff.Avalonia.Models;
 
 /// <summary>
-///     <see cref="Views.DiffView.CommentRequested" /> 事件的载荷——由宿主显式触发的
-///     <see cref="Views.DiffView.BeginCommentCommand" /> 引发,携带从当前选区推导的锚点;
-///     普通选区完成本身不会引发该事件。<br />
-///     Payload of <see cref="Views.DiffView.CommentRequested" /> — raised by the host-triggered
-///     <see cref="Views.DiffView.BeginCommentCommand" /> with the anchor derived from the current
-///     selection; completing an ordinary selection never raises it by itself.
+///     显式评论命令的锚点载荷;普通选区完成不引发评论请求。<br />
+///     Anchor payload of an explicit comment command; ordinary selection completion does not request a comment.
 /// </summary>
 public sealed class DiffCommentRequestedEventArgs : EventArgs
 {

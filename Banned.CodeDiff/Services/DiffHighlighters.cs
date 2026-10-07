@@ -4,15 +4,8 @@ using Banned.CodeDiff.Services.TextMate;
 namespace Banned.CodeDiff.Services;
 
 /// <summary>
-///     内置默认语法高亮器的持有者。JS 侧对应：core 的 file.ts 引入 lowlight 的
-///     <c>highlighter</c> 单例作为内置引擎；C# 移植版改为内置基于 TextMate 的
-///     <see cref="TextMate.TextMateHighlighter" />（highlight.js 未移植）。
-///     与上游一致的全局可变状态——设计上非线程安全。<br />
-///     Holder of the built-in default syntax highlighter. JS counterpart: core's
-///     file.ts imports the lowlight <c>highlighter</c> singleton as the built-in
-///     engine; the C# port ships the TextMate-based <see cref="TextMate.TextMateHighlighter" />
-///     as the built-in default instead (highlight.js is not ported).
-///     Global mutable state, same as upstream — not thread-safe by design.
+///     内置 TextMate 高亮器的全局持有者;非线程安全。<br />
+///     Global holder of the built-in TextMate highlighter; not thread-safe.
 /// </summary>
 public static class DiffHighlighters
 {

@@ -6,25 +6,12 @@ using TextMateSharp.Grammars;
 namespace Banned.CodeDiff.Services.TextMate;
 
 /// <summary>
-///     C# 移植版的内置语法高亮引擎(JS 对应物:核心库默认面向的 lowlight 单例高亮器;
-///     此处基于 TextMateSharp/oniguruma,并内嵌与上游 shiki 引擎相同的语法包与
-///     github-light/dark 主题)。与 shiki 一样是 "class" 型引擎:一次分词产出的包装节点
-///     其样式同时携带明暗两套主题颜色(以 CSS 变量
-///     "--diff-view-light:#...;--diff-view-dark:#..." 形式),因此切换主题永不重新分词。<br />
-///     The C# port's built-in syntax engine (JS counterpart: the lowlight singleton
-///     core programs against by default; here TextMateSharp/oniguruma with the same
-///     bundled grammars and github-light/dark themes as the upstream shiki engine).
-///     Like shiki it is a "class" engine: one tokenization produces wrappers whose
-///     style carries BOTH theme colors as CSS variables
-///     ("--diff-view-light:#...;--diff-view-dark:#..."), so theme switches never
-///     re-tokenize.
+///     基于 TextMateSharp 的内置高亮器;一次分词保留明暗配色与 scope,切换主题无需重新分词。<br />
+///     Built-in TextMateSharp highlighter; tokenization retains light/dark colors and scopes so theme changes need no retokenization.
 /// </summary>
 /// <remarks>
-///     基于 TextMateSharp(oniguruma 原生库),目标平台需提供对应的原生运行时;
-///     分词经由进程级共享的 <c>Registry</c>(单一 oniguruma 状态,设计上即为全局)。<br />
-///     Built on TextMateSharp (the oniguruma native library) — the target platform must
-///     provide the matching native runtime; tokenization goes through a process-wide shared
-///     <c>Registry</c> (a single oniguruma state, global by design).
+///     需对应平台的 oniguruma 原生运行时;分词使用进程级共享 Registry。<br />
+///     Requires the platform's oniguruma native runtime; tokenization uses a process-wide shared Registry.
 /// </remarks>
 public sealed class TextMateHighlighter : IDiffHighlighter
 {
@@ -88,11 +75,8 @@ public sealed class TextMateHighlighter : IDiffHighlighter
     }
 
     /// <summary>
-    ///     把整个原始文件分词为 hast 风格语法树(root 节点,子节点为逐 token 的 element 包装,
-    ///     相邻且外观相同的 token 已合并);文件名命中忽略规则或语言未注册时返回 <c>null</c>。<br />
-    ///     Tokenizes the whole raw file into a hast-like syntax tree (a root node whose children
-    ///     are per-token element wrappers, adjacent tokens of equal appearance merged); returns
-    ///     <c>null</c> when the file name hits an ignore pattern or the language is not registered.
+    ///     将完整文件分词为语法树并保留原始 scope;忽略的文件或未知语言返回 <c>null</c>。<br />
+    ///     Tokenizes a full file into a syntax tree retaining original scopes; ignored files and unknown languages return null.
     /// </summary>
     /// <param name="raw">完整原始文件文本。The full raw file text.</param>
     /// <param name="fileName">文件名,用于匹配忽略规则,可为 <c>null</c>。File name matched against the ignore patterns; may be <c>null</c>.</param>
@@ -100,11 +84,8 @@ public sealed class TextMateHighlighter : IDiffHighlighter
     /// <param name="theme">未使用——每个 token 的样式同时携带明暗两套主题颜色。Unused; each token's style carries both light and dark theme colors.</param>
     /// <returns>root 语法节点;需跳过高亮时为 <c>null</c>。The root syntax node, or <c>null</c> when highlighting must be skipped.</returns>
     /// <remarks>
-    ///     自第 1 行起对整个文件分词,规则状态跨行传递,与上游"高亮整个原始文件"契约一致;
-    ///     分词抛出的异常会向外传播(上游 JS 的 getAST 捕获引擎错误并返回 undefined)。<br />
-    ///     Tokenizes from line 1 with rule state carried across lines — the same "highlight the
-    ///     whole raw file" contract as upstream; tokenizer exceptions propagate to the caller
-    ///     (upstream JS getAST catches engine errors and returns undefined).
+    ///     从首行分词并跨行保留状态;分词异常向调用者传播。<br />
+    ///     Tokenizes from the first line with state carried across lines; tokenizer exceptions propagate.
     /// </remarks>
     public SyntaxNode? GetAst(string raw, string? fileName, string? lang, string? theme)
     {
@@ -129,8 +110,7 @@ public sealed class TextMateHighlighter : IDiffHighlighter
             Console.Error.WriteLine(e);
             throw;
         }
-        // JS shiki getAST catches engine errors and returns undefined.
-        // return null;
+        // 分词异常向外传播,与上游捕获错误并返回 undefined 的行为不同。
     }
 
     /// <summary>
@@ -142,8 +122,7 @@ public sealed class TextMateHighlighter : IDiffHighlighter
     {
         MaxLineToIgnoreSyntax = value;
 
-        // Cached files may now be over (or back under) the threshold — drop them so a fresh
-        // DiffFile sees the new setting, exactly as it would without the cache.
+        // 阈值变化后须清空缓存,避免复用原先允许或跳过的结果。
         SourceFile.ClearFileCache();
     }
 
@@ -162,14 +141,7 @@ public sealed class TextMateHighlighter : IDiffHighlighter
     }
 
     /// <summary>
-    ///     Tokenizes the full file from line 1 (rule stack carried across lines, so
-    ///     block comments / template literals spanning collapsed hunks keep their
-    ///     state — same "highlight the whole raw file" contract as upstream), and
-    ///     emits a flat hast-like tree: one wrapper element per token plus bare
-    ///     "\n" text nodes between lines. Adjacent tokens resolving to the same
-    ///     theme colors are merged into one span — vscode-textmate's binary
-    ///     tokenizer (what shiki consumes) coalesces equal-metadata tokens the
-    ///     same way (e.g. a "/*" begin capture and its comment body).
+    ///     从首行分词并跨行保留规则状态;相邻同色 token 合并为包装节点。
     /// </summary>
     private static SyntaxNode Tokenize(string raw, string scopeName)
     {
@@ -208,7 +180,7 @@ public sealed class TextMateHighlighter : IDiffHighlighter
 
             foreach (var token in result.Tokens)
             {
-                // LineText tokenizes with a trailing sentinel; clamp into the real line.
+                // 分词含行尾哨兵,须钳制到实际文本。
                 var start = Math.Clamp(token.StartIndex, 0, line.Length);
                 var end   = Math.Clamp(token.EndIndex, start, line.Length);
 
@@ -262,8 +234,6 @@ public sealed class TextMateHighlighter : IDiffHighlighter
     {
         foreach (var scopeName in scopes)
         {
-            // Split('.') equivalent scanned right-to-left without materializing the
-            // segment array/strings — each segment is only used for equality checks.
             var segmentEnd = scopeName.Length;
 
             for (var i = scopeName.Length - 1; i >= -1; i--)

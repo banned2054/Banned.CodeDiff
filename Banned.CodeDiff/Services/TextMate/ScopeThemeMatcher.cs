@@ -24,13 +24,8 @@ public sealed class ScopeThemeMatcher
     }
 
     /// <summary>
-    ///     从主题 JSON 构建 scope→前景色匹配器,走 vscode-textmate 的 parseTheme /
-    ///     resolveParsedThemeRules 流水线(规则排序、空 scope 规则提升为主题默认值、
-    ///     十六进制色统一大写);缺失 tokenColors 或无有效规则时返回不带规则的空匹配器。<br />
-    ///     Builds a scope-to-foreground matcher from theme JSON, running the vscode-textmate
-    ///     parseTheme / resolveParsedThemeRules pipeline (rule sorting, empty-scope rules
-    ///     lifted into the theme defaults, upper-cased hex colors); returns a rule-less empty
-    ///     matcher when tokenColors is missing or no valid rule exists.
+    ///     从主题 JSON 构建前景色匹配器;无有效规则时返回空匹配器。<br />
+    ///     Builds a foreground matcher from theme JSON; returns an empty matcher when no valid rules exist.
     /// </summary>
     /// <param name="themeJson">主题 JSON 文本(UTF-8)。The theme JSON document (UTF-8).</param>
     /// <returns>解析完成的匹配器。The parsed matcher.</returns>
@@ -38,8 +33,7 @@ public sealed class ScopeThemeMatcher
     {
         using var doc = JsonDocument.Parse(themeJson);
 
-        // vscode-textmate parseTheme reads rawTheme.settings; the bundled
-        // @shikijs/themes files (and shiki itself) use the equivalent tokenColors.
+        // 兼容 vscode-textmate 的 settings 与 shiki 的 tokenColors。
         if (!doc.RootElement.TryGetProperty("tokenColors", out var tokenColors) ||
             tokenColors.ValueKind != JsonValueKind.Array)
             return new ScopeThemeMatcher(new ThemeTrieElement(null, []), null);
@@ -86,8 +80,7 @@ public sealed class ScopeThemeMatcher
                 var value = foregroundElement.GetString()!;
 
                 if (IsValidHexColor(value))
-                    // ColorMap.getId upper-cases colors; shiki's output uses the
-                    // upper-cased form.
+                    // 颜色统一大写,与 shiki 输出一致。
                     foreground = value.ToUpperInvariant();
             }
 
@@ -121,8 +114,7 @@ public sealed class ScopeThemeMatcher
             return r != 0 ? r : a.Index.CompareTo(b.Index);
         });
 
-        // JS: resolveParsedThemeRules shifts the empty-scope rules off the sorted
-        // list into the theme defaults (later entries overwrite earlier ones).
+        // 空 scope 规则作为默认值,后项覆盖前项。
         string? defaultForeground = null;
 
         while (parsed is [{ Scope.Length: 0 }, ..])
@@ -134,9 +126,7 @@ public sealed class ScopeThemeMatcher
             if (incoming.Foreground != null) defaultForeground = incoming.Foreground;
         }
 
-        // shiki additionally falls back to the theme's editor.foreground for
-        // tokens whose scopes match nothing (the github themes only define the
-        // default there).
+        // 无匹配时回退 editor.foreground,与 shiki 一致。
         if (doc.RootElement.TryGetProperty("colors", out var colors)             &&
             colors.ValueKind == JsonValueKind.Object                             &&
             colors.TryGetProperty("editor.foreground", out var editorForeground) &&
@@ -155,16 +145,8 @@ public sealed class ScopeThemeMatcher
     }
 
     /// <summary>
-    ///     按 vscode-textmate 编码元数据的方式解析 token 作用域栈的前景色:作用域从最内层
-    ///     向外逐层匹配,命中主题规则的最深层生效——未命中的层继承外层作用域的颜色
-    ///     (例如 JSON key 的引号标点会因此渲染成 key 的颜色)。全部未命中时回退到主题默认
-    ///     前景色(shiki 的 colorMap[0])。<br />
-    ///     Resolves the foreground color for a token scope stack the way
-    ///     vscode-textmate's encoded metadata does: scopes are matched
-    ///     innermost-first and the deepest layer with a theme hit wins — a layer
-    ///     with no hit inherits the enclosing scope's color (that is why e.g. a
-    ///     JSON key's quote punctuation renders in the key color). Falls back to
-    ///     the theme default foreground (shiki's colorMap[0]).
+    ///     最内层命中的 scope 规则生效,否则继承外层颜色;均未命中时使用主题默认色。<br />
+    ///     Uses the innermost matching scope rule, inheriting outer colors otherwise; no match falls back to the theme default.
     /// </summary>
     /// <param name="scopeStack">从最内到最外排列的作用域栈。The scope stack, ordered innermost first.</param>
     /// <returns>

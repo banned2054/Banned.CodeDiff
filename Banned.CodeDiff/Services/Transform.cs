@@ -20,10 +20,8 @@ public static class Transform
     public static bool EnableTransform { get; private set; }
 
     /// <summary>
-    ///     ⚠️ **警告：危险操作** ⚠️ 此函数会修改全局状态，可能产生意外的副作用；内容可能还需要 escapeHTML 处理。<br />
-    ///     ⚠️ **WARNING: DANGEROUS OPERATION** ⚠️
-    ///     This function modifies global state and may cause unexpected side effects.
-    ///     You may also need escapeHTML for the content.
+    ///     设置进程级内容转换函数;影响后续内容处理。<br />
+    ///     Sets the process-wide content transform, affecting subsequent content processing.
     /// </summary>
     /// <param name="fn">内容转换函数，不能为 null。<br />The content transform function, must not be null.</param>
     public static void SetTransformForTemplateContent(Func<string, string> fn)
@@ -34,13 +32,13 @@ public static class Transform
     }
 
     /// <summary>
-    ///     ⚠️ **警告：危险操作** ⚠️<br />
-    ///     ⚠️ **WARNING: DANGEROUS OPERATION** ⚠️
+    ///     设置进程级文件转换函数。<br />
+    ///     Sets the process-wide file transform.
     /// </summary>
     /// <param name="fn">文件转换函数，不能为 null。<br />The file transform function, must not be null.</param>
     /// <remarks>
-    ///     同时清除源文件缓存，使下一次构建使用新的转换函数。<br />Also clears the source file cache so the next construction picks up the new
-    ///     transform.
+    ///     同时清空语法缓存,使后续处理使用新转换。<br />
+    ///     Also clears syntax caches so subsequent processing uses the new transform.
     /// </remarks>
     public static void SetTransformForFile(Func<string, string> fn)
     {
@@ -48,8 +46,7 @@ public static class Transform
 
         EnableTransform = true;
 
-        // Cached source files carry the previously transformed raw — drop them so the next
-        // construction picks up the new transform (fresh-instance behavior without the cache).
+        // 旧语法结果已包含旧转换,更换转换时须清空缓存。
         SourceFile.ClearFileCache();
     }
 

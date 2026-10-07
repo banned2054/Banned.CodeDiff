@@ -4,13 +4,8 @@ using Banned.CodeDiff.Models;
 namespace Banned.CodeDiff.Avalonia.Models;
 
 /// <summary>
-///     行内评论卡片行:渲染在锚点范围内最后一个可见行之后,聚合同一锚点上的全部评论。
-///     为 M7 新增的呈现行——上游的对应物是宿主业务的「+」评论 widget,本移植把它做成
-///     控件内建的行类型,内容经 <c>DiffView.Comments</c> 由宿主提供。<br />
-///     An inline comment card row: rendered after the last visible line of its anchored range,
-///     aggregating every comment on the same anchor. A presentation row new in M7 — the upstream
-///     counterpart is the host-business "+" comment widget, which this port builds in as a row
-///     type whose content the host supplies through <c>DiffView.Comments</c>.
+///     同锚点评论的卡片行,位于范围内最后一个可见行之后。<br />
+///     Card row grouping comments with the same anchor, placed after its last visible line.
 /// </summary>
 public abstract class DiffCommentRow : DiffRow
 {

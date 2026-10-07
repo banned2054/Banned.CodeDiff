@@ -3,30 +3,15 @@ using Banned.CodeDiff.Services;
 namespace Banned.CodeDiff.Models;
 
 /// <summary>
-///     packages/core/src/file.ts 的移植——单个源文件的原文 + 语法状态。上游的模块级跨实例缓存
-///     (cache.ts + getFile)未按原样移植;其中昂贵的部分——语法分词结果——改为通过 <see cref="DoSyntax" />
-///     内部的有界 LRU 记忆化,并作为性能增强记录(见 Docs/CHANGELOG.md)。在 doSyntax 层级缓存
-///     (而非像 getFile 那样共享整个 File 实例)保持了"语法只有在本文件执行过 doSyntax 后才存在"
-///     这一可观察规则。<br />
-///     Port of packages/core/src/file.ts — raw + syntax state of one source file.
-///     The upstream module-level cross-instance cache (cache.ts + getFile) is not ported
-///     as-is; the expensive part — the syntax tokenization result — is memoized instead
-///     through a bounded LRU inside <see cref="DoSyntax" />, recorded as a performance
-///     enhancement (see Docs/CHANGELOG.md). Caching at the doSyntax level (rather than
-///     sharing whole File instances like getFile does) keeps the observable rule "syntax
-///     exists only after doSyntax ran on this file" intact.
+///     单个源文件的原文与语法状态,移植自 packages/core/src/file.ts。语法仅在 <see cref="DoSyntax" /> 后可用。<br />
+///     Raw text and syntax state ported from packages/core/src/file.ts; syntax is available only after <see cref="DoSyntax" />.
 /// </summary>
 public sealed class SourceFile(string row, string lang, string? fileName = null)
 {
     private const int SyntaxResultCapacity = 8;
 
     /// <summary>
-    ///     Bounded LRU of recent syntax results (most recent first), keyed by the inputs that
-    ///     determine them: content, lang, file name, engine identity, and theme — except for
-    ///     <c>Class</c>-typed engines (the built-in one), whose ASTs carry both themes
-    ///     (the upstream otherThemeKey reuse generalized). Like
-    ///     <c>DiffParser.Shared</c>/<c>TemplateOptions</c> this is global mutable state shared
-    ///     across <see cref="Services.DiffFile" /> instances — single-threaded use by design.
+    ///     有界语法 LRU 缓存,按内容、语言、文件名、引擎及主题匹配;Class 引擎跨主题复用。全局状态,禁止并发使用。
     /// </summary>
     private static readonly LinkedList<SyntaxResultEntry> SyntaxResultOrder = [];
 
@@ -96,12 +81,8 @@ public sealed class SourceFile(string row, string lang, string? fileName = null)
     public HighlighterType? HighlighterType { get; private set; }
 
     /// <summary>
-    ///     丢弃所有记忆化的语法结果。在全局引擎配置变化时调用(transform 函数、语法忽略列表 / 阈值),
-    ///     使下一次 doSyntax 反映新设置——无记忆化时每次运行都会重新计算,该可观察行为被保留。<br />
-    ///     Drops every memoized syntax result. Called when global engine configuration changes
-    ///     (transform function, syntax ignore list / threshold) so the next doSyntax reflects the
-    ///     new settings — without memoization every run recomputed, and that observable behavior
-    ///     is preserved.
+    ///     清空语法缓存,使后续高亮使用更新后的全局配置。<br />
+    ///     Clears syntax caches so subsequent highlighting uses updated global settings.
     /// </summary>
     public static void ClearFileCache()
     {
@@ -178,13 +159,8 @@ public sealed class SourceFile(string row, string lang, string? fileName = null)
     }
 
     /// <summary>
-    ///     File.doSyntax({ registerHighlighter, theme }) 的移植。上游在注入的高亮器不认识该语言时
-    ///     回退到内置 lowlight 引擎;C# 移植的内置默认是 TextMate 引擎,双方都不认识的语言保持
-    ///     无高亮(GetAst → null)。<br />
-    ///     Port of File.doSyntax({ registerHighlighter, theme }). The upstream falls
-    ///     back to the built-in lowlight engine when the injected highlighter does not
-    ///     know the language; the C# port's built-in default is the TextMate engine,
-    ///     and a language unknown to both simply stays unhighlighted (GetAst → null).
+    ///     使用指定高亮器,不支持语言时回退内置引擎;两者均不支持时不高亮。<br />
+    ///     Uses the supplied highlighter, falling back to the built-in engine for unsupported languages; otherwise leaves text unhighlighted.
     /// </summary>
     /// <param name="registerHighlighter">
     ///     注入的高亮器;<c>null</c> 时使用内置默认。<br />The highlighter to register; <c>null</c> uses the
@@ -198,7 +174,6 @@ public sealed class SourceFile(string row, string lang, string? fileName = null)
         var finalHighlighter = registerHighlighter ?? DiffHighlighters.Default;
 
         if (RawLength is > 0 && RawLength > finalHighlighter.MaxLineToIgnoreSyntax)
-            // JS logs a dev warning ("Ignoring syntax highlighting ... exceeds the threshold").
             return;
 
         var supportEngine = finalHighlighter;
@@ -212,16 +187,12 @@ public sealed class SourceFile(string row, string lang, string? fileName = null)
             supportEngine = DiffHighlighters.Default;
         }
 
-        // NOTE: the enum must be qualified here — the simple name resolves to the
-        // HighlighterType property of this instance (C# "Color Color" rule).
         if (HasDoSyntax                           &&
             supportEngine.Name == HighlighterName &&
             supportEngine.Type == HighlighterType &&
             (Theme == theme || supportEngine.Type == Models.HighlighterType.Class))
             return;
 
-        // A memoized result for the same inputs replaces the re-tokenization (the expensive
-        // part of this method); the adopted fields are exactly what a fresh run produced.
         if (TryGetSyntaxResult(Raw, Lang, FileName, supportEngine, theme) is { } hit)
         {
             Ast             = hit.Ast;
@@ -243,8 +214,6 @@ public sealed class SourceFile(string row, string lang, string? fileName = null)
 
         var result = supportEngine.ProcessAst(Ast);
 
-        // The upstream additionally builds HTML string templates here when the
-        // global TemplateOptions switch is on; templates are not ported (see AGENTS.md).
 
         SyntaxFile = result.SyntaxFileObject;
 
@@ -257,8 +226,6 @@ public sealed class SourceFile(string row, string lang, string? fileName = null)
         CacheSyntaxResult(Raw, Lang, FileName, supportEngine, theme, Ast, SyntaxFile,
                           result.SyntaxFileLineNumber);
 
-        // JS additionally runs a dev-only #doCheck() comparing syntax lines with raw lines;
-        // the C# port covers that equivalence through golden tests instead.
 
         HasDoSyntax = true;
     }

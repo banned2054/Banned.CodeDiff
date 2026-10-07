@@ -3,24 +3,14 @@ using Banned.CodeDiff.Models;
 namespace Banned.CodeDiff.Utils;
 
 /// <summary>
-///     packages/utils/src/highlightAST.ts(processAST)的移植:遍历高亮器产出的树,把含
-///     换行的 text 节点拆分为逐行子节点,并将全部内容归入行号从 1 起始的逐行
-///     <see cref="SyntaxLine" /> 记录。所有高亮器引擎共用;无状态静态辅助。<br />
-///     Port of packages/utils/src/highlightAST.ts (processAST): walks the
-///     highlighter-produced tree, splits text nodes containing newlines into
-///     per-line child nodes, and buckets everything into 1-based per-line
-///     <see cref="SyntaxLine" /> records. Shared by every highlighter engine.
+///     语法树逐行处理工具,移植自 packages/utils/src/highlightAST.ts。<br />
+///     Per-line syntax tree helpers ported from packages/utils/src/highlightAST.ts.
 /// </summary>
 public static class HighlightAst
 {
     /// <summary>
-    ///     遍历 AST 并把文本内容归入行号从 1 起始的逐行 <see cref="SyntaxLine" /> 记录;
-    ///     会就地标注节点的 StartIndex / EndIndex / LineNumber,含换行的 text 节点会被
-    ///     拆分为逐行子节点。<br />
-    ///     Walks the AST and buckets text content into per-line <see cref="SyntaxLine" />
-    ///     records keyed from line 1; nodes are annotated in place with StartIndex /
-    ///     EndIndex / LineNumber, and text nodes containing newlines are split into
-    ///     per-line child nodes.
+    ///     按 1 基行号整理 AST,就地标注节点位置并拆分含换行的文本节点。<br />
+    ///     Groups the AST by 1-based line number, annotating positions in place and splitting multiline text nodes.
     /// </summary>
     /// <param name="ast">高亮器产出的根节点。The root node produced by the highlighter.</param>
     /// <returns>逐行文本段集合与总行数。The per-line span records and the total line count.</returns>
@@ -77,10 +67,8 @@ public static class HighlightAst
 
                     for (var i = 0; i < lines.Length; i++)
                     {
-                        // JS: i === lines.length - 1 ? lines[i] : lines[i] + "\n"
                         var value = i == lines.Length - 1 ? lines[i] : lines[i] + "\n";
 
-                        // JS: i === 0 ? lineNumber : ++lineNumber
                         var line = i == 0 ? lineNumber : ++lineNumber;
 
                         var child = new SyntaxNode
@@ -88,8 +76,7 @@ public static class HighlightAst
                             Type  = "text",
                             Value = value,
 
-                            // JS: Infinity placeholder — immediately overwritten by
-                            // AppendToLine below, never used in computation.
+                            // JS 的 Infinity 占位值会立即被 AppendToLine 覆盖,不参与计算。
                             StartIndex = int.MaxValue,
                             EndIndex   = int.MaxValue,
                             LineNumber = line

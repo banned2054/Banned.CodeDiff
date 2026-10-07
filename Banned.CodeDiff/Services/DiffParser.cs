@@ -5,20 +5,8 @@ namespace Banned.CodeDiff.Services;
 
 // Port of packages/core/src/parse/diff-parse.ts.
 //
-// !NOTE: ALL of the diff parse logic copy from desktop, SEE https://github.com/desktop/desktop
-// With mirror change
-//
-// https://en.wikipedia.org/wiki/Diff_utility
-//
-// @@ -l,s +l,s @@ optional section heading
-//
-// The hunk range information contains two hunk ranges. The range for the hunk of the original
-// file is preceded by a minus symbol, and the range for the new file is preceded by a plus
-// symbol. Each hunk range is of the format l,s where l is the starting line number and s is
-// the number of lines the change hunk applies to for each respective file.
-//
-// In many versions of GNU diff, each range can omit the comma and trailing value s,
-// in which case s defaults to 1
+// Derived from GitHub Desktop diff parsing: https://github.com/desktop/desktop
+// hunk 范围格式为 l,s:起始行号与行数;省略 s 时按 1 处理。
 /// <summary>
 ///     diff 解析所需的行前缀常量与正则表达式（来自 packages/core/src/parse/diff-parse.ts）。<br />Line prefix constants and regexes used
 ///     by the diff parser (from packages/core/src/parse/diff-parse.ts).
@@ -41,15 +29,13 @@ public static class DiffParserConstants
     ///     仅由换行符组成的行的前缀 "\n"，部分行只有换行符而没有其他字符（见 git-diff-view#41）。<br />Prefix for lines that only contain a newline
     ///     character without any other content (see git-diff-view#41).
     /// </summary>
-    // https://github.com/MrWangJustToDo/git-diff-view/issues/41
-    // some line only have a new line symbol without any other character
+    // 保留仅含换行符的行:git-diff-view issue #41。
     public const string DiffPrefixNewLine = "\n";
 
     /// <summary>
     ///     匹配 hunk 头部 "@@ -l,s +l,s @@" 的正则表达式，行数 s 可省略（省略时默认为 1）。<br />Regex matching hunk headers "@@ -l,s +l,s @@",
     ///     where the count s may be omitted (defaulting to 1).
     /// </summary>
-    // in which case s defaults to 1
     public static readonly Regex DiffHeaderRegex =
         new(@"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@", RegexOptions.Compiled);
 
@@ -75,7 +61,6 @@ public static class DiffParserConstants
 /// </remarks>
 public sealed class DiffParser
 {
-    // JS: /\n\\ No newline at end of file/g
     private static readonly Regex NoNewlineMarkerRegex = new(@"\n\\ No newline at end of file", RegexOptions.Compiled);
 
     /// <summary>
@@ -123,29 +108,13 @@ public sealed class DiffParser
     {
         _ls = _le + 1;
 
-        // We've reached the end of the diff
         if (_ls >= _text.Length) return false;
 
         _le = _text.IndexOf('\n', _ls);
 
-        // If we can't find the next newline character we'll put our
-        // end pointer at the end of the diff string
         if (_le == -1) _le = _text.Length;
 
-        // We've succeeded if there's anything to read in between the
-        // start and the end
-        //
-        // https://github.com/MrWangJustToDo/git-diff-view/issues/41
-        // some file content may have multiple line without any character
-        // such as
-        // ```
-        //
-        //
-        //
-        // +
-        // +
-        // ```
-        // this will cause ls === le, but we not in the end of file
+        // 空行可使 ls == le,不一定代表文件结束(上游 issue #41)。
         return _ls != _le;
     }
 
@@ -157,8 +126,7 @@ public sealed class DiffParser
     {
         if (header) return NextLine() ? JsSubstring(_text, _ls, _le) : null;
 
-        // JS: text.substring(ls + 1, le + 1) — substring clamps end at the string
-        // boundary (last line without a trailing newline)
+        // 末行可能无换行;JsSubstring 按 JS 语义钳制越界终点。
         return NextLine()
             ? JsSubstring(_text, _ls + 1, _le + 1)
             : _text.Length > _ls
@@ -189,22 +157,10 @@ public sealed class DiffParser
     }
 
     /// <summary>
-    ///     Parse the diff header, meaning everything from the start of the diff output to
-    ///     the end of the line beginning with +++
-    ///     Example diff header:
-    ///     diff --git a/app/src/lib/diff-parser.ts b/app/src/lib/diff-parser.ts
-    ///     index e1d4871..3bd3ee0 100644
-    ///     --- a/app/src/lib/diff-parser.ts
-    ///     +++ b/app/src/lib/diff-parser.ts
-    ///     Returns header info extracted from the diff header (currently whether it's a
-    ///     binary patch) or null if the end of the diff was reached before the +++ line
-    ///     could be found (which is a valid state).
+    ///     读取文件头并提取二进制补丁标记;文件结束或缺少 <c>+++</c> 时返回 <c>null</c>。
     /// </summary>
     private DiffHeaderInfo? ParseDiffHeader()
     {
-        // TODO: There's information in here that we might want to
-        // capture, such as mode changes
-        // check valid header (JS keeps `hasMinus` only for a __DEV__ console error)
         while (NextLine())
         {
             if (LineStartsWith("Binary files ") && LineEndsWith("differ"))
@@ -212,14 +168,12 @@ public sealed class DiffParser
 
             if (LineStartsWith("---"))
             {
-                // JS: hasMinus = true (only consumed by a __DEV__ console error)
             }
 
             if (LineStartsWith("+++")) return new DiffHeaderInfo { IsBinary = false };
         }
 
-        // It's not an error to not find the +++ line, see the
-        // 'parses diff of empty file' test in diff-parser-tests.ts
+        // 空文件 diff 可以没有 +++ 头。
         return null;
     }
 
@@ -257,7 +211,6 @@ public sealed class DiffParser
         var m = DiffParserConstants.DiffHeaderRegex.Match(line);
         if (!m.Success) throw new InvalidOperationException("Invalid hunk header format");
 
-        // If endLines are missing default to 1, see diffHeaderRe docs
         var oldStartLine = NumberFromGroup(m, 1);
         var oldLineCount = NumberFromGroup(m, 2, 1);
         var newStartLine = NumberFromGroup(m, 3);
@@ -322,12 +275,7 @@ public sealed class DiffParser
 
             if (line == null) throw new InvalidOperationException("Expected unified diff line but reached end of diff");
 
-            // A marker indicating that the last line in the original or the new file
-            // is missing a trailing newline. In other words, the presence of this marker
-            // means that the new and/or original file lacks a trailing newline.
-            //
-            // When we find it we have to look up the previous line and set the
-            // noTrailingNewLine flag
+            // 无末尾换行标记作用于前一行。
             if (c == DiffParserConstants.DiffPrefixNoNewline[0])
             {
                 // See https://github.com/git/git/blob/21f862b498925194f8f1ebe8203b7a7df756555b/apply.c#L1725-L1732
@@ -342,10 +290,7 @@ public sealed class DiffParser
                 continue;
             }
 
-            // We must increase `diffLineNumber` only when we're certain that the line
-            // is not a "no newline" marker. Otherwise, we'll end up with a wrong
-            // `diffLineNumber` for the next line. This could happen if the last line
-            // in the file doesn't have a newline before the change.
+            // 换行标记不占 diff 行号,须在处理标记后递增。
             diffLineNumber++;
 
             DiffLine diffLine;
@@ -398,7 +343,6 @@ public sealed class DiffParser
             var headerEnd = _le;
             var header    = JsSubstring(_text, 0, headerEnd);
 
-            // empty diff
             if (headerInfo == null)
                 return new RawDiff
                 {

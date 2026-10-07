@@ -111,8 +111,7 @@ public sealed class DiffHunkHeader(int oldStartLine, int oldLineCount, int newSt
         return $"@@ -{OldStartLine},{OldLineCount} +{NewStartLine},{NewLineCount} @@";
     }
 
-    // NOTE: kept identical to the JS original, which compares oldStartLine twice
-    // and never compares newLineCount.
+    // 保留上游比较行为:重复比较 oldStartLine,不比较 newLineCount。
     /// <summary>判断与另一个 hunk 头是否相等。<br />Determines equality with another hunk header.</summary>
     /// <remarks>
     ///     行为与 JS 原版逐行一致:OldStartLine 被比较了两次,且从不比较 NewLineCount。<br />Behavior is kept identical to the JS original:
@@ -168,12 +167,7 @@ public sealed class DiffHunk(
 }
 
 /// <summary>记录 diff 中每行相关细节。<br />Track details related to each line in the diff.</summary>
-//
-// The DiffLineItem / DiffHunkItem fields from diff-file.ts (index, prevHunkLine,
-// isFirst, isLast, hunkInfo, splitInfo, unifiedInfo) are flattened onto this class:
-// the JS implementation mutates one shared object identity (the DiffLine created by
-// the parser is the same object used as a DiffLineItem/DiffHunkItem and referenced
-// from split/unified models), so C# keeps the same instances instead of wrapping.
+// 解析、分栏和统一模型共享同一行实例,因此将 DiffLineItem / DiffHunkItem 状态合并于此。
 public class DiffLine(
     string       text,
     DiffLineType type,
