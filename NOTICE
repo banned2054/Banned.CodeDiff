@@ -1,78 +1,134 @@
 Banned.CodeDiff
 Copyright (c) Banned
 
-This project is a C#/.NET port of the git-diff-view project, with an Avalonia
-rendering layer.
+This project is a C#/.NET port of git-diff-view, with an Avalonia rendering
+layer. The following notices identify upstream sources of ported code,
+embedded resources, and the syntax highlighting engine.
 
-Portions of the design, parsing logic, algorithms, and behavior are based on or
-derived from:
+Ported code
+-----------
 
 git-diff-view
 Copyright (c) 2022 MrWangJustToDo
-Licensed under the MIT License
+License: MIT
 https://github.com/MrWangJustToDo/git-diff-view
 
-The diff parser ported through git-diff-view (Services/DiffParser.cs) originates
-from GitHub Desktop:
+Source of the diff models, parsing and transformation logic, rendering
+behavior, and multi-line selection implementation and styling.
 
-desktop
+GitHub Desktop
 Copyright (c) GitHub, Inc.
-Licensed under the MIT License
+License: MIT
 https://github.com/desktop/desktop
 
-The HTML escaping utility ported through git-diff-view (Utils/EscapeHtml.cs)
-originates from the Vue.js core packages/shared/src/escape-html.ts, licensed
-under the MIT License.
+Original source of the diff parser, ported through git-diff-view into
+Banned.CodeDiff/Services/DiffParser.cs.
 
-The character-level diff implementation (Services/FastDiff.cs) is a C# port of:
+Vue.js core
+Copyright (c) 2018-present, Yuxi (Evan) You and Vue contributors
+License: MIT
+https://github.com/vuejs/core
+
+Original source of the HTML escaping function in packages/shared/src/escapeHtml.ts,
+ported through git-diff-view into Banned.CodeDiff/Utils/EscapeHtml.cs.
+This attribution concerns the C# port; Vue is not a runtime dependency.
 
 fast-diff
-Copyright (c) Jason Chen <jhchen7@gmail.com>
-Licensed under the Apache License, Version 2.0
+Copyright 2014-2023 Jason Chen <jhchen7@gmail.com>
+License: Apache-2.0
 https://github.com/jhchen/fast-diff
 
-fast-diff itself modifies the diff-match-patch library by Neil Fraser.
+Source of the character-level diff implementation in
+Banned.CodeDiff/Services/FastDiff.cs, ported from fast-diff@1.3.0.
+fast-diff modifies Diff Match and Patch by Neil Fraser:
+Copyright 2006 Google Inc.
+License: Apache-2.0
+https://github.com/google/diff-match-patch
 
-The multi-line selection feature (Banned.CodeDiff/Models/MultiSelectModels.cs,
-Banned.CodeDiff/Utils/MultiSelectData.cs, Banned.CodeDiff.Avalonia/Services/DiffSelection.cs,
-Banned.CodeDiff.Avalonia/Services/DiffSelectionDom.cs, and the selection overlay styling in
-Themes/Generic.axaml) is a C#/Avalonia port of the git-diff-view multiSelect modules
-(packages/core/src/multiSelect/{types,data,manager,dom,visual}.ts, the selection styles of
-packages/*/src/_com.css, and the wrapper semantics of
-packages/react/src/components/DiffViewWithMultiSelect.tsx), all part of git-diff-view (MIT) and
-covered by the notice above.
+The Apache License, Version 2.0 is reproduced in this project's LICENSE file.
 
-The golden-test harness (tests/js-harness) bundles the TypeScript sources of
-git-diff-view and fast-diff@1.3.0 with esbuild to generate reference data at
-development time. These sources are test-only inputs and are not distributed
-with the compiled libraries or NuGet packages.
+Syntax highlighting
+-------------------
 
-Syntax highlighting (M5) is built on:
+TextMateSharp
+Copyright (c) 2021 Daniel Peñalba
+License: MIT
+https://github.com/danipen/TextMateSharp
 
-TextMateSharp (grammar tokenization engine, with its Onigwrap oniguruma binding)
-Copyright (c) 2022 danipascual
-Licensed under the MIT License
-https://github.com/danipascual/TextMateSharp
-
-The scope-to-color theme matching (Services/TextMate/ScopeThemeMatcher.cs) is a
-C# port of the vscode-textmate theme matcher as bundled with shiki:
+Provides TextMate grammar tokenization through the TextMateSharp NuGet package.
 
 vscode-textmate / @shikijs/vscode-textmate
 Copyright (c) Microsoft Corporation
-Licensed under the MIT License
+License: MIT
+https://github.com/microsoft/vscode-textmate
+https://github.com/shikijs/vscode-textmate
 
-The embedded TextMate grammars (Resources/TextMate/grammars) and the GitHub
-light/dark themes (Resources/TextMate/themes) are extracted from the shiki
-bundled languages and themes:
+Source of the scope-to-color theme matcher ported into
+Banned.CodeDiff/Services/TextMate/ScopeThemeMatcher.cs.
+
+Embedded grammars and themes
+---------------------------
 
 shiki (@shikijs/langs, @shikijs/themes)
-Copyright (c) 2021 Anthony Fu
-Licensed under the MIT License
+Copyright (c) 2021 Pine Wu
+Copyright (c) 2023 Anthony Fu <https://github.com/antfu>
+License: MIT
+https://github.com/shikijs/shiki
 
-The individual grammar files originate from their upstream VS Code language
-extensions and keep their respective licenses (MIT / TextMate license); the
-github-light/github-dark themes originate from the GitHub Visual Studio Code
-theme (MIT). Extraction happens at development time via
-tests/js-harness/extract-textmate.mjs, which also normalizes capture
-shorthand and converts/drops the begin/while rules TextMateSharp cannot
-compile.
+Source bundles for the TextMate grammars in
+Banned.CodeDiff/Resources/TextMate/grammars and the github-light.json and
+github-dark.json themes in Banned.CodeDiff/Resources/TextMate/themes.
+Resources are extracted by tests/js-harness/extract-textmate.mjs, with grammar
+compatibility adjustments for TextMateSharp. Individual grammars retain their
+upstream licenses, including MIT and TextMate licenses; shiki's license does
+not replace those licenses.
+
+GitHub VS Code theme
+Copyright (c) 2020 Primer
+License: MIT
+https://github.com/primer/github-vscode-theme
+
+Original source of the github-light.json and github-dark.json themes
+distributed through shiki.
+
+microsoft/vscode (built-in themes)
+Copyright (c) 2015 - present Microsoft Corporation
+License: MIT
+https://github.com/microsoft/vscode
+
+The syntax color definitions in monokai.json, vs-dark.json, and vs-light.json
+are based on the built-in Monokai, Dark+, and Light+ themes. Related
+diff/interface palette values are adapted from these editor colors.
+
+Development tools
+-----------------
+
+The golden-test harness in tests/js-harness uses the original TypeScript
+sources of git-diff-view and fast-diff@1.3.0 to generate reference data.
+These JavaScript/TypeScript sources and the development tools are not
+distributed with the compiled libraries or NuGet packages. The ported C#
+code and embedded grammar/theme resources are covered by the notices above.
+
+MIT License
+-----------
+
+The following terms apply to the components identified as MIT-licensed above,
+with their respective copyright notices retained in the corresponding entries.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
