@@ -282,22 +282,22 @@ public class DiffExpandTests
         // Revealed raw rows (no DiffLine) carry --diff-expand-content-- (#fafafa light) instead of
         // the plain-context background; the number cell keeps --diff-expand-lineNumber-- (#fafafa).
         var revealed = As<DiffSplitContentRow>(view.Rows[8]);
-        Assert.That(((SolidColorBrush)revealed.Left.ContentBackground).Color, Is.EqualTo(Color.Parse("#fafafa")));
-        Assert.That(((SolidColorBrush)revealed.Right.ContentBackground).Color, Is.EqualTo(Color.Parse("#fafafa")));
-        Assert.That(((SolidColorBrush)revealed.Left.NumberBackground).Color, Is.EqualTo(Color.Parse("#fafafa")));
+        Assert.That(((ISolidColorBrush)revealed.Left.ContentBackground).Color, Is.EqualTo(Color.Parse("#fafafa")));
+        Assert.That(((ISolidColorBrush)revealed.Right.ContentBackground).Color, Is.EqualTo(Color.Parse("#fafafa")));
+        Assert.That(((ISolidColorBrush)revealed.Left.NumberBackground).Color, Is.EqualTo(Color.Parse("#fafafa")));
 
         // In-diff context rows (with a DiffLine) keep --diff-plain-content-- (#ffffff light).
         var inDiff = As<DiffSplitContentRow>(view.Rows[1]); // ctx 038, part of the diff text
         Assert.That(inDiff.Left.Kind, Is.EqualTo(DiffCellKind.Context));
-        Assert.That(((SolidColorBrush)inDiff.Left.ContentBackground).Color, Is.EqualTo(Color.Parse("#ffffff")));
+        Assert.That(((ISolidColorBrush)inDiff.Left.ContentBackground).Color, Is.EqualTo(Color.Parse("#ffffff")));
 
         // Unified revealed rows share the expand palette.
         var unified = new DiffView { DiffFile = CreateExpandableFile(), ViewMode = DiffViewMode.Unified };
         unified.ExpandHunkDownCommand.Execute(As<DiffUnifiedHunkRow>(unified.Rows[9]));
         var unifiedRevealed = As<DiffUnifiedContentRow>(unified.Rows[9]);
         Assert.That(unifiedRevealed.Kind, Is.EqualTo(DiffCellKind.Expand));
-        Assert.That(((SolidColorBrush)unifiedRevealed.ContentBackground).Color, Is.EqualTo(Color.Parse("#fafafa")));
-        Assert.That(((SolidColorBrush)unifiedRevealed.NumberBackground).Color, Is.EqualTo(Color.Parse("#fafafa")));
+        Assert.That(((ISolidColorBrush)unifiedRevealed.ContentBackground).Color, Is.EqualTo(Color.Parse("#fafafa")));
+        Assert.That(((ISolidColorBrush)unifiedRevealed.NumberBackground).Color, Is.EqualTo(Color.Parse("#fafafa")));
     }
 
     [AvaloniaTest]

@@ -1,10 +1,8 @@
-using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless.NUnit;
-using Avalonia.VisualTree;
 using Avalonia.Media;
 using Avalonia.Styling;
-
+using Avalonia.VisualTree;
 using Banned.CodeDiff.Avalonia.Models;
 using Banned.CodeDiff.Avalonia.Views;
 using Banned.CodeDiff.Services;
@@ -63,8 +61,21 @@ public class DiffPaletteTests
 
     private static void AssertColor(IBrush? brush, string hex)
     {
-        Assert.That(brush, Is.InstanceOf<SolidColorBrush>());
-        Assert.That(((SolidColorBrush)brush!).Color, Is.EqualTo(Color.Parse(hex)));
+        Assert.That(brush, Is.InstanceOf<ISolidColorBrush>());
+        Assert.That(((ISolidColorBrush)brush!).Color, Is.EqualTo(Color.Parse(hex)));
+    }
+
+    /// <summary>
+    ///     The preset brushes are immutable with the opacity baked into the alpha channel —
+    ///     assert the effective color instead of the (now constant) brush opacity.
+    /// </summary>
+    private static void AssertOverlay(IBrush? brush, string hex, double opacity)
+    {
+        var color = Color.Parse(hex);
+
+        Assert.That(brush, Is.InstanceOf<ISolidColorBrush>());
+        Assert.That(((ISolidColorBrush)brush!).Color,
+                    Is.EqualTo(Color.FromArgb((byte)Math.Round(color.A * opacity), color.R, color.G, color.B)));
     }
 
     // Baseline rows: [0](ctx 1|1) [1](ctx 2|2) [2](ctx 3|3) [3](del 4|-) [4](-|add 4)
@@ -78,8 +89,7 @@ public class DiffPaletteTests
 
         AssertColor(add.Right.ContentBackground, "#dafbe1");
         AssertColor(add.Right.NumberBackground, "#aceebb");
-        AssertColor(add.Left.SelectionOverlay, "#f0c000");
-        Assert.That(((SolidColorBrush)add.Left.SelectionOverlay).Opacity, Is.EqualTo(0.15));
+        AssertOverlay(add.Left.SelectionOverlay, "#f0c000", 0.15);
         AssertColor(add.Left.SelectionEdgeStrip, "#2588fa");
     }
 
@@ -118,7 +128,7 @@ public class DiffPaletteTests
         Assert.That(context.Left.NumberBackground, Is.SameAs(ctxBg));
 
         // Slots left null keep the built-in values.
-        AssertColor(context.Right.SelectionOverlay, "#f0c000");
+        AssertOverlay(context.Right.SelectionOverlay, "#f0c000", 0.15);
         AssertColor(context.Right.SelectionEdgeStrip, "#2588fa");
     }
 

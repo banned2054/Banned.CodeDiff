@@ -1,0 +1,30 @@
+{
+  "name": "Visual Studio Light+",
+  "type": "light",
+  "colors": { "editor.foreground": "#000000" },
+  "tokenColors": [
+    { "scope": ["comment"], "settings": { "foreground": "#008000" } },
+    { "scope": ["string"], "settings": { "foreground": "#A31515" } },
+    { "scope": ["string.regexp"], "settings": { "foreground": "#811F3F" } },
+    { "scope": ["constant.numeric"], "settings": { "foreground": "#098658" } },
+    { "scope": ["constant.language"], "settings": { "foreground": "#0000FF" } },
+    { "scope": ["constant.character.escape"], "settings": { "foreground": "#EE0000" } },
+    { "scope": ["keyword"], "settings": { "foreground": "#AF00DB" } },
+    { "scope": ["keyword.operator"], "settings": { "foreground": "#000000" } },
+    { "scope": ["keyword.other.type"], "settings": { "foreground": "#0000FF" } },
+    { "scope": ["storage"], "settings": { "foreground": "#0000FF" } },
+    { "scope": ["storage.type"], "settings": { "foreground": "#0000FF" } },
+    { "scope": ["entity.name.type"], "settings": { "foreground": "#267F99" } },
+    { "scope": ["entity.name.class"], "settings": { "foreground": "#267F99" } },
+    { "scope": ["entity.other.inherited-class"], "settings": { "foreground": "#267F99" } },
+    { "scope": ["entity.name.function"], "settings": { "foreground": "#795E26" } },
+    { "scope": ["entity.name.tag"], "settings": { "foreground": "#800000" } },
+    { "scope": ["entity.other.attribute-name"], "settings": { "foreground": "#E50000" } },
+    { "scope": ["variable"], "settings": { "foreground": "#001080" } },
+    { "scope": ["variable.parameter"], "settings": { "foreground": "#001080" } },
+    { "scope": ["support.function"], "settings": { "foreground": "#795E26" } },
+    { "scope": ["support.type"], "settings": { "foreground": "#267F99" } },
+    { "scope": ["support.constant"], "settings": { "foreground": "#0070C1" } },
+    { "scope": ["punctuation"], "settings": { "foreground": "#000000" } }
+  ]
+}

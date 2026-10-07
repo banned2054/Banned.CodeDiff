@@ -1,0 +1,31 @@
+{
+  "name": "Monokai",
+  "type": "dark",
+  "colors": { "editor.foreground": "#F8F8F2" },
+  "tokenColors": [
+    { "scope": ["comment"], "settings": { "foreground": "#88846F" } },
+    { "scope": ["string", "string.quoted"], "settings": { "foreground": "#E6DB74" } },
+    { "scope": ["constant.numeric"], "settings": { "foreground": "#AE81FF" } },
+    { "scope": ["constant.language"], "settings": { "foreground": "#AE81FF" } },
+    { "scope": ["constant.character.escape"], "settings": { "foreground": "#AE81FF" } },
+    { "scope": ["keyword"], "settings": { "foreground": "#F92672" } },
+    { "scope": ["keyword.control"], "settings": { "foreground": "#F92672" } },
+    { "scope": ["keyword.operator"], "settings": { "foreground": "#F92672" } },
+    { "scope": ["storage"], "settings": { "foreground": "#66D9EF" } },
+    { "scope": ["storage.type"], "settings": { "foreground": "#66D9EF" } },
+    { "scope": ["entity.name.type"], "settings": { "foreground": "#66D9EF" } },
+    { "scope": ["entity.name.class"], "settings": { "foreground": "#A6E22E" } },
+    { "scope": ["entity.other.inherited-class"], "settings": { "foreground": "#A6E22E" } },
+    { "scope": ["entity.name.function"], "settings": { "foreground": "#A6E22E" } },
+    { "scope": ["entity.other.attribute-name"], "settings": { "foreground": "#A6E22E" } },
+    { "scope": ["variable"], "settings": { "foreground": "#F8F8F2" } },
+    { "scope": ["variable.language"], "settings": { "foreground": "#FD971F" } },
+    { "scope": ["variable.parameter"], "settings": { "foreground": "#FD971F" } },
+    { "scope": ["support.function"], "settings": { "foreground": "#A6E22E" } },
+    { "scope": ["support.type"], "settings": { "foreground": "#66D9EF" } },
+    { "scope": ["support.constant"], "settings": { "foreground": "#66D9EF" } },
+    { "scope": ["punctuation.definition.comment"], "settings": { "foreground": "#88846F" } },
+    { "scope": ["meta.tag"], "settings": { "foreground": "#F92672" } },
+    { "scope": ["meta.brace"], "settings": { "foreground": "#F8F8F2" } }
+  ]
+}

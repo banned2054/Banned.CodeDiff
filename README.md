@@ -6,8 +6,9 @@ English | [**简体中文**](https://github.com/banned2054/Banned.CodeDiff/blob/
 
 An Avalonia diff viewer for unified diff text. It renders split or unified views with line and word
 highlights, expandable hunks, syntax highlighting, line selection, copy, and long-line wrapping.
-Hosts can attach inline comments to line ranges and override the main semantic colors through a
-single palette entry.
+Hosts can attach inline comments to line ranges, combine built-in theme presets (GitHub, Codex,
+Monokai, Visual Studio) independently per palette side, and override individual semantic colors or
+syntax scopes.
 
 The first package version is `0.1.0`; both packages target .NET 10.0. The built-in visual style
 currently follows GitHub diff conventions and includes light and dark palettes. Additional styles
@@ -25,8 +26,9 @@ See [NOTICE](./NOTICE) for upstream acknowledgements.
 - Select lines, copy selected or complete file contents, and wrap long lines.
 - Attach inline comments to line ranges: the view renders comment cards and persistent anchor
   highlights while the host owns drafting, submitting, and persistence.
-- Override the main semantic colors (line kinds, selection, comment cards) per theme variant
-  through `DiffView.Palette`.
+- Combine built-in theme presets per palette side (`DiffView.ThemePreset` / `DiffPreset` /
+  `SyntaxPreset`: GitHub, Codex, Monokai, Visual Studio) and override individual semantic colors
+  (`DiffView.Palette`) or syntax scopes (`DiffView.SyntaxOverrides`) on top of any preset.
 - Use the core parser and models without Avalonia, or provide a custom `IDiffHighlighter`.
 
 ## Installation
@@ -102,9 +104,27 @@ Bind it to the Avalonia control:
   2. After a selection, bind a host button to `DiffView.BeginCommentCommand` and handle `CommentRequested` — it delivers the anchor (side + start/end line numbers + file path) derived from the selection.
   3. Render the comment editor in the host, then hand the comment list back through `DiffView.Comments`. Each anchor renders one card below the last visible line of its range, and its lines keep a persistent highlight that survives new selections, view-mode switches, and hunk expansions. Comments are file-scoped: only those whose `Anchor.FilePath` matches `DiffView.FilePath` render, so switching files never leaks comments onto same-numbered lines. Reassign `Comments` (a new collection instance) after the comment set changes; drafting, submitting, replying, deleting, and persistence stay in the host.
 - Override the main semantic colors with `DiffView.Palette` (`Light`/`Dark` slots for added,
-  deleted, and context line backgrounds, the selection overlay and edge strip, and the comment
-  highlight and card colors). `null` slots keep the built-in upstream colors; the default
-  appearance is unchanged.
+  deleted, and context line backgrounds — number and content cells together or separately — plus
+  expand rows, hunk headers, the splitter, word-level emphasis, per-kind selected-line backgrounds,
+  the selection overlay and edge strip, and the comment highlight and card colors). `null` slots
+  keep the resolved preset values; the default appearance is unchanged.
+- Theme presets and per-slot resolution (M8): `DiffView.ThemePreset` applies a combined preset
+  (`GitHub`, `Codex`, `Monokai`, `VisualStudio`) to the Diff/interface palette and the syntax
+  theme at once; `DiffView.DiffPreset` / `DiffView.SyntaxPreset` pin one side independently (e.g.
+  Monokai syntax colors over GitHub diff backgrounds). Every slot resolves independently: host
+  overrides beat the independent preset, which beats the combined preset, which beats the GitHub
+  baseline. Presets without a light variant (Monokai, Codex) fall back to GitHub light under
+  light themes — no color inversion. Switching presets keeps host overrides. Preset and syntax
+  brushes are immutable, so theme state cannot leak between instances through a mutated brush.
+- Override syntax colors per scope with `DiffView.SyntaxOverrides` (`Overrides`: scope name → hex
+  color; `DefaultForeground`: plain-text color). Rules apply after the preset match, so one scope
+  can be rewritten without rewriting the theme; `DefaultForeground` only rewrites tokens that took
+  the theme's default color, and it also colors whole rows without syntax information (such as
+  `.txt` files). Custom syntax colors resolve from the retained token scopes — the
+  engine never re-tokenizes and its shared themes are never mutated. Without any preset or
+  override the wrapper's built-in colors are used directly.
+- Text-selection color slots (`TextSelectionBackground` / `TextSelectionForeground`) are defined
+  for a future character-selection feature; M8 ships no character-selection interaction.
 - Expand hunks with `OnSplitHunkExpand` or `OnUnifiedHunkExpand`. Expansion requires full old/new file contents.
 
 `DiffParser.Shared` and `TemplateOptions` hold global state. Avoid using them concurrently across threads.

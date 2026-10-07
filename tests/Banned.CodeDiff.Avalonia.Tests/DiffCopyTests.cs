@@ -22,7 +22,8 @@ namespace Banned.CodeDiff.Avalonia.Tests;
 /// </summary>
 public class DiffCopyTests
 {
-    private static DiffFile CreateExpandableFile()
+    /// <summary>Shared with the M7/M8 review regression tests (internal: same test assembly).</summary>
+    internal static DiffFile CreateExpandableFile()
     {
         var oldLines = new List<string>();
         var newLines = new List<string>();
@@ -103,7 +104,7 @@ public class DiffCopyTests
 
     // Template column indexes: split = old-num(0), old-content(1), splitter(2), new-num(3),
     // new-content(4); unified = old-num(0), new-num(1), content(2).
-    private static Point CellCenter(Window window, ItemsControl items, object row, int column)
+    internal static Point CellCenter(Window window, ItemsControl items, object row, int column)
     {
         var container = items.ContainerFromItem(row);
 

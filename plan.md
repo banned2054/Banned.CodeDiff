@@ -20,6 +20,7 @@
 | M5 | 语法高亮 | ✅ 已完成 |
 | M6 | 打磨 | ✅ 已完成 |
 | M7 | 行范围评论与主题定制入口 | ✅ 已完成（2026-10-06） |
+| M8 | Diff/语法配色分层、主题预设与局部覆盖 | ✅ 已完成（2026-10-06） |
 
 每个里程碑保持可构建、可测试、可演示；完成一个更新一次本文件状态与 `Docs/CHANGELOG.md`。
 
@@ -28,14 +29,17 @@
 - `Banned.CodeDiff` 核心库完成：解析（`DiffParser`）、split/unified 行模型（`DiffFile`）、
   词级区间（`ChangeRange` / `FastDiff`）、展开状态机、`TemplateOptions` 全局开关。
 - 目录已按 `Models` / `Services` / `Utils` 分类。
-- 614 个核心测试 + 67 个 Avalonia headless 测试全绿（构建 0 警告 0 错误），
+- 当前回归基线为 624 个核心测试 + 90 个 Avalonia headless 测试全绿（Debug/Release 构建 0 警告 0 错误），
   含与 JS 原版逐字段对比的黄金基准，以及与真实 shiki 引擎逐字段对比的语法黄金基准。
 - `Banned.CodeDiff.Avalonia` 已就位：`DiffView` 控件（split/unified 视图、词级高亮、
   语法高亮、hunk 展开/收起 + 虚拟化、明暗主题、行选择、复制、长行 wrap）与配套 Demo，
   详见第 4~8 节执行结果。
-- M7 已完成（2026-10-06）：行范围评论（锚点事件 + 评论卡片 + 持久高亮）与统一语义配色
-  入口 `DiffView.Palette`，见第 11 节执行结果。后续可评估项：任意字符/子串选择
-  （`DiffSegmentText` 自绘文本选择）。
+- M7 已完成（2026-10-06）：行范围评论（锚点事件 + 评论卡片 + 持久高亮）与初版语义配色
+  入口 `DiffView.Palette`，见第 11 节执行结果。
+- M8 已完成（2026-10-06）：Diff/界面与语法两套调色板分离、GitHub/Codex/Monokai/Visual Studio
+  预设、逐槽位覆盖优先级（宿主覆盖 → 独立预设 → 组合预设 → GitHub 基线）、TextMate token
+  scope 保留与逐 scope 语法覆盖，见第 12 节执行结果。任意字符/子串选择
+  （`DiffSegmentText` 自绘文本选择）仍未实现，颜色槽位已在 M8 预留。
 
 ## 4. M2 最小可看
 
@@ -215,10 +219,11 @@
   与 shiki `codeToHast` 输出逐字符一致。
 - **嵌入资源**：`Resources/TextMate/`（29 个 grammar + 2 个主题，提取自
   @shikijs/langs/@shikijs/themes——主语言 + 依赖 grammar，vue 依赖 html-derivative/
-  vue-directives 等）。提取脚本对 TextMateSharp 做了两处规整：capture 字符串简写包
-  `{name}`、负向 `while:"^(?!X)"` 转 `end:"(?=X)"`（正向 while 如 `///` 续行块无等价
-  end，规则删除，样例不触发）；TextMateResources 动态枚举嵌入 grammar 建语言表
-  （name+alias → scope）。
+  vue-directives 等）。提取脚本对 TextMateSharp 做两处规整：capture 字符串简写包
+  `{name}`；begin-only 规则（缺 end/while）补永不匹配的 end。begin/while 规则**原样保留**
+  ——TextMateSharp 2.x 原生支持 while（初版脚本误判不支持而丢弃/转换，曾导致 C# `//`、
+  `///` 注释整族规则失效，2026-10-07 复审修复，见 M8 复审修复记录）；TextMateResources
+  动态枚举嵌入 grammar 建语言表（name+alias → scope）。
 - **黄金基准**：`build-syntax.mjs` + `gen-syntax.ts`（esbuild external shiki，wasm 在 node
   运行时解析）用真实 shiki + 上游 `processAST` 生成 `syntax-golden.json`（C#/TS/JSON/Vue
   四用例，含块注释、插值模板、正则、转义字符串）。C# `SyntaxGoldenTests` 逐字段对比：
@@ -406,6 +411,152 @@
   命名空间内，代码中的裸标识符 `Avalonia` 优先解析为 `Banned.CodeDiff.Avalonia`（库命名
   空间遮蔽框架命名空间），全限定 `Avalonia.Styling.X` 会翻车，`using Avalonia.Styling;` 则
   正常——两类场景行为不一致，新测试文件建议照抄既有测试的 using 集合。
+
+## 12. M8 Diff/语法配色分层、主题预设与局部覆盖（已完成，2026-10-06）
+
+**目标**：在保留 GitHub 当前外观的基础上，提供可组合的 Diff/界面配色与语法高亮配色，
+内置 GitHub、Codex、Monokai、Visual Studio 等预设，并允许宿主通过 XAML Style 只覆盖少数颜色。
+配色体系先行；本阶段不实现字符/子串选择交互。
+
+**设计基线**：
+
+- **两套独立调色板**：
+  - Diff/界面调色板负责画布背景、增删与上下文行、行号区、行内增删强调、分隔线、hunk、评论、
+    行选择与文字选择等控件视觉状态。浅/深变体分别定义。
+  - 语法调色板只负责普通文本与语法 token 的前景色（如注释、关键字、字符串、数字、类型、函数）；
+    不得隐式覆盖画布或 diff 行背景。
+  - 一个组合主题预设可以同时指定两套调色板，供宿主一键使用；两套预设仍可独立选择和覆盖，
+    例如 Monokai 语法色搭配 GitHub Diff 行背景。
+- **Diff 语义槽位**：至少区分新增/删除/上下文行背景及行号背景、行内新增/删除片段强调、
+  选中新增/删除/上下文行背景、行号前景、画布/分隔线/hunk/展开行与评论颜色。选中行使用明确的
+  按行类别配色，不依赖通用半透明覆盖层与红/绿底色混合出的不确定结果。
+- **字符选择槽位**：预留文字选择背景与可选前景色。文字选择前景默认保留语法色；只有宿主显式设置
+  覆盖色时，才统一改写所选字符的前景。M8 只定义颜色语义与优先级，不实现字符命中、拖选、键盘选择
+  或复制行为。
+- **语法 scope 保真**：当前 TextMate 分词已取得 token scope，但输出 AST 前会按 GitHub 最终颜色合并，
+  scope 随之丢失。调整为保留原始文本区间与 scope，按当前控件的语法预设匹配主题颜色、应用宿主覆盖，
+  最后再合并同色相邻区间绘制。复用现有 `ScopeThemeMatcher`；不可用已合并的最终颜色反推 token 类别，
+  也不可通过修改共享高亮器全局主题实现每控件配色。
+- **预设与覆盖层级**：项目默认值 → 组合预设 → 独立 Diff/语法预设 → 宿主局部覆盖，逐语义槽位解析。
+  切换预设保留宿主已设覆盖；清除某项覆盖后回退到当前预设值。共享预设对象不可被宿主修改，主题状态按
+  `DiffView` 实例隔离。
+- **XAML Style 局部覆盖**：公开独立预设与覆盖入口，使 Style 可以选择组合预设并只提供少量非空覆盖项，
+  未覆盖槽位继续继承预设值。普通嵌套对象赋值不会自动逐属性合并；设计时应采用逐槽位可设属性或可合并的
+  专用 override 集合，不要求宿主复制整套调色板。现有 `DiffView.Palette` 的 M7 用法作为 Diff 覆盖入口
+  保留或提供清晰迁移方式；复杂语法 scope 规则走独立语法覆盖集合。
+- **候选预设**：GitHub 预设作为当前视觉与黄金回归基线；另评估 Codex、Monokai、Visual Studio 风格。
+  Codex 颜色需依据用户认可的实际截图/参考确定；Visual Studio 需注明所参考的主题版本。预设明确支持的
+  明暗变体；没有浅色版本的主题需明确回退行为，不得简单反转颜色伪造。
+
+**实现顺序**：
+
+1. 冻结语义槽位、组合/独立预设关系、明暗变体和局部覆盖优先级；确定新增公开 API 与现有 `Palette` 的衔接。
+2. 扩展 Diff 画刷解析与行模型，覆盖增删/上下文、行内强调、行类别选中状态、行号与评论等槽位；确保
+   选中行背景、评论标记和词级差异强调有稳定绘制顺序，且不会意外改写语法前景。
+3. 调整 TextMate 高亮数据通路以保留 scope；在 `DiffView` 实例范围内选择语法主题并应用局部 scope 覆盖，
+   保持核心解析与既有黄金输出语义不变。
+4. 添加 GitHub、Codex、Monokai、Visual Studio 预设及按槽位合并逻辑；提供 XAML Style 选预设和局部覆盖的
+   消费示例。
+5. 在 Demo 中分别切换 Diff 与语法预设，并演示组合预设后只覆盖一个/少量颜色；同步双语 README 与
+   CHANGELOG。
+
+**验收**：
+
+- [x] Diff/界面预设与语法预设可独立组合；组合预设提供便捷入口但不耦合两套配置。
+- [x] Diff 各行类别、行内增删强调、选中行状态、浅/深背景、评论等均可按语义槽位定制；GitHub 默认外观
+      保持现有值。
+- [x] 语法配色保留 scope 粒度；至少验证注释、关键字、字符串、数字、类型/函数等类别可由预设着色，宿主
+      可以覆盖单个 scope 而不重写整套主题。
+- [x] 覆盖优先级稳定：局部覆盖胜过独立预设，独立预设胜过组合预设，组合预设胜过项目默认；清除覆盖恢复
+      当前预设值；不同 `DiffView` 实例互不影响。
+- [x] 字符选择的颜色槽位与行选择分别定义；M8 不宣称已支持字符选择交互。
+- [x] Demo 演示 GitHub/Codex/Monokai/Visual Studio 组合与独立搭配，并能通过宿主 Style 覆盖少数槽位。
+- [x] TextMate/核心黄金测试保持原有行为；新增 Avalonia 测试覆盖各状态背景、语法 scope 覆盖和层级合并。
+
+**执行结果（2026-10-06）**：
+
+- **两套独立调色板与解析链**：`DiffThemeContext`（internal record，行构建期只读）承载变体 +
+  宿主 `DiffPalette` 覆盖 + 组合/独立预设 + 语法覆盖。`DiffBrushes.Get(variant, palette,
+  themePreset, diffPreset)` 逐槽位解析：宿主细粒度槽位 → 宿主 M7 粗槽位（仅宿主层）→ 独立
+  Diff 预设 → 组合预设 → GitHub 基线（黄金锁定的上游值,全值兜底）。`DiffThemePresets`
+  （internal static）按预设 × 变体持全值 `DiffPaletteColors`;预设实例进程级共享只读,宿主
+  永不触碰,主题状态按 `DiffView` 实例隔离。
+- **`DiffPaletteColors` 扩槽位**：画布背景（经 `DiffView` 应用到控件 Background,GitHub 基线
+  为 null 不触碰宿主背景,清除预设后回收自己设置的画布）、行号前景、增删/上下文行的行号格与
+  内容格分离背景、展开行、hunk 三槽、分隔线、词级增删强调、`SelectedAdd/Delete/Context
+  Background`（模板选中覆盖层改绑按行类别解析的 `SelectedBackground`;GitHub 基线回落到 M7
+  通用覆盖层——同一画刷实例,M7 外观与 API 语义不变）、预留 `TextSelectionBackground/
+  Foreground`（M8 仅定义槽位）。
+- **语法 scope 保留**：`TextMateHighlighter.Tokenize` 在同色合并时保留每个原始 token
+  （`SyntaxNodeProperties.Tokens`:wrapper 内区间 + scope 栈数组拷贝,防 TextMateSharp 复用
+  存储）——GitHub 内置主题下的合并行为与黄金输出零变化（624 核心测试含 SyntaxGolden 全绿）。
+  渲染端 `DiffSyntaxRuns.Extract` 增加可选 `DiffSyntaxColors` 解析器:非空时逐 token 经
+  `ScopeThemeMatcher` 重新匹配前景,否则直接用 wrapper style 最终颜色（零开销）。默认
+  (GitHub 且无覆盖)时 `DiffSyntaxColors.Create` 返回 null,完整走原通路。
+- **`DiffSyntaxColors`（per-view 解析器,Models/）**：按 (语法预设 ?? 组合预设语法侧, 变体)
+  取内置主题 matcher(共享只读,经公开门面 `DiffSyntaxThemes.GetMatcher`);宿主 scope 规则
+  合成为 vscode-textmate 主题 JSON 走同一条 `ScopeThemeMatcher.FromThemeJson` 流水线（不另起
+  匹配实现）;`MatchForeground` 优先级:覆盖规则 → 预设规则 → 宿主默认前景覆盖 → 预设默认
+  前景回退。无效颜色值（非 #RGB/#RGBA/#RRGGBB/#RRGGBBAA）被忽略,全部无效视为未定制。
+- **预设值**：GitHub=黄金基线(上游 `--diff-*--` + github-light/dark);Monokai=VS Code 内置
+  Monokai 语法色 + 基于 #272822 的派生 diff 行背景,仅深色;Visual Studio=Dark+/Light+ 语法色
+  + VS Code git diff 行色派生背景,明暗都有;Codex=初版占位（plan.md 候选预设事项:待用户认可
+  的实际截图/参考校准）,仅深色。无浅色变体的预设回退 GitHub 对应变体,不做颜色反转。
+- **`DiffView` 新属性**：`ThemePreset` / `DiffPreset` / `SyntaxPreset` /
+  `SyntaxOverrides`（全部可空,赋值重建行,与 Comments/Palette 同一失效通道）;`Palette`
+  语义更新为解析链顶层宿主覆盖（M7 用法不变）。模板选中覆盖层改绑 `SelectedBackground`。
+- **`ScopeThemeMatcher` 公开化**：类转 public 并新增 `MatchRuleForeground`（不回退主题默认
+  前景,供覆盖链区分「规则命中」与「主题默认」）;核心库新增公开门面 `DiffSyntaxThemes`
+  （常量主题名 + `GetMatcher`）,控件库不直接触碰 internal 的 `TextMateResources`。NOTICE
+  无新增上游(monokai/vs 主题 JSON 为本项目按 VS Code 内置主题手写的等价 tokenColors 子集)。
+- **Demo**：新增预设工具栏行——组合主题 ComboBox(GitHub/Codex/Monokai/Visual Studio)、
+  Diff/语法独立 ComboBox(跟随组合/GitHub/Codex/Monokai/Visual Studio)、
+  「覆盖新增行背景(单槽位)」与「覆盖注释色(单 scope)」开关,状态栏反馈当前预设与覆盖组合。
+- **测试**：新增 `DiffThemePresetTests`（15 个:GitHub 基线同一性、独立预设压组合、宿主覆盖
+  压预设且其余槽位保持预设值、清除覆盖回落当前预设、细槽位压 M7 粗槽位、Monokai/Codex 浅色
+  回退、选中三槽基线回落覆盖层、画布/文字选择槽位、语法 resolver 语义(未定制 null、覆盖规则
+  压预设规则、默认前景不重写规则命中、覆盖跨预设存活、无效值忽略、Monokai 浅色回退 github-
+  light)与块注释行逐主题重着色的 builder 级集成）与 `DiffPresetViewTests`（6 个:预设切换重建
+  行、深色变体值、画布应用/回收、独立 Diff 预设保持 GitHub 语法侧+Monokai 行背景、语法覆盖
+  重建且只改目标 scope、选中背景进模板实化矩形、双实例隔离）。基线：624 核心 + 112 headless
+  全绿，Debug/Release 0 警告 0 错误。Demo 实机验证：切换组合预设到 Visual Studio 后关键字
+  变紫、hunk 头换 VS 底色、状态栏反馈(截图目视 + 程序化 headless 断言双证据)。
+- **已知引擎差异（非本次引入）**：TextMateSharp 对 C# 行注释（`//`）的分词与 vscode-oniguruma
+  不同（`//` 被分为 keyword+text 而非 comment,块注释 `/* */` 正确）——M5 黄金的 3 行豁免
+  之外的又一种引擎级差异,渲染层无法修复;预设/覆盖管线按 TextMateSharp 实际产出着色。后续可
+  评估升级 TextMateSharp 或对行注释加 port 侧修正。
+  （2026-10-07 更正：该差异并不存在——`//` 被误分词是提取脚本丢弃 begin/while 规则所致,
+  TextMateSharp 2.x 经 `BeginWhileRule` 原生支持 while;语法包恢复原规则后行注释正确,见下方
+  2026-10-07 复审修复记录。）
+
+**复审修复记录（2026-10-07,上一轮 11 个复现场景通过后的 4 项 P2 + M5 注释）**：
+
+- **P2 选中色解析链（`DiffBrushes.Selected`）**：按行类别的选中背景此前只查宿主细槽位、
+  之后直接进预设层——违反「宿主覆盖优先」,也放任组合预设的细槽位穿透独立 GitHub 预设。
+  现在的顺序：宿主细槽位 → 宿主粗槽位 `SelectionHighlight` → 独立预设细槽位 → 其通用
+  `SelectionHighlight` → 组合预设细槽位 → 其通用值 → GitHub 基线粗覆盖层（同一画刷实例,
+  M7 外观不变）。修复宿主 HotPink 被 VS `#add6ff` 遮蔽、GitHub 独立预设放行 VS 蓝两个场景。
+- **P2 画布背景保护补全（`DiffView.ApplyCanvasBackground`）**：只覆盖「修改后立即清除」,
+  重建覆盖宿主背景时不更新保存值,清除时恢复旧值。现在当前背景不是控件自己的画布画刷
+  即重新保存宿主值,清除恢复最新宿主背景。
+- **P2 展开锚点探测（`DiffView.OnAnchorTuneLayout`）**：评论卡片高于视口时,估算偏移使锚点
+  落在虚拟化实化窗口之外,校正找不到容器、三趟后放弃。新增 `ProbeAnchorIntoView`:方向由
+  最近已实化行判定（实化区连续,锚点必在外侧）,按视口高度逐步探测（上限 24 次）,实化后
+  走原有精确校正;分栏/统一/Expand All 共用该路径。
+- **M5 注释分词（extract-textmate.mjs）**：脚本此前断言 TextMateSharp 不支持 begin/while
+  ——对 2.x 不成立（DLL 含 `CompileWhile`/`BeginWhileRule`）。删除 while 丢弃与负向
+  `^(?!X)`→end 转换,原样保留规则（csharp `//`、`///` 与 markdown 72 条规则恢复）;上游
+  「只有 begin、缺 end/while」的畸形规则（xml 的 `<%--`/`--(?!>)`,vscode-textmate 实测
+  让规则永久驻留）补永不匹配的 `end:"(?!)"`,避免 TextMateSharp 以 null end 编译崩溃。
+  重新提取后语法黄金 447 span 仍全绿（3 处豁免不变）,行/文档注释分词回归测试落地
+  （`SyntaxHighlightTests` 2 个）。repro 8 注释样例随包语法 0/8 → 修复后通过。
+- **测试**：新增 `Resolution_HostCoarseSelection_BeatsPresetFineSlots`、
+  `Resolution_IndependentGitHubPreset_PinsSelectionToItsGenericColor`、
+  `ThemePreset_RebuildAfterAHostAssignment_RestoresTheLatestHostBackground`、
+  `HunkExpansion_WithCardTallerThanTheViewport_KeepsTheViewportAnchor`（220px 视口 + 20 行
+  评论 ≈334px 卡片）与 `GetAst_LineComment_UsesTheCommentColor` /
+  `GetAst_DocComment_ContinuesAcrossLines`。基线：627 核心 + 128 headless 全绿,
+  Debug/Release 0 警告 0 错误。
 
 ---
 

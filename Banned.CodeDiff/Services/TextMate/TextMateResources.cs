@@ -81,6 +81,11 @@ internal sealed class TextMateResources : IRegistryOptions
             _themes[themeName] =
                 ScopeThemeMatcher
                    .FromThemeJson(ReadResource($"Banned.CodeDiff.Resources.TextMate.themes.{themeName}.json"));
+
+        foreach (var themeName in new[] { "monokai", "vs-dark", "vs-light", "codex-dark" })
+            _themes[themeName] =
+                ScopeThemeMatcher
+                   .FromThemeJson(ReadResource($"Banned.CodeDiff.Resources.TextMate.themes.{themeName}.json"));
     }
 
     /// <summary>进程级懒加载单例。<br />The lazily initialized process-wide singleton.</summary>
@@ -139,6 +144,16 @@ internal sealed class TextMateResources : IRegistryOptions
         _darkTheme  = _themes[DarkThemeName];
 
         return (_lightTheme, _darkTheme);
+    }
+
+    /// <summary>
+    ///     返回共享只读的内置主题匹配器;未注册的名称返回 <c>null</c>。<br />
+    ///     Returns a shared read-only bundled theme matcher, or null for an unregistered name.
+    /// </summary>
+    /// <param name="name">主题资源名(不含扩展名)。The theme resource name (without extension).</param>
+    public ScopeThemeMatcher? GetSyntaxTheme(string name)
+    {
+        return _themes.GetValueOrDefault(name);
     }
 
     private static byte[] ReadResource(string resourceName)

@@ -25,6 +25,7 @@
 
 	<ItemGroup>
 		<ProjectReference Include="..\..\Banned.CodeDiff.Avalonia\Banned.CodeDiff.Avalonia.csproj" />
+		<ProjectReference Include="..\..\Banned.CodeDiff.Avalonia.Demo\Banned.CodeDiff.Avalonia.Demo.csproj" />
 	</ItemGroup>
 
 </Project>

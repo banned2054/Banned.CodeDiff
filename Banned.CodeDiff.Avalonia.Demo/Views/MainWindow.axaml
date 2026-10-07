@@ -17,7 +17,7 @@
         <vm:MainWindowViewModel />
     </Design.DataContext>
 
-    <Grid RowDefinitions="Auto,Auto,*,Auto,Auto" Margin="8">
+    <Grid RowDefinitions="Auto,Auto,Auto,*,Auto,Auto" Margin="8">
         <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8">
             <Button Command="{Binding RenderCommand}" Content="渲染 diff" />
             <Button Command="{Binding LoadSampleCommand}" Content="载入示例" />
@@ -40,7 +40,27 @@
             <ToggleButton Content="深色主题" IsChecked="{Binding IsDark}" />
         </StackPanel>
 
-        <TextBox Grid.Row="1"
+        <!-- M8 theme presets: the combined preset drives both palette sides at once; the two
+             independent combos pin one side against the combined choice; the toggles demo
+             per-slot host overrides (one palette slot / one syntax scope) on top of any preset. -->
+        <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
+            <TextBlock VerticalAlignment="Center" Text="组合主题:" />
+            <ComboBox MinWidth="140"
+                      ItemsSource="{Binding CombinedPresetOptions}"
+                      SelectedItem="{Binding SelectedCombinedPreset}" />
+            <TextBlock VerticalAlignment="Center" Text="Diff 独立:" />
+            <ComboBox MinWidth="120"
+                      ItemsSource="{Binding SidePresetOptions}"
+                      SelectedItem="{Binding SelectedDiffPreset}" />
+            <TextBlock VerticalAlignment="Center" Text="语法独立:" />
+            <ComboBox MinWidth="120"
+                      ItemsSource="{Binding SidePresetOptions}"
+                      SelectedItem="{Binding SelectedSyntaxPreset}" />
+            <ToggleButton Content="覆盖新增行背景(单槽位)" IsChecked="{Binding IsAddBackgroundOverridden}" />
+            <ToggleButton Content="覆盖注释色(单 scope)" IsChecked="{Binding IsSyntaxScopeOverridden}" />
+        </StackPanel>
+
+        <TextBox Grid.Row="2"
                  MinHeight="140"
                  MaxHeight="200"
                  Margin="0,8"
@@ -49,15 +69,20 @@
                  TextWrapping="NoWrap"
                  PlaceholderText="粘贴 unified diff 文本" />
 
-        <Border Grid.Row="2"
+        <Border Grid.Row="3"
                 BorderBrush="Gray"
                 BorderThickness="1">
             <views:DiffView x:Name="DiffView"
                             Comments="{Binding Comments}"
                             DiffFile="{Binding DiffFile}"
+                            DiffPreset="{Binding SelectedDiffPreset.Value}"
                             FilePath="{Binding CurrentFilePath}"
                             IsSelectionEnabled="{Binding IsSelectionEnabled}"
+                            Palette="{Binding Palette}"
                             SyntaxHighlight="{Binding IsSyntax}"
+                            SyntaxOverrides="{Binding SyntaxOverrides}"
+                            SyntaxPreset="{Binding SelectedSyntaxPreset.Value}"
+                            ThemePreset="{Binding SelectedCombinedPreset.Value}"
                             UseSingleLineNumberColumn="{Binding IsSingleNumberColumn}"
                             ViewMode="{Binding ViewMode}"
                             Wrap="{Binding IsWrap}" />
@@ -65,7 +90,7 @@
 
         <!-- Host-side comment editor: DiffView.CommentRequested (via code-behind) opens it, the
              host submits onto the anchor and hands the list back through DiffView.Comments. -->
-        <StackPanel Grid.Row="3"
+        <StackPanel Grid.Row="4"
                     Orientation="Horizontal"
                     Spacing="8"
                     IsVisible="{Binding IsCommentEditorOpen}">
@@ -78,8 +103,8 @@
             <Button Command="{Binding ClearCommentsCommand}" Content="清除全部评论" />
         </StackPanel>
 
-        <TextBlock Grid.Row="4" Margin="0,8,0,0" Text="{Binding Stats}" />
-        <TextBlock Grid.Row="4"
+        <TextBlock Grid.Row="5" Margin="0,8,0,0" Text="{Binding Stats}" />
+        <TextBlock Grid.Row="5"
                    Margin="0,8,0,0"
                    HorizontalAlignment="Right"
                    Text="{Binding SelectionStatus}" />

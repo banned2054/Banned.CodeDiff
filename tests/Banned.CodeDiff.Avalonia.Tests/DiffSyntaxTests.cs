@@ -92,7 +92,7 @@ public class DiffSyntaxTests
         // "return" is a keyword: github-light keyword color #d73a49 (upper-cased like shiki).
         var returnRun = runs!.First(r => r.Start == ReturnRunStart(row.Right.Text));
 
-        Assert.That(((SolidColorBrush)returnRun.Foreground).Color.ToString(),
+        Assert.That(((ISolidColorBrush)returnRun.Foreground).Color.ToString(),
                     Is.EqualTo("#FFD73A49".ToLowerInvariant()));
 
         // The left (old) side resolves from the old file's syntax table as well.
@@ -110,7 +110,7 @@ public class DiffSyntaxTests
 
         var returnRun = row.SyntaxRuns!.First(r => r.Start == ReturnRunStart(row.Text));
 
-        Assert.That(((SolidColorBrush)returnRun.Foreground).Color.ToString(),
+        Assert.That(((ISolidColorBrush)returnRun.Foreground).Color.ToString(),
                     Is.EqualTo("#FFD73A49".ToLowerInvariant()));
     }
 
@@ -148,7 +148,7 @@ public class DiffSyntaxTests
 
         var lightRun = lightRow.Right.SyntaxRuns!.First(r => r.Start == ReturnRunStart(lightRow.Right.Text));
 
-        Assert.That(((SolidColorBrush)lightRun.Foreground).Color.ToString(),
+        Assert.That(((ISolidColorBrush)lightRun.Foreground).Color.ToString(),
                     Is.EqualTo("#FFD73A49".ToLowerInvariant()));
 
         window.RequestedThemeVariant = ThemeVariant.Dark;
@@ -157,7 +157,7 @@ public class DiffSyntaxTests
 
         var darkRun = darkRow.Right.SyntaxRuns!.First(r => r.Start == ReturnRunStart(darkRow.Right.Text));
 
-        Assert.That(((SolidColorBrush)darkRun.Foreground).Color.ToString(), Is.EqualTo("#FFF97583".ToLowerInvariant()),
+        Assert.That(((ISolidColorBrush)darkRun.Foreground).Color.ToString(), Is.EqualTo("#FFF97583".ToLowerInvariant()),
                     "dark theme rows must use the --diff-view-dark color");
     }
 
@@ -195,7 +195,7 @@ public class DiffSyntaxTests
         // Dark variant picks the dark variable.
         var dark = DiffSyntaxRuns.Extract(Line(1, "a"), 1, ThemeVariant.Dark);
 
-        Assert.That(((SolidColorBrush)dark![0].Foreground).Color.ToString(),
+        Assert.That(((ISolidColorBrush)dark![0].Foreground).Color.ToString(),
                     Is.EqualTo("#FFF97583".ToLowerInvariant()));
     }
 

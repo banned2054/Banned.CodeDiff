@@ -1,0 +1,30 @@
+{
+  "name": "Visual Studio Dark+",
+  "type": "dark",
+  "colors": { "editor.foreground": "#D4D4D4" },
+  "tokenColors": [
+    { "scope": ["comment"], "settings": { "foreground": "#6A9955" } },
+    { "scope": ["string"], "settings": { "foreground": "#CE9178" } },
+    { "scope": ["string.regexp"], "settings": { "foreground": "#D16969" } },
+    { "scope": ["constant.numeric"], "settings": { "foreground": "#B5CEA8" } },
+    { "scope": ["constant.language"], "settings": { "foreground": "#569CD6" } },
+    { "scope": ["constant.character.escape"], "settings": { "foreground": "#D7BA7D" } },
+    { "scope": ["keyword"], "settings": { "foreground": "#C586C0" } },
+    { "scope": ["keyword.operator"], "settings": { "foreground": "#D4D4D4" } },
+    { "scope": ["keyword.other.type"], "settings": { "foreground": "#569CD6" } },
+    { "scope": ["storage"], "settings": { "foreground": "#569CD6" } },
+    { "scope": ["storage.type"], "settings": { "foreground": "#569CD6" } },
+    { "scope": ["entity.name.type"], "settings": { "foreground": "#4EC9B0" } },
+    { "scope": ["entity.name.class"], "settings": { "foreground": "#4EC9B0" } },
+    { "scope": ["entity.other.inherited-class"], "settings": { "foreground": "#4EC9B0" } },
+    { "scope": ["entity.name.function"], "settings": { "foreground": "#DCDCAA" } },
+    { "scope": ["entity.name.tag"], "settings": { "foreground": "#569CD6" } },
+    { "scope": ["entity.other.attribute-name"], "settings": { "foreground": "#9CDCFE" } },
+    { "scope": ["variable"], "settings": { "foreground": "#9CDCFE" } },
+    { "scope": ["variable.parameter"], "settings": { "foreground": "#9CDCFE" } },
+    { "scope": ["support.function"], "settings": { "foreground": "#DCDCAA" } },
+    { "scope": ["support.type"], "settings": { "foreground": "#4EC9B0" } },
+    { "scope": ["support.constant"], "settings": { "foreground": "#4FC1FF" } },
+    { "scope": ["punctuation"], "settings": { "foreground": "#D4D4D4" } }
+  ]
+}

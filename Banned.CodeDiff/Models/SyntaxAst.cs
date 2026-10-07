@@ -19,6 +19,12 @@ public sealed class SyntaxNodeProperties
 
     /// <summary>内联样式(hast properties.style);可为 <c>null</c>。<br />Inline style (hast properties.style); may be <c>null</c>.</summary>
     public string? Style { get; set; }
+
+    /// <summary>
+    ///     原始 token 与 scope 栈,区间相对包装文本;未提供时使用 <see cref="Style" /> 颜色。<br />
+    ///     Original tokens and scope stacks, with ranges relative to wrapper text; absent tokens fall back to <see cref="Style" /> colors.
+    /// </summary>
+    public List<SyntaxTokenSpan>? Tokens { get; set; }
 }
 
 /// <summary>

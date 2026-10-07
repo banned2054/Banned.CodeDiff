@@ -50,6 +50,16 @@ public class DiffViewTests
         return (T)value!;
     }
 
+    /// <summary>
+    ///     Preset and syntax brushes are immutable (M8): assignable-brush semantics, not
+    ///     exact-type, is what these assertions need.
+    /// </summary>
+    private static ISolidColorBrush AsBrush(IBrush? brush)
+    {
+        Assert.That(brush, Is.InstanceOf<ISolidColorBrush>());
+        return (ISolidColorBrush)brush!;
+    }
+
     [AvaloniaTest]
     public void DiffView_BuildsExpectedRows_FromSampleDiff()
     {
@@ -96,8 +106,8 @@ public class DiffViewTests
         var view = new DiffView { DiffFile = CreateSampleFile() };
 
         var pair        = As<DiffSplitContentRow>(view.Rows[3]);
-        var addBrush    = As<SolidColorBrush>(pair.Right.ContentBackground);
-        var deleteBrush = As<SolidColorBrush>(pair.Left.ContentBackground);
+        var addBrush    = AsBrush(pair.Right.ContentBackground);
+        var deleteBrush = AsBrush(pair.Left.ContentBackground);
 
         // Upstream git-diff-view light values: --diff-add-content-- / --diff-del-content--.
         Assert.That(addBrush.Color, Is.EqualTo(Color.Parse("#dafbe1")));
@@ -142,7 +152,7 @@ public class DiffViewTests
         Assert.That(content.Count(r => r.Kind == DiffCellKind.Delete), Is.EqualTo(2));
         Assert.That(content.Count(r => r.Kind == DiffCellKind.Add), Is.EqualTo(4));
 
-        var addBrush = As<SolidColorBrush>(add.ContentBackground);
+        var addBrush = AsBrush(add.ContentBackground);
         Assert.That(addBrush.Color, Is.EqualTo(Color.Parse("#dafbe1")));
     }
 
@@ -173,8 +183,8 @@ public class DiffViewTests
         Assert.That(pair.Right.Highlights, Is.EqualTo(new[] { new DiffHighlight(11, 1) }));
 
         // Highlight brushes follow the line kind (upstream light values).
-        Assert.That(As<SolidColorBrush>(pair.Left.HighlightBrush).Color, Is.EqualTo(Color.Parse("#ffcecb")));
-        Assert.That(As<SolidColorBrush>(pair.Right.HighlightBrush).Color, Is.EqualTo(Color.Parse("#aceebb")));
+        Assert.That(AsBrush(pair.Left.HighlightBrush).Color, Is.EqualTo(Color.Parse("#ffcecb")));
+        Assert.That(AsBrush(pair.Right.HighlightBrush).Color, Is.EqualTo(Color.Parse("#aceebb")));
 
         // Unpaired add lines and context rows carry no word-level highlights.
         Assert.That(As<DiffSplitContentRow>(view.Rows[4]).Right.Highlights, Is.Empty);

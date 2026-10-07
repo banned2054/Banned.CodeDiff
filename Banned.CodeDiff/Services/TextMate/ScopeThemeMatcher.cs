@@ -3,20 +3,15 @@ using System.Text.Json;
 namespace Banned.CodeDiff.Services.TextMate;
 
 /// <summary>
-///     Foreground-only port of the vscode-textmate theme matching
-///     (parseTheme / resolveParsedThemeRules / ThemeTrieElement / Theme.match —
-///     source: @shikijs/vscode-textmate, the engine shiki uses, MIT).
-///     TextMateSharp's own Theme.Match mis-resolves descendant selectors on scope
-///     stacks (e.g. "source.cs" matching "string … embedded source"), so the C#
-///     port carries this straight port instead; golden tests compare against
-///     shiki's actual output.
+///     vscode-textmate 前景色匹配器的移植(@shikijs/vscode-textmate, MIT),用于解析主题与 scope 覆盖。<br />
+///     Foreground matcher ported from @shikijs/vscode-textmate (MIT), used for themes and scope overrides.
 /// </summary>
-internal sealed class ScopeThemeMatcher
+// 保留 vscode-textmate 的 scope 栈匹配语义,避免 TextMateSharp 后代选择器的行为差异。
+public sealed class ScopeThemeMatcher
 {
     /// <summary>
-    ///     JS: Theme.getDefaults().foreground — rules with an empty scope become the
-    ///     theme defaults (github themes carry the default foreground there). shiki
-    ///     falls back to it for tokens whose scopes match nothing.
+    ///     未命中任何规则时使用的主题默认前景色。<br />
+    ///     Theme default foreground used when no rule matches.
     /// </summary>
     private readonly string? _defaultForeground;
 
@@ -178,24 +173,32 @@ internal sealed class ScopeThemeMatcher
     /// </returns>
     public string? MatchForeground(IList<string> scopeStack)
     {
+        var ruleColor = MatchRuleForeground(scopeStack);
+
+        return ruleColor ?? _defaultForeground;
+    }
+
+    /// <summary>
+    ///     匹配 scope 前景色,不使用主题默认色;未命中显式规则时返回 <c>null</c>。<br />
+    ///     Matches scope foregrounds without the theme default; returns null when no explicit rule matches.
+    /// </summary>
+    /// <param name="scopeStack">从最内到最外排列的作用域栈。The scope stack, ordered innermost first.</param>
+    public string? MatchRuleForeground(IList<string> scopeStack)
+    {
         for (var i = scopeStack.Count - 1; i >= 0; i--)
         {
             var rules = _root.Match(scopeStack[i]);
 
-            // The metadata provider resolves one scope name at a time with no
-            // stack context, so descendant-selector rules cannot apply — only
-            // the trie node's main rule (no parent scopes) counts. A main rule
-            // with no foreground keeps the enclosing scope's color.
+            // 逐层匹配无父 scope 上下文,仅主规则可用;无前景色时继承外层。
             foreach (var rule in rules)
                 if (rule.ParentScopes is not { Length: > 0 } && rule.Foreground != null)
                     return rule.Foreground;
         }
 
-        return _defaultForeground;
+        return null;
     }
 
-    // ---- _scopePathMatchesParentScopes: scopePath walks from the token's
-    // parent scope towards the root; parentScopes are ordered inner → outer.
+    // 父 scope 按内到外匹配。
 
     private static bool ScopePathMatchesParentScopes(IList<string> stack, int from, string[]? parentScopes)
     {

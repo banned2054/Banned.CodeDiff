@@ -82,7 +82,13 @@ public sealed class DiffSplitCellModel : INotifyPropertyChanged
                 _                   => null
             }
             : null;
-        NumberForeground   = brushes.NumberForeground;
+        NumberForeground = brushes.NumberForeground;
+        SelectedBackground = kind switch
+        {
+            DiffCellKind.Add    => brushes.SelectedAdd,
+            DiffCellKind.Delete => brushes.SelectedDelete,
+            _                   => brushes.SelectedContext
+        };
         SelectionOverlay   = brushes.MultiSelectOverlay;
         SelectionEdgeStrip = brushes.MultiSelectBorder;
         CommentOverlay     = brushes.CommentOverlay;
@@ -130,24 +136,26 @@ public sealed class DiffSplitCellModel : INotifyPropertyChanged
     public IBrush NumberForeground { get; }
 
     /// <summary>
-    ///     获取多选覆盖层画刷(不透明度 15% 的 #f0c000,上游
-    ///     <c>--diff-multi-select-bg</c>)。<br />
-    ///     Gets the multi-select overlay brush (#f0c000 at 15% opacity, upstream
-    ///     <c>--diff-multi-select-bg</c>).
+    ///     按行类别解析的选中背景。<br />
+    ///     Selected background resolved by line kind.
+    /// </summary>
+    public IBrush SelectedBackground { get; }
+
+    /// <summary>
+    ///     解析后的多选覆盖层画刷。<br />
+    ///     Resolved multi-select overlay brush.
     /// </summary>
     public IBrush SelectionOverlay { get; }
 
     /// <summary>
-    ///     获取多选边缘条画刷(#2588fa,上游 <c>--diff-multi-select-border</c>)。<br />
-    ///     Gets the multi-select edge-strip brush (#2588fa, upstream
-    ///     <c>--diff-multi-select-border</c>).
+    ///     解析后的多选边缘条画刷。<br />
+    ///     Resolved multi-select edge-strip brush.
     /// </summary>
     public IBrush SelectionEdgeStrip { get; }
 
     /// <summary>
-    ///     获取评论锚点行的持久高亮画刷(浅色 #fff8c5/深色 #d29922 的半透明覆盖)。<br />
-    ///     Gets the persistent highlight brush of commented lines (#fff8c5 light / #d29922 dark,
-    ///     semi-transparent overlays).
+    ///     解析后的评论行持久高亮画刷。<br />
+    ///     Resolved persistent highlight brush for commented lines.
     /// </summary>
     public IBrush CommentOverlay { get; }
 

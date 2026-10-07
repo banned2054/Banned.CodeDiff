@@ -38,6 +38,13 @@ public sealed class DiffView : TemplatedControl
     /// <summary>Approximate advance width of one monospace digit relative to the font size.</summary>
     private const double MonospaceCharWidthRatio = 0.62;
 
+    /// <summary>
+    ///     Viewport-sized probe scrolls an unrealized expansion anchor may receive before the
+    ///     tune gives up (see OnAnchorTuneLayout) — generous enough for several tall comment
+    ///     cards, bounded so a pathological expansion cannot scroll forever.
+    /// </summary>
+    private const int MaxAnchorTuneProbes = 24;
+
     /// <summary>标识 <see cref="DiffFile" /> 依赖属性。<br />Identifies the <see cref="DiffFile" /> dependency property.</summary>
     public static readonly StyledProperty<DiffFile?> DiffFileProperty =
         AvaloniaProperty.Register<DiffView, DiffFile?>(nameof(DiffFile));
@@ -83,6 +90,22 @@ public sealed class DiffView : TemplatedControl
     public static readonly StyledProperty<DiffPalette?> PaletteProperty =
         AvaloniaProperty.Register<DiffView, DiffPalette?>(nameof(Palette));
 
+    /// <summary>标识 <see cref="ThemePreset" /> 依赖属性。<br />Identifies the <see cref="ThemePreset" /> dependency property.</summary>
+    public static readonly StyledProperty<DiffThemePreset?> ThemePresetProperty =
+        AvaloniaProperty.Register<DiffView, DiffThemePreset?>(nameof(ThemePreset));
+
+    /// <summary>标识 <see cref="DiffPreset" /> 依赖属性。<br />Identifies the <see cref="DiffPreset" /> dependency property.</summary>
+    public static readonly StyledProperty<DiffThemePreset?> DiffPresetProperty =
+        AvaloniaProperty.Register<DiffView, DiffThemePreset?>(nameof(DiffPreset));
+
+    /// <summary>标识 <see cref="SyntaxPreset" /> 依赖属性。<br />Identifies the <see cref="SyntaxPreset" /> dependency property.</summary>
+    public static readonly StyledProperty<DiffThemePreset?> SyntaxPresetProperty =
+        AvaloniaProperty.Register<DiffView, DiffThemePreset?>(nameof(SyntaxPreset));
+
+    /// <summary>标识 <see cref="SyntaxOverrides" /> 依赖属性。<br />Identifies the <see cref="SyntaxOverrides" /> dependency property.</summary>
+    public static readonly StyledProperty<DiffSyntaxOverrides?> SyntaxOverridesProperty =
+        AvaloniaProperty.Register<DiffView, DiffSyntaxOverrides?>(nameof(SyntaxOverrides));
+
     /// <summary>标识 <see cref="Highlighter" /> 依赖属性。<br />Identifies the <see cref="Highlighter" /> dependency property.</summary>
     public static readonly StyledProperty<IDiffHighlighter?> HighlighterProperty =
         AvaloniaProperty.Register<DiffView, IDiffHighlighter?>(nameof(Highlighter));
@@ -118,24 +141,31 @@ public sealed class DiffView : TemplatedControl
     private readonly DiffSelection _selection = new();
 
     private ItemsControl? _items;
-    private double        _numberColumnWidth = NumberColumnMinWidth;
-    private Vector?       _pendingExpandOffset;
-    private bool          _rebuilding;
+
+    private double  _numberColumnWidth = NumberColumnMinWidth;
+    private Vector? _pendingExpandOffset;
+    private int     _anchorTuneLayouts;
+    private int     _anchorTuneApplies;
+    private int     _anchorTuneProbes;
+    private double  _anchorTuneLastTop;
+    private bool    _anchorTuneApplied;
+    private bool    _rebuilding;
+
+    /// <summary>Pending post-layout correction of an expansion anchor (see OnAnchorTuneLayout).</summary>
+    private ExpandAnchorTune? _pendingAnchorTune;
 
     private IReadOnlyList<DiffRow> _rows = [];
     private ScrollViewer?          _scrollViewer;
 
     /// <summary>
-    ///     LineIndex → content row map for the current <see cref="Rows" /> (built lazily,
-    ///     dropped on every rebuild): the split visual pass used to scan all rows per selected line
-    ///     (O(lines × rows) per pointer move); the map keeps it O(1) per line.
+    ///     当前行的懒加载索引;重建行时清空。
     /// </summary>
     private Dictionary<int, DiffSplitContentRow>? _splitRowsByLineIndex;
 
     /// <summary>初始化 <see cref="DiffView" /> 类的新实例。<br />Initializes a new instance of the <see cref="DiffView" /> class.</summary>
     public DiffView()
     {
-        // SetCurrentValue keeps these overridable by styles and inherited values.
+        // 保留样式和继承值对默认字体的覆盖。
         SetCurrentValue(FontFamilyProperty, new FontFamily("Menlo, Consolas, monospace"));
         SetCurrentValue(FontSizeProperty, 14.0);
 
@@ -308,6 +338,46 @@ public sealed class DiffView : TemplatedControl
     {
         get => GetValue(PaletteProperty);
         set => SetValue(PaletteProperty, value);
+    }
+
+    /// <summary>
+    ///     组合 Diff/语法预设,默认 GitHub。优先级:宿主覆盖 → 独立预设 → 组合预设 → GitHub;赋值重建行。<br />
+    ///     Combined diff/syntax preset, default GitHub. Priority: host overrides, independent presets, combined preset, GitHub; assignment rebuilds rows.
+    /// </summary>
+    public DiffThemePreset? ThemePreset
+    {
+        get => GetValue(ThemePresetProperty);
+        set => SetValue(ThemePresetProperty, value);
+    }
+
+    /// <summary>
+    ///     独立 Diff 预设,覆盖组合预设的 Diff 配色;不影响语法。赋值重建行。<br />
+    ///     Independent diff preset, overriding the combined diff palette without changing syntax; assignment rebuilds rows.
+    /// </summary>
+    public DiffThemePreset? DiffPreset
+    {
+        get => GetValue(DiffPresetProperty);
+        set => SetValue(DiffPresetProperty, value);
+    }
+
+    /// <summary>
+    ///     独立语法预设,覆盖组合预设且不重新分词;缺少浅色变体时回退 GitHub 浅色。赋值重建行。<br />
+    ///     Independent syntax preset, overriding the combined theme without retokenizing; missing light variants use GitHub light. Assignment rebuilds rows.
+    /// </summary>
+    public DiffThemePreset? SyntaxPreset
+    {
+        get => GetValue(SyntaxPresetProperty);
+        set => SetValue(SyntaxPresetProperty, value);
+    }
+
+    /// <summary>
+    ///     宿主语法 scope 与默认前景覆盖,切换预设时保留。赋值重建行。<br />
+    ///     Host syntax scope and default-foreground overrides, retained across preset changes; assignment rebuilds rows.
+    /// </summary>
+    public DiffSyntaxOverrides? SyntaxOverrides
+    {
+        get => GetValue(SyntaxOverridesProperty);
+        set => SetValue(SyntaxOverridesProperty, value);
     }
 
     /// <summary>获取按当前行与字号解析出的行号列宽度。<br />Gets the resolved line-number column width for the current rows and font size.</summary>
@@ -607,24 +677,22 @@ public sealed class DiffView : TemplatedControl
                  change.Property == HighlighterProperty)
         {
             if (change.Property == ViewModeProperty)
-                // Upstream wrapper (DiffViewWithMultiSelect.tsx): a mode change drops the
-                // persisted preselected lines (updateMultiResult(undefined)); the manager state
-                // itself survives.
+                // 切换模式清除预选行,保留交互状态,与上游一致。
                 _selection.SetPreselectedLines(MultiSelectPreselectedLines.Empty);
 
             RebuildRows();
         }
         else if (change.Property == IsSelectionEnabledProperty && !change.GetNewValue<bool>())
         {
-            // Upstream wrapper destroys the manager when disabled — destroy() clears the
-            // selection; here the pointer routing is simply gated by the flag as well.
+            // 禁用多选时清除选区并关闭指针处理。
             ClearSelection();
         }
-        else if (change.Property == CommentsProperty || change.Property == PaletteProperty ||
-                 change.Property == FilePathProperty)
+        else if (change.Property == CommentsProperty   || change.Property == PaletteProperty      ||
+                 change.Property == FilePathProperty   || change.Property == ThemePresetProperty  ||
+                 change.Property == DiffPresetProperty || change.Property == SyntaxPresetProperty ||
+                 change.Property == SyntaxOverridesProperty)
         {
-            // Comment cards and palette brushes are baked into the rows, and comments are scoped
-            // to the file identity — all three rebuild.
+            // 评论、文件身份和配色均影响行模型,须重建。
             RebuildRows();
         }
         else if (change.Property == FontSizeProperty)
@@ -635,13 +703,17 @@ public sealed class DiffView : TemplatedControl
 
     private void OnFileUpdated()
     {
-        // Updated also fires from the Build*DiffLines calls inside RebuildRows; the flag breaks the re-entry.
+        // 构建行也会触发 Updated,须防止重入。
         if (!_rebuilding) RebuildRows();
     }
 
     private void RebuildRows()
     {
         _rebuilding = true;
+
+        // 旧锚点指向即将替换的行。
+        DropPendingAnchorTune();
+
         try
         {
             var file = DiffFile;
@@ -667,19 +739,15 @@ public sealed class DiffView : TemplatedControl
             SetAndRaise(RowsProperty, ref _rows, rows);
             _splitRowsByLineIndex = null;
             UpdateNumberColumnWidth();
+            ApplyCanvasBackground();
 
-            // Upstream manager subscribes diffFile changes and re-runs the selection visual (its
-            // 16 ms debounce is a DOM batching optimization — applied synchronously here): rows
-            // are fresh objects, so hidden lines stay unhighlighted while remaining in the range
-            // and revealed lines pick the highlight up after an expand.
+            // 新行实例须重新应用选区;隐藏行展开后恢复高亮。
             ApplySelectionVisual();
 
-            // The comment-anchor channel re-locates by line numbers on every rebuild — view-mode
-            // switches and hunk expands/collapses included — and never touches the selection flags.
+            // 评论按稳定行号重新定位,不改变选区状态。
             ApplyCommentVisual();
 
-            // Expands/collapses flip IsHide on selection members; the model change also covers
-            // the file commands' availability.
+            // 展开状态影响命令可用性。
             RaiseCommandsCanExecuteChanged();
         }
         finally
@@ -691,14 +759,56 @@ public sealed class DiffView : TemplatedControl
     private IReadOnlyList<DiffRow> BuildSplit(DiffFile file)
     {
         file.BuildSplitDiffLines();
-        return DiffSplitRowBuilder.Build(file, ActualThemeVariant, Palette);
+        return DiffSplitRowBuilder.Build(file, CreateThemeContext());
     }
 
     private IReadOnlyList<DiffRow> BuildUnified(DiffFile file)
     {
         file.BuildUnifiedDiffLines();
-        return DiffUnifiedRowBuilder.Build(file, ActualThemeVariant, Palette);
+        return DiffUnifiedRowBuilder.Build(file, CreateThemeContext());
     }
+
+    /// <summary>
+    ///     当前控件实例的配色解析输入(变体 + 宿主覆盖 + 预设选择)。所有层都来自本实例的
+    ///     属性——不同 <see cref="DiffView" /> 实例互不影响。<br />
+    ///     This control instance's color-resolution input (variant + host overrides + preset
+    ///     choices). Every layer comes from this instance's properties — separate
+    ///     <see cref="DiffView" /> instances never affect each other.
+    /// </summary>
+    private DiffThemeContext CreateThemeContext() =>
+        new(ActualThemeVariant, Palette, ThemePreset, DiffPreset, SyntaxPreset, SyntaxOverrides);
+
+
+    /// <summary>
+    ///     应用画布配色;撤销时恢复宿主背景,不覆盖宿主后续设置。
+    /// </summary>
+    private void ApplyCanvasBackground()
+    {
+        var canvas = DiffBrushes.Get(ActualThemeVariant, Palette, ThemePreset, DiffPreset).CanvasBackground;
+
+        if (canvas != null)
+        {
+            // 记录宿主最新背景,清除画布配色时恢复它。
+            if (!_canvasApplied || !ReferenceEquals(Background, _appliedCanvasBrush))
+                _backgroundBeforeCanvas = Background;
+
+            _appliedCanvasBrush = canvas;
+            _canvasApplied      = true;
+            SetCurrentValue(BackgroundProperty, canvas);
+        }
+        else if (_canvasApplied)
+        {
+            _canvasApplied = false;
+
+            // 仅撤销本控件设置的画布,保留宿主后续赋值。
+            if (ReferenceEquals(Background, _appliedCanvasBrush))
+                SetCurrentValue(BackgroundProperty, _backgroundBeforeCanvas);
+        }
+    }
+
+    private bool    _canvasApplied;
+    private IBrush? _appliedCanvasBrush;
+    private IBrush? _backgroundBeforeCanvas;
 
     private void UpdateNumberColumnWidth()
     {
@@ -933,15 +1043,14 @@ public sealed class DiffView : TemplatedControl
 
         if (comments == null || comments.Count == 0 || file == null) return;
 
-        // Same file-scoping as the card placement: highlights follow only the comments of the
-        // file the view currently shows.
+        // 仅高亮当前文件的评论。
         var filePath = FilePath;
 
         var ranges = comments.Where(comment => comment.Anchor.FilePath == filePath)
                              .Select(comment =>
-                                  MultiSelectData.NormalizeRange(new MultiSelectRange(comment.Anchor.Side,
-                                                                                      comment.Anchor.StartLineNumber,
-                                                                                      comment.Anchor.EndLineNumber)))
+                                         MultiSelectData.NormalizeRange(new MultiSelectRange(comment.Anchor.Side,
+                                                                                 comment.Anchor.StartLineNumber,
+                                                                                 comment.Anchor.EndLineNumber)))
                              .ToList();
 
         ApplySplitRanges(file, ranges, false, cell =>
@@ -1048,7 +1157,7 @@ public sealed class DiffView : TemplatedControl
 
             if (!byAnchor.TryGetValue(anchor, out var group))
             {
-                group = [];
+                group            = [];
                 byAnchor[anchor] = group;
                 order.Add(anchor);
             }
@@ -1067,7 +1176,7 @@ public sealed class DiffView : TemplatedControl
 
             if (!insertAfter.TryGetValue(last, out var anchors))
             {
-                anchors      = [];
+                anchors           = [];
                 insertAfter[last] = anchors;
             }
 
@@ -1076,16 +1185,16 @@ public sealed class DiffView : TemplatedControl
 
         if (insertAfter.Count == 0) return rows;
 
-        var brushes = DiffBrushes.Get(ActualThemeVariant, Palette);
+        var brushes = DiffBrushes.Get(ActualThemeVariant, Palette, ThemePreset, DiffPreset);
         var result  = new List<DiffRow>(rows.Count + insertAfter.Count);
 
         for (var index = 0; index < rows.Count; index++)
         {
             result.Add(rows[index]);
 
-            if (insertAfter.TryGetValue(index, out var anchors))
-                foreach (var anchor in anchors)
-                    result.Add(CreateCommentRow(anchor, byAnchor[anchor], brushes));
+            if (!insertAfter.TryGetValue(index, out var anchors)) continue;
+            foreach (var anchor in anchors)
+                result.Add(CreateCommentRow(anchor, byAnchor[anchor], brushes));
         }
 
         return result;
@@ -1118,8 +1227,8 @@ public sealed class DiffView : TemplatedControl
 
         bool Matches(string? number)
         {
-            return number != null && int.TryParse(number, out var value) &&
-                   value >= anchor.StartLineNumber && value <= anchor.EndLineNumber;
+            return number != null                   && int.TryParse(number, out var value) &&
+                   value  >= anchor.StartLineNumber && value <= anchor.EndLineNumber;
         }
     }
 
@@ -1157,13 +1266,28 @@ public sealed class DiffView : TemplatedControl
         if (contentRowHeight <= 0) return null;
 
         return new ExpandAnchor(_scrollViewer.Offset.Y, contentRowHeight, placeholderContainer.Bounds.Height,
-                                index, _rows.Count);
+                                index, _rows.Count, ContentTopOf(placeholderContainer),
+                                ContentTopOf(ContainerOfRow(index + 1)));
+    }
+
+    private Visual? ContainerOfRow(int index)
+    {
+        return index >= 0 && index < _rows.Count ? _items?.ContainerFromItem(_rows[index]) : null;
     }
 
     /// <summary>
-    ///     Re-anchors the viewport after an expansion rebuilt the rows, mirroring the browser scroll
-    ///     anchoring the upstream web views rely on: the clicked hunk row — or, when the expansion
-    ///     removes it, the row that followed it — keeps its pre-click viewport position.
+    ///     Content-space (offset-independent) top of a realized row container — measuring in the
+    ///     items' coordinates keeps the anchor math valid whatever the scroll offset is.
+    /// </summary>
+    private double? ContentTopOf(Visual? container)
+    {
+        var matrix = container?.TransformToVisual(_items!);
+
+        return matrix?.Transform(new Point()).Y;
+    }
+
+    /// <summary>
+    ///     展开后保持占位行的视口位置;占位行移除时改用其后一行。
     /// </summary>
     private void ApplyExpandAnchor(ExpandAnchor anchor, HunkExpandDirection direction, int hunkIndex)
     {
@@ -1202,18 +1326,146 @@ public sealed class DiffView : TemplatedControl
 
         if (insertedAbove <= 0 && !placeholderReplaced) return;
 
-        // A replaced placeholder contributes its own height back to the content above the anchor.
-        var delta = insertedAbove * anchor.ContentRowHeight -
-                    (placeholderReplaced ? anchor.PlaceholderHeight : 0);
+        // 占位行保留时以它为锚点,移除时以原后一行为锚点。
+        var postAnchorIndex = placeholderReplaced
+            ? anchor.OldIndex + (_rows.Count - anchor.OldCount + 1)
+            : FindHunkRowIndex(hunkIndex);
+        var preTop = placeholderReplaced ? anchor.AfterContentTop : anchor.AnchorContentTop;
 
-        if (Math.Abs(delta) < 0.01) return;
+        if (postAnchorIndex >= 0 && postAnchorIndex < _rows.Count && preTop != null)
+        {
+            // 先估算偏移使锚点进入虚拟化窗口,布局后再按真实高度校正。
+            _pendingExpandOffset = new Vector(_scrollViewer.Offset.X,
+                                              anchor.OffsetY + insertedAbove * anchor.ContentRowHeight -
+                                              (placeholderReplaced ? anchor.PlaceholderHeight : 0));
+            _pendingAnchorTune    =  new ExpandAnchorTune(anchor.OffsetY, preTop.Value, _rows[postAnchorIndex]);
+            _anchorTuneLayouts    =  0;
+            _anchorTuneApplies    =  0;
+            _anchorTuneProbes     =  0;
+            _anchorTuneApplied    =  false;
+            _items!.LayoutUpdated -= OnAnchorTuneLayout;
+            _items.LayoutUpdated  += OnAnchorTuneLayout;
+        }
+        else
+        {
+            // 无法测量锚点时使用估算高度,扣除已移除的占位行。
+            var delta = insertedAbove * anchor.ContentRowHeight -
+                        (placeholderReplaced ? anchor.PlaceholderHeight : 0);
 
-        // ScrollViewer.Offset is coerced against the current extent, which still reflects the old
-        // rows until the next layout pass — defer the adjustment to the rebuild's extent change,
-        // then restore the captured offset plus the inserted height.
-        _pendingExpandOffset        =  new Vector(_scrollViewer.Offset.X, anchor.OffsetY + delta);
+            if (Math.Abs(delta) < 0.01) return;
+
+            _pendingExpandOffset = new Vector(_scrollViewer.Offset.X, anchor.OffsetY + delta);
+        }
+
+        // Offset 会按旧 extent 钳制,须等重建后的 extent 更新再调整。
         _scrollViewer.ScrollChanged -= OnScrollChanged;
         _scrollViewer.ScrollChanged += OnScrollChanged;
+    }
+
+    /// <summary>
+    ///     布局后按实际行高校正锚点,直到测量稳定。
+    /// </summary>
+    private void OnAnchorTuneLayout(object? sender, EventArgs e)
+    {
+        if (_pendingAnchorTune is not { } tune || _items == null || _scrollViewer == null) return;
+
+        if (_items.ContainerFromItem(tune.Row) is not Visual container)
+        {
+            // 真实行高可能将锚点挤出虚拟化窗口,向其滚动一屏后继续校正。
+            if (++_anchorTuneLayouts <= 3) return;
+
+            if (!ProbeAnchorIntoView(tune)) DropPendingAnchorTune();
+
+            return;
+        }
+
+        var top = ContentTopOf(container);
+
+        if (top == null)
+        {
+            DropPendingAnchorTune();
+
+            return;
+        }
+
+        if (_anchorTuneApplied && Math.Abs(top.Value - _anchorTuneLastTop) < 0.01)
+        {
+            DropPendingAnchorTune();
+
+            return;
+        }
+
+        if (_anchorTuneApplies >= 4)
+        {
+            DropPendingAnchorTune();
+
+            return;
+        }
+
+        _anchorTuneLastTop = top.Value;
+        _anchorTuneApplied = true;
+        _anchorTuneApplies++;
+        _anchorTuneLayouts = 0;
+
+        _scrollViewer.Offset = new Vector(_scrollViewer.Offset.X, tune.OffsetY + top.Value - tune.PreTop);
+    }
+
+    /// <summary>
+    ///     向未实现的锚点滚动一屏以触发虚拟化;无探测方向或超出预算时返回 <c>false</c>。
+    /// </summary>
+    private bool ProbeAnchorIntoView(ExpandAnchorTune tune)
+    {
+        if (_scrollViewer == null || _items == null || _scrollViewer.Viewport.Height <= 0) return false;
+
+        if (_anchorTuneProbes >= MaxAnchorTuneProbes) return false;
+
+        var anchorIndex = IndexOfRow(tune.Row);
+
+        if (anchorIndex < 0) return false;
+
+        var neighbor = FindNearestRealizedRowIndex(anchorIndex);
+
+        if (neighbor < 0) return false;
+
+        _anchorTuneProbes++;
+        _anchorTuneLayouts = 0;
+        _scrollViewer.Offset = new Vector(_scrollViewer.Offset.X,
+                                          _scrollViewer.Offset.Y +
+                                          (neighbor < anchorIndex ? _scrollViewer.Viewport.Height
+                                                                  : -_scrollViewer.Viewport.Height));
+
+        return true;
+    }
+
+    /// <summary>Index of the row nearest to <paramref name="index" /> with a realized container.</summary>
+    private int FindNearestRealizedRowIndex(int index)
+    {
+        var maxDistance = Math.Max(index, _rows.Count - 1 - index);
+
+        for (var distance = 1; distance <= maxDistance; distance++)
+        {
+            if (IsRealized(index - distance)) return index - distance;
+            if (IsRealized(index + distance)) return index + distance;
+        }
+
+        return -1;
+
+        bool IsRealized(int rowIndex)
+        {
+            return rowIndex >= 0 && rowIndex < _rows.Count &&
+                   _items?.ContainerFromItem(_rows[rowIndex]) is { Bounds.Height: > 0 };
+        }
+    }
+
+    private void DropPendingAnchorTune()
+    {
+        if (_pendingAnchorTune == null) return;
+
+        _pendingAnchorTune    =  null;
+        _items?.LayoutUpdated -= OnAnchorTuneLayout;
+        _anchorTuneApplied    =  false;
+        _anchorTuneApplies    =  0;
+        _anchorTuneProbes     =  0;
     }
 
     private void OnScrollChanged(object? sender, ScrollChangedEventArgs e)
@@ -1352,7 +1604,8 @@ public sealed class DiffView : TemplatedControl
 
         public bool CanExecute(object? parameter)
         {
-            return owner.DiffFile != null && owner._selection.GetState().CurrentRange != null;
+            // 隐藏选区不能发起评论,条件与复制一致。
+            return owner.CanCopySelection();
         }
 
         public void Execute(object? parameter)
@@ -1408,9 +1661,17 @@ public sealed class DiffView : TemplatedControl
 
     /// <summary>Pre-expansion scroll state used to anchor the viewport across a row rebuild.</summary>
     private readonly record struct ExpandAnchor(
-        double OffsetY,
-        double ContentRowHeight,
-        double PlaceholderHeight,
-        int    OldIndex,
-        int    OldCount);
+        double  OffsetY,
+        double  ContentRowHeight,
+        double  PlaceholderHeight,
+        int     OldIndex,
+        int     OldCount,
+        double? AnchorContentTop,
+        double? AfterContentTop);
+
+    /// <summary>
+    ///     The exact post-layout re-anchoring input: the pre-expand offset, the anchor row's
+    ///     pre-expand content-space top, and the row that inherits the anchor position.
+    /// </summary>
+    private readonly record struct ExpandAnchorTune(double OffsetY, double PreTop, DiffRow Row);
 }

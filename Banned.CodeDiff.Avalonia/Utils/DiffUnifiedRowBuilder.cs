@@ -31,8 +31,21 @@ internal static class DiffUnifiedRowBuilder
     /// <returns>统一行列表(含 hunk 占位行)。<br />The unified rows (including hunk placeholder rows).</returns>
     public static IReadOnlyList<DiffRow> Build(DiffFile file, ThemeVariant variant, DiffPalette? palette = null)
     {
-        var brushes = DiffBrushes.Get(variant, palette);
-        var rows    = new List<DiffRow>(file.UnifiedLineLength);
+        return Build(file, new DiffThemeContext(variant, palette));
+    }
+
+    /// <summary>
+    ///     从 <paramref name="file" /> 的统一模型构建扁平行列表,经
+    ///     <paramref name="theme" /> 解析画刷与语法颜色(预设/覆盖链)。<br />
+    ///     Builds the flat row list from the unified model of <paramref name="file" />, resolving
+    ///     brushes and syntax colors through <paramref name="theme" /> (the preset/override chain).
+    /// </summary>
+    public static IReadOnlyList<DiffRow> Build(DiffFile file, DiffThemeContext theme)
+    {
+        var brushes      = theme.ResolveBrushes();
+        var syntaxColors = theme.ResolveSyntaxColors();
+
+        var rows = new List<DiffRow>(file.UnifiedLineLength);
 
         for (var index = 0; index <= file.UnifiedLineLength; index++)
         {
@@ -50,15 +63,14 @@ internal static class DiffUnifiedRowBuilder
 
             var lineText = (line.Value ?? line.Diff?.Text ?? string.Empty).TrimEnd('\r', '\n');
 
-            // Upstream prefers the new file's syntax line, falling back to the old one.
+            // 统一行优先使用新侧语法,否则用旧侧。
             var syntaxLine = line.NewLineNumber is { } newNumber ? file.GetNewSyntaxLine(newNumber)
                 : line.OldLineNumber is { } oldNumber            ? file.GetOldSyntaxLine(oldNumber)
                                                                    : null;
 
-            var syntaxRuns = DiffSyntaxRuns.Extract(syntaxLine, lineText.Length, variant);
+            var syntaxRuns = DiffSyntaxRuns.Extract(syntaxLine, lineText.Length, theme.Variant, syntaxColors);
 
-            // Raw gap lines revealed by expansion have no DiffLine — they render as plain rows
-            // from the file content, colored with the expand palette (upstream hasDiff=false).
+            // 展开的原文行没有 DiffLine,按展开配色呈现。
             if (line.Diff is not { } diff)
             {
                 rows.Add(new DiffUnifiedContentRow(line.OldLineNumber, line.NewLineNumber,

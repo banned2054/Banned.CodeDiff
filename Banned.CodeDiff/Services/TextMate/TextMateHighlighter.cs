@@ -187,13 +187,10 @@ public sealed class TextMateHighlighter : IDiffHighlighter
 
         var lines = raw.Split('\n');
 
-        // Per line: (span start/length in lineBuilder, light color, dark color, standard token
-        // type) with equal-appearance merging — the merged value is sliced once at emission
-        // instead of being re-concatenated on every merge.
-        var spans = new List<(int Start, int Length, string? Light, string? Dark, int TokenType)>();
+        // 同色 token 合并范围,保留原始 token 的相对区间与 scope,供各视图重新配色。
+        var spans = new List<(int Start, int Length, string? Light, string? Dark, int TokenType,
+            List<(int Start, int Length, string[] Scopes)> Tokens)>();
 
-        // Reused across lines (Clear keeps the capacity) — the whole line's token text is
-        // appended exactly once per character.
         var lineBuilder = new StringBuilder();
 
         IStateStack? ruleStack = null;
@@ -223,19 +220,32 @@ public sealed class TextMateHighlighter : IDiffHighlighter
                 var dark      = darkTheme.MatchForeground(token.Scopes);
                 var tokenType = StandardTokenType(token.Scopes);
 
+                // 复制 scope 栈以免分词器复用存储;最内层在前。
+                var scopes = token.Scopes is { Count: > 0 } list ? list.ToArray() : [];
+
                 if (spans.Count         > 0      &&
                     spans[^1].Light     == light &&
                     spans[^1].Dark      == dark  &&
                     spans[^1].TokenType == tokenType)
-                    spans[^1] = (spans[^1].Start, spans[^1].Length + length, light, dark, tokenType);
+                {
+                    var last = spans[^1];
+
+                    last.Tokens.Add((lineBuilder.Length - last.Start, length, scopes));
+
+                    spans[^1] = (last.Start, last.Length + length, light, dark, tokenType, last.Tokens);
+                }
                 else
-                    spans.Add((lineBuilder.Length, length, light, dark, tokenType));
+                {
+                    spans.Add((lineBuilder.Length, length, light, dark, tokenType,
+                               [(0, length, scopes)]));
+                }
 
                 lineBuilder.Append(line, start, length);
             }
 
             foreach (var span in spans)
-                children.Add(BuildWrapper(lineBuilder.ToString(span.Start, span.Length), span.Light, span.Dark));
+                children.Add(BuildWrapper(lineBuilder.ToString(span.Start, span.Length), span.Light,
+                                          span.Dark, span.Tokens));
 
             if (i < lines.Length - 1) children.Add(new SyntaxNode { Type = "text", Value = "\n" });
         }
@@ -284,19 +294,21 @@ public sealed class TextMateHighlighter : IDiffHighlighter
         return 0;
     }
 
-    private static SyntaxNode BuildWrapper(string value, string? light, string? dark)
+    private static SyntaxNode BuildWrapper(string value, string? light, string? dark,
+                                           List<(int Start, int Length, string[] Scopes)> tokens)
     {
-        // Same shape as shiki's codeToHast({ themes: { dark, light },
-        // cssVariablePrefix: "--diff-view-" }) output: dark variable first,
-        // no trailing semicolon; unmatched tokens keep the theme default
-        // foreground, so a token span always carries both colors.
+        // 保留 shiki 输出格式:深色变量在前,无末尾分号,未匹配 token 使用主题默认色。
         var style = GetStyle(light, dark);
 
         return new SyntaxNode
         {
-            Type       = "element",
-            Properties = style.Length > 0 ? new SyntaxNodeProperties { Style = style } : null,
-            Children   = [new SyntaxNode { Type = "text", Value = value }]
+            Type = "element",
+            Properties = new SyntaxNodeProperties
+            {
+                Style  = style.Length > 0 ? style : null,
+                Tokens = [.. tokens.Select(t => new SyntaxTokenSpan(t.Start, t.Length, t.Scopes))]
+            },
+            Children = [new SyntaxNode { Type = "text", Value = value }]
         };
     }
 

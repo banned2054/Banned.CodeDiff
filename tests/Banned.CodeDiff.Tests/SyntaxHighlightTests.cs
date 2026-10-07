@@ -177,6 +177,53 @@ public class SyntaxHighlightTests
     }
 
     [Test]
+    public void GetAst_LineComment_UsesTheCommentColor()
+    {
+        // The bundled C# `//` rule is a begin/while rule — the extraction used to
+        // drop those (they read as keyword+text), the only grammar shape where the
+        // golden engine and the port diverged on plain comments.
+        var raw = "int x; // trailing\n// own line\nint y;\n";
+
+        var engine = TextMateHighlighter.Instance;
+        var result = engine.ProcessAst(engine.GetAst(raw, "a.cs", "cs", "light")!);
+
+        foreach (var lineNumber in new[] { 1, 2 })
+        {
+            var spans = result.SyntaxFileObject[lineNumber].NodeList!;
+
+            Assert.That(spans.Where(s => s.Wrapper?.Properties?.Style?.Contains("--diff-view-light:#6A737D") == true)
+                             .Select(s => s.Node.Value),
+                        Is.Not.Empty,
+                        $"line {lineNumber} should contain a comment-colored span");
+        }
+
+        // The comment span covers the `// ...` text itself.
+        var trailing = result.SyntaxFileObject[1].NodeList!
+                             .First(s => s.Wrapper?.Properties?.Style?.Contains("--diff-view-light:#6A737D") == true);
+
+        Assert.That(trailing.Node.Value, Does.Contain("//"));
+    }
+
+    [Test]
+    public void GetAst_DocComment_ContinuesAcrossLines()
+    {
+        // `///` doc comments are a begin/while rule whose while condition keeps the
+        // comment alive on every following `///` line.
+        var raw = "/// summary line\n/// detail line\nint x;\n";
+
+        var engine = TextMateHighlighter.Instance;
+        var result = engine.ProcessAst(engine.GetAst(raw, "a.cs", "cs", "light")!);
+
+        foreach (var lineNumber in new[] { 1, 2 })
+        {
+            Assert.That(result.SyntaxFileObject[lineNumber].NodeList!
+                             .Any(s => s.Wrapper?.Properties?.Style?.Contains("--diff-view-light:#6A737D") == true),
+                        Is.True,
+                        $"doc comment line {lineNumber} should use the comment color");
+        }
+    }
+
+    [Test]
     public void GetAst_UnsupportedLang_ReturnsNull()
     {
         Assert.That(TextMateHighlighter.Instance.GetAst("hello", "a.txt", "txt", "light"), Is.Null);

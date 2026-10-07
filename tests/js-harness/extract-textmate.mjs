@@ -48,56 +48,31 @@ function normalizeCaptureShorthand(node) {
   }
 }
 
-// TextMateSharp has no support for begin/while rules (no `end`). The vue
-// bundle uses two shapes:
-// - negative while "^(?!X)" (continue while X does not match) → approximately
-//   "end: (?=X)" (stop at X); used for embedded script blocks;
-// - other while shapes (e.g. the /// comment continuation in
-//   vue-sfc-style-variable-injection) have no faithful end equivalent and the
-//   rule is dropped (the region falls through to the remaining rules).
-function normalizeWhileRules(node) {
+// Begin/while rules are kept verbatim: TextMateSharp 2.x natively supports them
+// (its Rule model compiles `while` / `whileCaptures` like vscode-textmate's
+// BeginWhileRule). Dropping or approximating them broke whole rule families —
+// e.g. the C# `//` and `///` comment rules are begin/while rules, and replacing
+// them left comments untokenized.
+
+// vscode-textmate tolerates rules with `begin` but neither `end` nor `while`:
+// the compiled rule simply has no end pattern and stays on the state stack
+// (observed with real shiki: every following line stays inside the rule's
+// scope). TextMateSharp instead compiles a BeginEndRule with a null end regex
+// and throws ArgumentNullException at compile time. Normalize those rules to an
+// end that can never match — the observable token stream is the same.
+function normalizeBeginOnlyRules(node) {
   if (Array.isArray(node)) {
-    for (let i = node.length - 1; i >= 0; i--) {
-      if (node[i] && typeof node[i] === "object") {
-        const replacement = transformWhileRule(node[i]);
-        if (replacement === null) {
-          node.splice(i, 1);
-        } else if (replacement !== undefined) {
-          node[i] = replacement;
-        }
-      }
-      normalizeWhileRules(node[i]);
-    }
+    node.forEach(normalizeBeginOnlyRules);
     return;
   }
   if (node && typeof node === "object") {
-    for (const key of Object.keys(node)) {
-      const value = node[key];
-      if (value && typeof value === "object" && !Array.isArray(value) &&
-          (key === "repository" || key === "patterns" || (value.begin !== undefined))) {
-        const replacement = transformWhileRule(value);
-        if (replacement !== undefined) {
-          node[key] = replacement;
-        }
-      }
-      normalizeWhileRules(value);
+    if (node.begin !== undefined && node.end === undefined && node.while === undefined) {
+      node.end = "(?!)";
+    }
+    for (const value of Object.values(node)) {
+      normalizeBeginOnlyRules(value);
     }
   }
-}
-
-// Returns a replacement rule, null to drop the rule, or undefined to keep as-is.
-function transformWhileRule(rule) {
-  if (!(rule.begin !== undefined && rule.while !== undefined && rule.end === undefined)) {
-    return undefined;
-  }
-  const m = /^\^\(\?\!(.+)\)$/.exec(rule.while);
-  if (m) {
-    rule.end = `(?=${m[1]})`;
-    delete rule.while;
-    return rule;
-  }
-  console.warn(`dropping unsupported while rule: ${rule.while} (${rule.name ?? "unnamed"})`);
-  return {};
 }
 
 const byName = new Map();
@@ -120,7 +95,7 @@ for (const id of langs) {
 
 for (const [name, grammar] of byName) {
   normalizeCaptureShorthand(grammar);
-  normalizeWhileRules(grammar);
+  normalizeBeginOnlyRules(grammar);
 
   writeFileSync(
     fileURLToPath(new URL(`${name}.json`, grammarsDir)),

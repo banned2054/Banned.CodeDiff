@@ -1,3 +1,4 @@
+using Avalonia.Media;
 using Avalonia.Styling;
 using Banned.CodeDiff.Avalonia.Demo.Models;
 using Banned.CodeDiff.Avalonia.Models;
@@ -8,6 +9,12 @@ using System.Runtime.CompilerServices;
 using System.Windows.Input;
 
 namespace Banned.CodeDiff.Avalonia.Demo.ViewModels;
+
+/// <summary>One ComboBox entry of the M8 preset demo: display name + the (nullable) preset value.</summary>
+public sealed record DiffPresetOption(string Name, DiffThemePreset? Value)
+{
+    public override string ToString() => Name;
+}
 
 public sealed class MainWindowViewModel : INotifyPropertyChanged
 {
@@ -26,7 +33,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     private bool      _isSingleNumberColumn;
     private bool      _isSyntax = true;
     private bool      _isWrap;
-    private string    _commentDraft = "";
+    private string    _commentDraft    = "";
     private string    _currentFilePath = "Program.cs";
     private string    _selectionStatus = "未选择";
 
@@ -35,6 +42,34 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
 
     private string       _syntaxFile = "store.cs";
     private DiffViewMode _viewMode   = DiffViewMode.Split;
+
+    private DiffPresetOption _selectedCombinedPreset;
+    private DiffPresetOption _selectedDiffPreset;
+    private DiffPresetOption _selectedSyntaxPreset;
+    private bool             _isAddBackgroundOverridden;
+    private bool             _isSyntaxScopeOverridden;
+    private DiffPalette?     _palette;
+
+    private DiffSyntaxOverrides? _syntaxOverrides;
+
+    /// <summary>The combined theme presets (M8): one selection drives both palette sides.</summary>
+    public static IReadOnlyList<DiffPresetOption> CombinedPresetOptions { get; } =
+    [
+        new("GitHub(默认)", DiffThemePreset.GitHub),
+        new("Codex(初版)", DiffThemePreset.Codex),
+        new("Monokai", DiffThemePreset.Monokai),
+        new("Visual Studio", DiffThemePreset.VisualStudio)
+    ];
+
+    /// <summary>The independent per-side presets; <c>null</c> follows the combined selection.</summary>
+    public static IReadOnlyList<DiffPresetOption> SidePresetOptions { get; } =
+    [
+        new("跟随组合", null),
+        new("GitHub", DiffThemePreset.GitHub),
+        new("Codex(初版)", DiffThemePreset.Codex),
+        new("Monokai", DiffThemePreset.Monokai),
+        new("Visual Studio", DiffThemePreset.VisualStudio)
+    ];
 
     public MainWindowViewModel()
     {
@@ -49,11 +84,14 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         CollapseAllCommand      = new RelayCommand(CollapseAll);
         _copySelectionCommand = new RelayCommand(() => CopySelectionRequested?.Invoke(),
                                                  () => _selectionVisibleLines > 0);
-        CopyOldFileCommand    = new RelayCommand(() => CopyOldFileRequested?.Invoke());
-        CopyNewFileCommand    = new RelayCommand(() => CopyNewFileRequested?.Invoke());
-        SubmitCommentCommand  = new RelayCommand(SubmitComment, () => _pendingAnchor != null);
-        CancelCommentCommand  = new RelayCommand(CancelComment, () => _pendingAnchor != null);
-        ClearCommentsCommand  = new RelayCommand(ClearComments, () => _comments.Count > 0);
+        CopyOldFileCommand      = new RelayCommand(() => CopyOldFileRequested?.Invoke());
+        CopyNewFileCommand      = new RelayCommand(() => CopyNewFileRequested?.Invoke());
+        SubmitCommentCommand    = new RelayCommand(SubmitComment, () => _pendingAnchor  != null);
+        CancelCommentCommand    = new RelayCommand(CancelComment, () => _pendingAnchor  != null);
+        ClearCommentsCommand    = new RelayCommand(ClearComments, () => _comments.Count > 0);
+        _selectedCombinedPreset = CombinedPresetOptions[0];
+        _selectedDiffPreset     = SidePresetOptions[0];
+        _selectedSyntaxPreset   = SidePresetOptions[0];
         Render();
     }
 
@@ -188,6 +226,127 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     {
         get => _isSingleNumberColumn;
         set => Set(ref _isSingleNumberColumn, value);
+    }
+
+    /// <summary>
+    ///     组合主题预设(M8):一键同时应用 Diff/界面调色板与语法主题,直接绑定
+    ///     <c>DiffView.ThemePreset</c>。
+    /// </summary>
+    public DiffPresetOption SelectedCombinedPreset
+    {
+        get => _selectedCombinedPreset;
+        set
+        {
+            if (!Set(ref _selectedCombinedPreset, value)) return;
+
+            // A combined switch keeps host overrides and the independent presets — the M8
+            // resolution contract; the status line mirrors it.
+            var name = value.Name;
+
+            if (_selectedDiffPreset.Value != null) name += "(Diff 独立:" + _selectedDiffPreset.Name + ")";
+
+            if (_selectedSyntaxPreset.Value != null) name += "(语法独立:" + _selectedSyntaxPreset.Name + ")";
+
+            if (_isAddBackgroundOverridden) name += "(含新增行覆盖)";
+
+            if (_isSyntaxScopeOverridden) name += "(含注释色覆盖)";
+
+            SelectionStatus = "主题预设:" + name;
+        }
+    }
+
+    /// <summary>独立的 Diff/界面预设;<c>null</c> 跟随组合预设。绑定 <c>DiffView.DiffPreset</c>。</summary>
+    public DiffPresetOption SelectedDiffPreset
+    {
+        get => _selectedDiffPreset;
+        set
+        {
+            if (!Set(ref _selectedDiffPreset, value)) return;
+
+            SelectionStatus = value.Value == null
+                ? "Diff 预设:跟随组合"
+                : "Diff 预设(独立):" + value.Name + " —— 语法侧不受影响";
+        }
+    }
+
+    /// <summary>独立的语法预设;<c>null</c> 跟随组合预设。绑定 <c>DiffView.SyntaxPreset</c>。</summary>
+    public DiffPresetOption SelectedSyntaxPreset
+    {
+        get => _selectedSyntaxPreset;
+        set
+        {
+            if (!Set(ref _selectedSyntaxPreset, value)) return;
+
+            SelectionStatus = value.Value == null
+                ? "语法预设:跟随组合"
+                : "语法预设(独立):" + value.Name + " —— Diff 行背景不受影响";
+        }
+    }
+
+    /// <summary>
+    ///     宿主局部覆盖演示一:通过 <c>DiffView.Palette</c> 只覆盖「新增行背景」一个槽位,
+    ///     其余槽位继续继承当前预设(切换预设不丢覆盖)。
+    /// </summary>
+    public bool IsAddBackgroundOverridden
+    {
+        get => _isAddBackgroundOverridden;
+        set
+        {
+            if (!Set(ref _isAddBackgroundOverridden, value)) return;
+
+            Palette = value
+                ? new DiffPalette
+                {
+                    Light = new DiffPaletteColors { AddLineBackground = new SolidColorBrush(Color.Parse("#d8b4fe")) },
+                    Dark  = new DiffPaletteColors { AddLineBackground = new SolidColorBrush(Color.Parse("#6b21a8")) }
+                }
+                : null;
+
+            SelectionStatus = value ? "宿主覆盖:新增行背景 → 紫色(单槽位)" : "宿主覆盖:已清除,回到当前预设值";
+        }
+    }
+
+    /// <summary>
+    ///     宿主局部覆盖演示二:通过 <c>DiffView.SyntaxOverrides</c> 只改写 comment 一个 scope,
+    ///     其余 token 继续按当前预设着色。
+    /// </summary>
+    public bool IsSyntaxScopeOverridden
+    {
+        get => _isSyntaxScopeOverridden;
+        set
+        {
+            if (!Set(ref _isSyntaxScopeOverridden, value)) return;
+
+            SyntaxOverrides = value
+                ? new DiffSyntaxOverrides
+                {
+                    Overrides = [new DiffSyntaxOverride { Scope = "comment", Color = "#FF8800" }]
+                }
+                : null;
+
+            SelectionStatus = value ? "语法覆盖:comment → #FF8800(单 scope)" : "语法覆盖:已清除,回到当前预设值";
+        }
+    }
+
+    /// <summary>
+    ///     Bound to <c>DiffView.Palette</c> — the M7 host override entry, top of the M8 chain.
+    ///     Raises the change notification: the binding must push each new instance (or
+    ///     <c>null</c>) into the view's <see cref="Views.DiffView.Palette" /> property.
+    /// </summary>
+    public DiffPalette? Palette
+    {
+        get => _palette;
+        private set => Set(ref _palette, value);
+    }
+
+    /// <summary>
+    ///     Bound to <c>DiffView.SyntaxOverrides</c> — the M8 syntax scope overrides; raises the
+    ///     change notification like <see cref="Palette" />.
+    /// </summary>
+    public DiffSyntaxOverrides? SyntaxOverrides
+    {
+        get => _syntaxOverrides;
+        private set => Set(ref _syntaxOverrides, value);
     }
 
     /// <summary>Status line for the latest completed selection and copy feedback (M6 copy feature).</summary>
@@ -453,7 +612,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         file.BuildSplitDiffLines();
         file.BuildUnifiedDiffLines();
         CurrentFilePath = file.OldFileName is { Length: > 0 } name ? name : file.NewFileName;
-        DiffFile = file;
+        DiffFile        = file;
     }
 
     /// <summary>

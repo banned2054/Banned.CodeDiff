@@ -37,23 +37,26 @@
                                                         Width="{Binding $parent[v:DiffView].NumberColumnWidth}"
                                                         Background="{Binding Left.NumberBackground}">
                                                     <Panel>
+                                                        <!-- The selected background paints below the text:
+                                                             preset selected backgrounds are opaque, and a
+                                                             rectangle above the text would hide the number.
+                                                             The comment-anchor highlight (persistent,
+                                                             independent of the selection channel) and the
+                                                             edge strip stay above (upstream _com.css
+                                                             .diff-multi-select-active ::after/::before; the
+                                                             strip is the number cell's right edge — upstream
+                                                             overhangs 2px into the content cell, kept inside
+                                                             here) -->
+                                                        <Rectangle Fill="{Binding Left.SelectedBackground}"
+                                                                   IsVisible="{Binding Left.IsSelected}" />
                                                         <TextBlock Classes="diff-line-number"
                                                                    Margin="10,2"
                                                                    Foreground="{Binding Left.NumberForeground}"
                                                                    Text="{Binding Left.Number}"
                                                                    TextAlignment="Right"
                                                                    VerticalAlignment="Center" />
-                                                        <!-- Comment-anchor highlight (persistent, independent
-                                                             of the selection channel) then multi-select
-                                                             overlay + edge strip (upstream _com.css
-                                                             .diff-multi-select-active ::after/::before; the
-                                                             strip is the number cell's right edge — upstream
-                                                             overhangs 2px into the content cell, kept inside
-                                                             here) -->
                                                         <Rectangle Fill="{Binding Left.CommentOverlay}"
                                                                    IsVisible="{Binding Left.IsCommented}" />
-                                                        <Rectangle Fill="{Binding Left.SelectionOverlay}"
-                                                                   IsVisible="{Binding Left.IsSelected}" />
                                                         <Rectangle Width="4"
                                                                    HorizontalAlignment="Right"
                                                                    Fill="{Binding Left.SelectionEdgeStrip}"
@@ -65,6 +68,12 @@
                                                         Background="{Binding Left.ContentBackground}"
                                                         ClipToBounds="True">
                                                     <Panel>
+                                                        <!-- The selected background paints below the code:
+                                                             preset selected backgrounds are opaque, and a
+                                                             rectangle above the text would hide the line and
+                                                             its word-level highlights. -->
+                                                        <Rectangle Fill="{Binding Left.SelectedBackground}"
+                                                                   IsVisible="{Binding Left.IsSelected}" />
                                                         <!-- Auto,* grid: the star column gives the
                                                              segment text a finite wrap width. -->
                                                         <Grid Classes="diff-content-layout"
@@ -82,8 +91,6 @@
                                                         </Grid>
                                                         <Rectangle Fill="{Binding Left.CommentOverlay}"
                                                                    IsVisible="{Binding Left.IsCommented}" />
-                                                        <Rectangle Fill="{Binding Left.SelectionOverlay}"
-                                                                   IsVisible="{Binding Left.IsSelected}" />
                                                     </Panel>
                                                 </Border>
                                                 <Rectangle Grid.Column="2"
@@ -93,6 +100,8 @@
                                                         Width="{Binding $parent[v:DiffView].NumberColumnWidth}"
                                                         Background="{Binding Right.NumberBackground}">
                                                     <Panel>
+                                                        <Rectangle Fill="{Binding Right.SelectedBackground}"
+                                                                   IsVisible="{Binding Right.IsSelected}" />
                                                         <TextBlock Classes="diff-line-number"
                                                                    Margin="10,2"
                                                                    Foreground="{Binding Right.NumberForeground}"
@@ -101,8 +110,6 @@
                                                                    VerticalAlignment="Center" />
                                                         <Rectangle Fill="{Binding Right.CommentOverlay}"
                                                                    IsVisible="{Binding Right.IsCommented}" />
-                                                        <Rectangle Fill="{Binding Right.SelectionOverlay}"
-                                                                   IsVisible="{Binding Right.IsSelected}" />
                                                         <Rectangle Width="4"
                                                                    HorizontalAlignment="Right"
                                                                    Fill="{Binding Right.SelectionEdgeStrip}"
@@ -114,6 +121,8 @@
                                                         Background="{Binding Right.ContentBackground}"
                                                         ClipToBounds="True">
                                                     <Panel>
+                                                        <Rectangle Fill="{Binding Right.SelectedBackground}"
+                                                                   IsVisible="{Binding Right.IsSelected}" />
                                                         <Grid Classes="diff-content-layout"
                                                               Margin="4,2,0,2"
                                                               ColumnDefinitions="Auto,*"
@@ -129,8 +138,6 @@
                                                         </Grid>
                                                         <Rectangle Fill="{Binding Right.CommentOverlay}"
                                                                    IsVisible="{Binding Right.IsCommented}" />
-                                                        <Rectangle Fill="{Binding Right.SelectionOverlay}"
-                                                                   IsVisible="{Binding Right.IsSelected}" />
                                                     </Panel>
                                                 </Border>
                                             </Grid>
@@ -202,6 +209,8 @@
                                                         Width="{Binding $parent[v:DiffView].NumberColumnWidth}"
                                                         Background="{Binding NumberBackground}">
                                                     <Panel>
+                                                        <Rectangle Fill="{Binding SelectedBackground}"
+                                                                   IsVisible="{Binding IsSelected}" />
                                                         <TextBlock Classes="diff-line-number"
                                                                    Margin="10,2"
                                                                    Foreground="{Binding NumberForeground}"
@@ -210,8 +219,6 @@
                                                                    VerticalAlignment="Center" />
                                                         <Rectangle Fill="{Binding CommentOverlay}"
                                                                    IsVisible="{Binding IsCommented}" />
-                                                        <Rectangle Fill="{Binding SelectionOverlay}"
-                                                                   IsVisible="{Binding IsSelected}" />
                                                     </Panel>
                                                 </Border>
                                                 <Border Grid.Column="1"
@@ -219,6 +226,8 @@
                                                         Width="{Binding $parent[v:DiffView].NumberColumnWidth}"
                                                         Background="{Binding NumberBackground}">
                                                     <Panel>
+                                                        <Rectangle Fill="{Binding SelectedBackground}"
+                                                                   IsVisible="{Binding IsSelected}" />
                                                         <TextBlock Classes="diff-line-number diff-dual-num"
                                                                    Margin="10,2"
                                                                    Foreground="{Binding NumberForeground}"
@@ -237,8 +246,6 @@
                                                                    VerticalAlignment="Center" />
                                                         <Rectangle Fill="{Binding CommentOverlay}"
                                                                    IsVisible="{Binding IsCommented}" />
-                                                        <Rectangle Fill="{Binding SelectionOverlay}"
-                                                                   IsVisible="{Binding IsSelected}" />
                                                         <!-- The upstream strip sits on the joint .diff-line-num
                                                              cell's right edge — between the new-number column and
                                                              the content column. -->
@@ -253,6 +260,8 @@
                                                         Background="{Binding ContentBackground}"
                                                         ClipToBounds="True">
                                                     <Panel>
+                                                        <Rectangle Fill="{Binding SelectedBackground}"
+                                                                   IsVisible="{Binding IsSelected}" />
                                                         <Grid Classes="diff-content-layout"
                                                               Margin="4,2,0,2"
                                                               ColumnDefinitions="Auto,*"
@@ -268,8 +277,6 @@
                                                         </Grid>
                                                         <Rectangle Fill="{Binding CommentOverlay}"
                                                                    IsVisible="{Binding IsCommented}" />
-                                                        <Rectangle Fill="{Binding SelectionOverlay}"
-                                                                   IsVisible="{Binding IsSelected}" />
                                                     </Panel>
                                                 </Border>
                                             </Grid>
@@ -369,7 +376,12 @@
                                         </DataTemplate>
                                         <DataTemplate x:DataType="m:DiffUnifiedCommentRow">
                                             <Grid ColumnDefinitions="Auto,Auto,*">
-                                                <Border Width="{Binding $parent[v:DiffView].NumberColumnWidth}" />
+                                                <!-- The dual-number gutters mirror the content rows above; the
+                                                     first one carries the dual-num class so the single-number-
+                                                     column mode collapses it exactly like the content rows'
+                                                     old-number cell (keeping the card aligned with the content). -->
+                                                <Border Classes="diff-dual-num"
+                                                        Width="{Binding $parent[v:DiffView].NumberColumnWidth}" />
                                                 <Border Width="{Binding $parent[v:DiffView].NumberColumnWidth}"
                                                         Grid.Column="1" />
                                                 <Border Grid.Column="2"

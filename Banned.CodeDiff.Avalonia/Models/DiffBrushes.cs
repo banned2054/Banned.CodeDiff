@@ -4,147 +4,196 @@ using Avalonia.Styling;
 namespace Banned.CodeDiff.Avalonia.Models;
 
 /// <summary>
-///     Resolved brushes for one theme variant. Values mirror the light/dark CSS variables of the
-///     upstream git-diff-view <c>_base.css</c>; theme switching rebuilds rows with the other set.
+///     Resolved brushes for one theme variant, after the M8 resolution chain
+///     (host palette overrides → independent diff preset → combined theme preset →
+///     the GitHub baseline). The GitHub values mirror the light/dark CSS variables of
+///     the upstream git-diff-view <c>_base.css</c>; theme switching rebuilds rows with
+///     the other set.
 /// </summary>
-internal sealed record DiffBrushSet(
-    IBrush NumberForeground,
-    IBrush AddNumber,
-    IBrush AddContent,
-    IBrush DeleteNumber,
-    IBrush DeleteContent,
-    IBrush ContextNumber,
-    IBrush ContextContent,
-    IBrush ExpandContent,
-    IBrush EmptyNumber,
-    IBrush EmptyContent,
-    IBrush HunkNumber,
-    IBrush HunkContent,
-    IBrush HunkSide,
-    IBrush HunkForeground,
-    IBrush AddContentHighlight,
-    IBrush DeleteContentHighlight,
-    IBrush Splitter,
-    IBrush MultiSelectOverlay,
-    IBrush MultiSelectBorder,
-    IBrush CommentOverlay,
-    IBrush CommentCardBackground,
-    IBrush CommentCardBorder);
+internal sealed record DiffBrushSet
+{
+    public required IBrush NumberForeground { get; init; }
+    public required IBrush AddNumber        { get; init; }
+    public required IBrush AddContent       { get; init; }
+    public required IBrush DeleteNumber     { get; init; }
+    public required IBrush DeleteContent    { get; init; }
+    public required IBrush ContextNumber    { get; init; }
+    public required IBrush ContextContent   { get; init; }
+    public required IBrush ExpandContent    { get; init; }
 
-/// <summary>Light/dark brush sets for the diff view (upstream <c>--diff-*--</c> variables).</summary>
+    /// <summary>Empty half-row cells (upstream colors them like the context number cell).</summary>
+    public required IBrush EmptyNumber { get; init; }
+
+    /// <summary>Empty half-row cells (upstream colors them like the expand content cell).</summary>
+    public required IBrush EmptyContent { get; init; }
+
+    public required IBrush HunkNumber  { get; init; }
+    public required IBrush HunkContent { get; init; }
+
+    /// <summary>
+    ///     The hunk row's new-side cells — upstream shares the content background
+    ///     (<c>--diff-hunk-line--</c> for both).
+    /// </summary>
+    public required IBrush HunkSide { get; init; }
+
+    public required IBrush HunkForeground         { get; init; }
+    public required IBrush AddContentHighlight    { get; init; }
+    public required IBrush DeleteContentHighlight { get; init; }
+    public required IBrush Splitter               { get; init; }
+    public required IBrush MultiSelectOverlay     { get; init; }
+    public required IBrush MultiSelectBorder      { get; init; }
+    public required IBrush CommentOverlay         { get; init; }
+    public required IBrush CommentCardBackground  { get; init; }
+    public required IBrush CommentCardBorder      { get; init; }
+
+    /// <summary>
+    ///     Explicit per-kind selected backgrounds (M8) — the template binds these instead of a
+    ///     generic overlay; the GitHub baseline keeps the upstream translucent overlay value.
+    /// </summary>
+    public required IBrush SelectedAdd { get; init; }
+
+    public required IBrush SelectedDelete  { get; init; }
+    public required IBrush SelectedContext { get; init; }
+
+    /// <summary>
+    ///     Canvas background, or <c>null</c> when neither the preset nor the palette defines one
+    ///     (the GitHub baseline never touches the control background).
+    /// </summary>
+    public IBrush? CanvasBackground { get; init; }
+
+    /// <summary>
+    ///     Text (substring) selection colors — M8 defines the slots only, no interaction.
+    ///     <c>null</c> foreground keeps the syntax colors for selected characters.
+    /// </summary>
+    public IBrush? TextSelectionBackground { get; init; }
+
+    public IBrush? TextSelectionForeground { get; init; }
+}
+
+/// <summary>
+///     Resolves the <see cref="DiffBrushSet" /> for a theme variant through the M8 slot
+///     chain: host <see cref="DiffPalette" /> overrides → the independent diff preset →
+///     the combined theme preset's diff palette → the GitHub baseline (the golden-locked
+///     upstream values). Each slot resolves independently, so a preset switch keeps host
+///     overrides and an unset slot keeps the next layer's value.
+/// </summary>
 internal static class DiffBrushes
 {
-    private static readonly IBrush NumberForegroundLight = Parse("#555555");
-    private static readonly IBrush AddNumberLight        = Parse("#aceebb");
-    private static readonly IBrush AddContentLight       = Parse("#dafbe1");
-    private static readonly IBrush DeleteNumberLight     = Parse("#ffcecb");
-    private static readonly IBrush DeleteContentLight    = Parse("#ffebe9");
-    private static readonly IBrush ContextNumberLight    = Parse("#fafafa");
-    private static readonly IBrush ContextContentLight   = Parse("#ffffff");
-    private static readonly IBrush ExpandContentLight    = Parse("#fafafa");
-    private static readonly IBrush EmptyNumberLight      = Parse("#fafafa");
-    private static readonly IBrush EmptyContentLight     = Parse("#fafafa");
-    private static readonly IBrush HunkNumberLight       = Parse("#b6e3ff");
-    private static readonly IBrush HunkContentLight      = Parse("#ddf4ff");
-    private static readonly IBrush HunkForegroundLight   = Parse("#777777");
-    private static readonly IBrush AddHighlightLight     = Parse("#aceebb");
-    private static readonly IBrush DeleteHighlightLight  = Parse("#ffcecb");
-    private static readonly IBrush SplitterLight         = Parse("#dedede");
-    private static readonly IBrush NumberForegroundDark  = Parse("#a0aaab");
-    private static readonly IBrush AddNumberDark         = Parse("#284228");
-    private static readonly IBrush AddContentDark        = Parse("#18271f");
-    private static readonly IBrush DeleteNumberDark      = Parse("#4f2828");
-    private static readonly IBrush DeleteContentDark     = Parse("#23191c");
-    private static readonly IBrush ContextNumberDark     = Parse("#161b22");
-    private static readonly IBrush ContextContentDark    = Parse("#0d1117");
-    private static readonly IBrush ExpandContentDark     = Parse("#161b22");
-    private static readonly IBrush EmptyNumberDark       = Parse("#161b22");
-    private static readonly IBrush EmptyContentDark      = Parse("#161b22");
-    private static readonly IBrush HunkNumberDark        = Parse("#0c2d6b");
-    private static readonly IBrush HunkContentDark       = Parse("#131d2e");
-    private static readonly IBrush HunkForegroundDark    = Parse("#9298a0");
-    private static readonly IBrush AddHighlightDark      = Parse("#2f5732");
-    private static readonly IBrush DeleteHighlightDark   = Parse("#713431");
-    private static readonly IBrush SplitterDark          = Parse("#3d444d");
-
-    // multiSelect palette (packages/*/src/_com.css): --diff-multi-select-bg #f0c000 at opacity
-    // 0.15 for the cell overlay, --diff-multi-select-border #2588fa solid for the edge strip.
-    // The CSS variables carry no per-theme definitions — both variants use the same fallbacks.
-    private static readonly IBrush MultiSelectOverlay = WithOpacity(Parse("#f0c000"), 0.15);
-    private static readonly IBrush MultiSelectBorder  = Parse("#2588fa");
-
-    // Comment presentation (native M7 feature — no upstream variable): the anchored-line
-    // overlay tints commented lines (GitHub's highlighted-line yellow), the card uses the
-    // subtle canvas/border pair.
-    private static readonly IBrush CommentOverlayLight          = WithOpacity(Parse("#fff8c5"), 0.55);
-    private static readonly IBrush CommentCardBackgroundLight   = Parse("#f6f8fa");
-    private static readonly IBrush CommentCardBorderLight       = Parse("#d1d9e0");
-    private static readonly IBrush CommentOverlayDark           = WithOpacity(Parse("#d29922"), 0.28);
-    private static readonly IBrush CommentCardBackgroundDark    = Parse("#151b23");
-    private static readonly IBrush CommentCardBorderDark        = Parse("#3d444d");
-
-    private static readonly DiffBrushSet LightSet = new(NumberForegroundLight, AddNumberLight, AddContentLight,
-                                                        DeleteNumberLight, DeleteContentLight,
-                                                        ContextNumberLight, ContextContentLight,
-                                                        ExpandContentLight, EmptyNumberLight,
-                                                        EmptyContentLight, HunkNumberLight,
-                                                        HunkContentLight, HunkContentLight, HunkForegroundLight,
-                                                        AddHighlightLight, DeleteHighlightLight,
-                                                        SplitterLight, MultiSelectOverlay, MultiSelectBorder,
-                                                        CommentOverlayLight, CommentCardBackgroundLight,
-                                                        CommentCardBorderLight);
-
-    private static readonly DiffBrushSet DarkSet = new(NumberForegroundDark, AddNumberDark, AddContentDark,
-                                                       DeleteNumberDark, DeleteContentDark,
-                                                       ContextNumberDark, ContextContentDark,
-                                                       ExpandContentDark, EmptyNumberDark,
-                                                       EmptyContentDark, HunkNumberDark,
-                                                       HunkContentDark, HunkContentDark, HunkForegroundDark,
-                                                       AddHighlightDark, DeleteHighlightDark,
-                                                       SplitterDark, MultiSelectOverlay, MultiSelectBorder,
-                                                       CommentOverlayDark, CommentCardBackgroundDark,
-                                                       CommentCardBorderDark);
-
     public static DiffBrushSet Get(ThemeVariant variant)
     {
         return Get(variant, null);
     }
 
-    /// <summary>
-    ///     Resolves the brush set for a variant, applying the host's <see cref="DiffPalette" />
-    ///     overrides on top of the built-in values (<c>null</c> slots keep the built-ins).
-    /// </summary>
     public static DiffBrushSet Get(ThemeVariant variant, DiffPalette? palette)
     {
-        var baseSet = variant == ThemeVariant.Dark ? DarkSet : LightSet;
-        var colors  = palette?.GetColors(variant);
+        return Get(variant, palette, null, null);
+    }
 
-        if (colors == null) return baseSet;
+    /// <summary>
+    ///     按宿主覆盖 → 独立预设 → 组合预设 → GitHub 解析画刷;细槽位优先,缺少浅色变体回退 GitHub。<br />
+    ///     Resolves brushes by host overrides, independent preset, combined preset, GitHub; fine slots win and missing light variants use GitHub.
+    /// </summary>
+    public static DiffBrushSet Get(
+        ThemeVariant variant, DiffPalette? palette, DiffThemePreset? themePreset, DiffThemePreset? diffPreset)
+    {
+        var github = DiffThemePresets.GetDiffColors(variant, DiffThemePreset.GitHub)!;
 
-        return baseSet with
+        // 显式独立预设缺少当前变体时回退 GitHub,不继承组合预设。
+        var pinnedToGithub = diffPreset != null && DiffThemePresets.GetDiffColors(variant, diffPreset) == null;
+
+        var theme = pinnedToGithub ? null : DiffThemePresets.GetDiffColors(variant, themePreset);
+
+        var diff = pinnedToGithub ? github : DiffThemePresets.GetDiffColors(variant, diffPreset);
+
+        var host = palette?.GetColors(variant);
+
+        // 逐槽位优先级:宿主 → 独立预设 → 组合预设 → GitHub。
+        IBrush Chain(Func<DiffPaletteColors, IBrush?> fine)
         {
-            AddNumber             = colors.AddLineBackground ?? baseSet.AddNumber,
-            AddContent            = colors.AddLineBackground ?? baseSet.AddContent,
-            DeleteNumber          = colors.DeleteLineBackground ?? baseSet.DeleteNumber,
-            DeleteContent         = colors.DeleteLineBackground ?? baseSet.DeleteContent,
-            ContextNumber         = colors.ContextBackground ?? baseSet.ContextNumber,
-            ContextContent        = colors.ContextBackground ?? baseSet.ContextContent,
-            MultiSelectOverlay    = colors.SelectionHighlight ?? baseSet.MultiSelectOverlay,
-            MultiSelectBorder     = colors.SelectionEdge ?? baseSet.MultiSelectBorder,
-            CommentOverlay        = colors.CommentLineHighlight ?? baseSet.CommentOverlay,
-            CommentCardBackground = colors.CommentCardBackground ?? baseSet.CommentCardBackground,
-            CommentCardBorder     = colors.CommentCardBorder ?? baseSet.CommentCardBorder
+            if (host != null)
+            {
+                var hostValue = fine(host);
+
+                if (hostValue != null) return hostValue;
+            }
+
+            var value = diff != null ? fine(diff) : null;
+
+            value ??= theme != null ? fine(theme) : null;
+
+            return value ?? fine(github) ?? github.ContextContentBackground!;
+        }
+
+        // 宿主细槽位优先于行级槽位。
+        IBrush ChainHostCoarse(Func<DiffPaletteColors, IBrush?> fine, Func<DiffPaletteColors, IBrush?> coarse)
+        {
+            if (host == null) return Chain(fine);
+            var hostValue = fine(host) ?? coarse(host);
+
+            return hostValue ?? Chain(fine);
+        }
+
+        // GitHub 未定义画布和文本选区颜色,可保持 null。
+        IBrush? ChainOptional(Func<DiffPaletteColors, IBrush?> slot)
+        {
+            var value = host != null ? slot(host) : null;
+
+            value ??= diff != null ? slot(diff) : null;
+
+            return value ?? (theme != null ? slot(theme) : null);
+        }
+
+        var overlay = Chain(c => c.SelectionHighlight);
+
+        // 选中背景按细槽位再通用覆盖层解析;宿主优先于预设,GitHub 保留共享覆盖层实例。
+        IBrush Selected(Func<DiffPaletteColors, IBrush?> fine)
+        {
+            if (host != null)
+            {
+                var hostValue = fine(host) ?? host.SelectionHighlight;
+
+                if (hostValue != null) return hostValue;
+            }
+
+            var value = diff != null ? fine(diff) ?? diff.SelectionHighlight : null;
+
+            value ??= theme != null ? fine(theme) ?? theme.SelectionHighlight : null;
+
+            return value ?? overlay;
+        }
+
+        return new DiffBrushSet
+        {
+            NumberForeground = Chain(c => c.NumberForeground),
+            AddNumber        = ChainHostCoarse(c => c.AddNumberBackground, c => c.AddLineBackground),
+            AddContent       = ChainHostCoarse(c => c.AddContentBackground, c => c.AddLineBackground),
+            DeleteNumber     = ChainHostCoarse(c => c.DeleteNumberBackground, c => c.DeleteLineBackground),
+            DeleteContent    = ChainHostCoarse(c => c.DeleteContentBackground, c => c.DeleteLineBackground),
+            ContextNumber    = ChainHostCoarse(c => c.ContextNumberBackground, c => c.ContextBackground),
+            ContextContent   = ChainHostCoarse(c => c.ContextContentBackground, c => c.ContextBackground),
+            ExpandContent    = Chain(c => c.ExpandBackground),
+            // 空侧跟随预设的上下文/展开配色,不应用宿主行级覆盖。
+            EmptyNumber = diff?.ContextNumberBackground ??
+                          theme?.ContextNumberBackground ?? github.ContextNumberBackground!,
+            EmptyContent            = diff?.ExpandBackground ?? theme?.ExpandBackground ?? github.ExpandBackground!,
+            HunkNumber              = Chain(c => c.HunkNumberBackground),
+            HunkContent             = Chain(c => c.HunkBackground),
+            HunkSide                = Chain(c => c.HunkBackground),
+            HunkForeground          = Chain(c => c.HunkForeground),
+            AddContentHighlight     = Chain(c => c.WordAddHighlight),
+            DeleteContentHighlight  = Chain(c => c.WordDeleteHighlight),
+            Splitter                = Chain(c => c.Splitter),
+            MultiSelectOverlay      = overlay,
+            MultiSelectBorder       = Chain(c => c.SelectionEdge),
+            CommentOverlay          = Chain(c => c.CommentLineHighlight),
+            CommentCardBackground   = Chain(c => c.CommentCardBackground),
+            CommentCardBorder       = Chain(c => c.CommentCardBorder),
+            SelectedAdd             = Selected(c => c.SelectedAddBackground),
+            SelectedDelete          = Selected(c => c.SelectedDeleteBackground),
+            SelectedContext         = Selected(c => c.SelectedContextBackground),
+            CanvasBackground        = ChainOptional(c => c.CanvasBackground),
+            TextSelectionBackground = ChainOptional(c => c.TextSelectionBackground),
+            TextSelectionForeground = ChainOptional(c => c.TextSelectionForeground)
         };
-    }
-
-    private static IBrush Parse(string hex)
-    {
-        return new SolidColorBrush(Color.Parse(hex));
-    }
-
-    private static IBrush WithOpacity(IBrush brush, double opacity)
-    {
-        var solid = (SolidColorBrush)brush;
-        return new SolidColorBrush(solid.Color, opacity);
     }
 }
